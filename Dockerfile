@@ -1,5 +1,5 @@
 # ── Build stage ───────────────────────────────────────────
-sed -i 's/golang:1.24-alpine/golang:1.25-alpine/' Dockerfile
+FROM golang:1.25-alpine AS builder
 
 RUN apk add --no-cache git ca-certificates
 
