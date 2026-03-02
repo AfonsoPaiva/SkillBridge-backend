@@ -33,6 +33,6 @@ COPY --from=builder /app/admin-dashboard.html .
 # Create uploads directory
 RUN mkdir -p /app/uploads
 
-EXPOSE 8080
+EXPOSE 8080 
 
 CMD ["./server"]
