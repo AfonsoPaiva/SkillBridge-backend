@@ -23,7 +23,17 @@ var firebaseAuth *auth.Client
 
 // InitFirebase inicializa o cliente Firebase Auth
 func InitFirebase() {
-	opt := option.WithCredentialsFile(config.AppConfig.FirebaseCredentialsPath)
+	var opt option.ClientOption
+
+	// Try to load from env var (Cloud Run with secrets)
+	credsContent := os.Getenv("FIREBASE_CREDENTIALS_CONTENT")
+	if credsContent != "" {
+		opt = option.WithCredentialsJSON([]byte(credsContent))
+	} else {
+		// Fall back to file path (local development)
+		opt = option.WithCredentialsFile(config.AppConfig.FirebaseCredentialsPath)
+	}
+
 	app, err := firebase.NewApp(context.Background(), nil, opt)
 	if err != nil {
 		log.Fatalf("Erro ao inicializar Firebase: %v", err)
@@ -80,9 +90,19 @@ func DeleteUser(uid string) error {
 func GeneratePasswordResetLink(email string) (string, error) {
 	ctx := context.Background()
 
-	credBytes, err := os.ReadFile(config.AppConfig.FirebaseCredentialsPath)
-	if err != nil {
-		return "", fmt.Errorf("erro ao ler credenciais Firebase: %w", err)
+	var credBytes []byte
+	var err error
+
+	// Try to load from env var (Cloud Run with secrets)
+	credsContent := os.Getenv("FIREBASE_CREDENTIALS_CONTENT")
+	if credsContent != "" {
+		credBytes = []byte(credsContent)
+	} else {
+		// Fall back to file path (local development)
+		credBytes, err = os.ReadFile(config.AppConfig.FirebaseCredentialsPath)
+		if err != nil {
+			return "", fmt.Errorf("erro ao ler credenciais Firebase: %w", err)
+		}
 	}
 
 	creds, err := google.CredentialsFromJSON(ctx, credBytes,
