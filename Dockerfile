@@ -12,9 +12,6 @@ RUN go mod download
 # Copy source
 COPY . .
 
-# Ensure docs package is available and tidy
-RUN go mod tidy
-
 # Build static binary
 RUN CGO_ENABLED=0 GOOS=linux go build -o server ./cmd/server
 

@@ -1,14 +1,4 @@
 // Package main SkillBridge API
-//
-// @title           SkillBridge API
-// @version         1.0
-// @description     API para a plataforma SkillBridge — liga estudantes e projetos.
-// @host            localhost:8080
-// @BasePath        /api
-//
-// @securityDefinitions.apikey BearerAuth
-// @in header
-// @name Authorization
 package main
 
 import (
@@ -20,7 +10,6 @@ import (
 	"github.com/paiva/SkillBridge/Backend/internal/routes"
 
 	"github.com/gin-gonic/gin"
-	_ "github.com/paiva/SkillBridge/Backend/docs" 
 )
 
 func main() {
