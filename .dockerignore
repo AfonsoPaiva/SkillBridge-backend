@@ -1,0 +1,11 @@
+.env
+.env.*
+*.exe
+*.test
+skillbridge-server
+uploads/
+docs/
+.git/
+.gitignore
+README.md
+*.md

@@ -1,0 +1,26 @@
+# Environment & secrets
+.env
+.env.*
+!.env.example
+
+# Binary
+skillbridge-server
+*.exe
+
+# Uploads (user-generated content)
+uploads/avatars/*
+uploads/projects/*
+!uploads/.gitkeep
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Firebase credentials (sensitive)
+config/firebase-credentials.json

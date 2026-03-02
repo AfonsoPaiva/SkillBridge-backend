@@ -1,0 +1,805 @@
+package handlers
+
+import (
+	"encoding/base64"
+	"fmt"
+	"net/http"
+
+	"gorm.io/gorm"
+	"github.com/gin-gonic/gin"
+	"github.com/paiva/SkillBridge/Backend/config"
+	"github.com/paiva/SkillBridge/Backend/internal/database"
+	"github.com/paiva/SkillBridge/Backend/internal/models"
+)
+
+// ensureUniqueSlug checks if a slug is unique and appends a counter if needed.
+// excludeID allows updating a project without conflicting with itself.
+func ensureUniqueSlug(baseSlug string, excludeID uint) string {
+	slug := baseSlug
+	counter := 1
+	
+	for {
+		var count int64
+		query := database.DB.Model(&models.Project{}).Where("slug = ?", slug)
+		if excludeID != 0 {
+			query = query.Where("id != ?", excludeID)
+		}
+		query.Count(&count)
+		
+		if count == 0 {
+			return slug
+		}
+		
+		slug = fmt.Sprintf("%s-%d", baseSlug, counter)
+		counter++
+	}
+}
+
+// CreateProject - Cria um novo projeto
+//
+// @Summary      Criar projeto
+// @Description  Cria um novo projeto
+// @Tags         projects
+// @Accept       json
+// @Produce      json
+// @Security     BearerAuth
+// @Param        input  body  object{title=string,description=string}  true  "Dados do projeto"
+// @Success      201  {object}  map[string]interface{}
+// @Failure      400  {object}  map[string]string
+// @Failure      404  {object}  map[string]string
+// @Router       /projects [post]
+func CreateProject(c *gin.Context) {
+	firebaseUID := c.GetString("firebase_uid")
+
+	var owner models.User
+	if err := database.DB.Where("firebase_uid = ?", firebaseUID).First(&owner).Error; err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "Utilizador não encontrado."})
+		return
+	}
+
+	var input struct {
+		Title       string `json:"title" binding:"required"`
+		Description string `json:"description"`
+		ImageURL    string `json:"image_url"`
+		Status      string `json:"status"`
+		Roles       []struct {
+			Title       string `json:"title"`
+			SkillName   string `json:"skill_name"`
+			Description string `json:"description"`
+			Spots       int    `json:"spots"`
+		} `json:"roles"`
+	}
+
+	if err := c.ShouldBindJSON(&input); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	status := input.Status
+	if status == "" {
+		status = "open"
+	}
+
+	// Generate unique slug
+	slug := models.GenerateSlug(input.Title)
+	slug = ensureUniqueSlug(slug, 0)
+
+	project := models.Project{
+		OwnerID:     owner.ID,
+		Title:       input.Title,
+		Slug:        slug,
+		Description: input.Description,
+		ImageURL:    input.ImageURL,
+		Status:      status,
+	}
+
+	database.DB.Create(&project)
+
+	// Save inline roles
+	for _, r := range input.Roles {
+		if r.Title == "" && r.SkillName == "" {
+			continue
+		}
+		spots := r.Spots
+		if spots < 1 {
+			spots = 1
+		}
+		role := models.ProjectRole{
+			ProjectID:   project.ID,
+			Title:       r.Title,
+			SkillName:   r.SkillName,
+			Description: r.Description,
+			Spots:       spots,
+		}
+		database.DB.Create(&role)
+	}
+
+	// Registar o criador como primeiro proprietário
+	projectOwner := models.ProjectOwner{
+		ProjectID: project.ID,
+		UserID:    owner.ID,
+	}
+	database.DB.Create(&projectOwner)
+
+	// Return project with roles preloaded
+	database.DB.Preload("Roles").First(&project, project.ID)
+	c.JSON(http.StatusCreated, gin.H{"message": "Projeto criado.", "project": project})
+}
+
+// GetProjects - Lista projetos com filtros opcionais
+//
+// @Summary      Listar projetos
+// @Description  Lista projetos — filtra por estado e/ou skill_id
+// @Tags         projects
+// @Produce      json
+// @Param        status    query  string  false  "Estado: open (default) / in_progress / completed / all"
+// @Param        skill_id  query  int     false  "Filtrar projetos que procuram esta skill"
+// @Success      200  {array}   models.Project
+// @Router       /projects [get]
+func GetProjects(c *gin.Context) {
+	status := c.DefaultQuery("status", "open")
+	skillID := c.Query("skill_id")
+
+	query := database.DB.Preload("Owner").Preload("Roles")
+	if status != "all" {
+		query = query.Where("status = ?", status)
+	}
+	if skillID != "" {
+		query = query.Where("id IN (SELECT project_id FROM project_roles WHERE skill_id = ? AND filled = false)", skillID)
+	}
+
+	var projects []models.Project
+	query.Order("created_at DESC").Find(&projects)
+	c.JSON(http.StatusOK, projects)
+}
+
+// GetProjectByID - Detalhes de um projeto
+//
+// @Summary      Obter projeto por ID ou slug
+// @Description  Devolve os detalhes de um projeto (busca por slug ou ID)
+// @Tags         projects
+// @Produce      json
+// @Param        id   path      string  true  "Slug ou ID do projeto"
+// @Success      200  {object}  models.Project
+// @Failure      404  {object}  map[string]string
+// @Router       /projects/{id} [get]
+func GetProjectByID(c *gin.Context) {
+	var project models.Project
+	param := c.Param("id")
+	
+	// Try to find by slug first, fallback to ID
+	err := database.DB.Preload("Owner").Preload("Roles").Preload("Members.User").Where("slug = ?", param).First(&project).Error
+	if err != nil {
+		// Try by ID as fallback
+		err = database.DB.Preload("Owner").Preload("Roles").Preload("Members.User").First(&project, param).Error
+		if err != nil {
+			c.JSON(http.StatusNotFound, gin.H{"error": "Projeto não encontrado."})
+			return
+		}
+	}
+	c.JSON(http.StatusOK, project)
+}
+
+// GetProjectMembers - Lista os membros aceites de um projeto (público)
+//
+// @Summary      Listar membros do projeto
+// @Description  Devolve os membros com candidatura aceite de um projeto
+// @Tags         projects
+// @Produce      json
+// @Param        id  path  int  true  "ID do projeto"
+// @Success      200  {array}   models.ProjectMember
+// @Failure      404  {object}  map[string]string
+// @Router       /projects/{id}/members [get]
+func GetProjectMembers(c *gin.Context) {
+	var project models.Project
+	param := c.Param("id")
+	
+	// Try to find by slug first, fallback to ID
+	err := database.DB.Where("slug = ?", param).First(&project).Error
+	if err != nil {
+		// Try by ID as fallback
+		err = database.DB.First(&project, param).Error
+		if err != nil {
+			c.JSON(http.StatusNotFound, gin.H{"error": "Projeto não encontrado."})
+			return
+		}
+	}
+	var members []models.ProjectMember
+	database.DB.Preload("User").Where("project_id = ? AND status = ?", project.ID, "accepted").Find(&members)
+	// Omit emails from public response
+	for i := range members {
+		members[i].User.Email = ""
+	}
+	c.JSON(http.StatusOK, members)
+}
+
+// JoinProject - Utilizador candidata-se a um projeto
+//
+// @Summary      Candidatar a projeto
+// @Description  Envia uma candidatura (estado pending) para participar num projeto
+// @Tags         projects
+// @Accept       json
+// @Produce      json
+// @Security     BearerAuth
+// @Param        id     path  int                     true  "ID do projeto"
+// @Param        input  body  object{role_id=integer}  false "Role pretendida"
+// @Success      201  {object}  map[string]string
+// @Failure      404  {object}  map[string]string
+// @Failure      409  {object}  map[string]string
+// @Router       /projects/{id}/join [post]
+func JoinProject(c *gin.Context) {
+	firebaseUID := c.GetString("firebase_uid")
+
+	var user models.User
+	if err := database.DB.Where("firebase_uid = ?", firebaseUID).First(&user).Error; err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "Utilizador não encontrado."})
+		return
+	}
+
+	var project models.Project
+	param := c.Param("id")
+	
+	// Try to find by slug first, fallback to ID
+	err := database.DB.Preload("Owners").Where("slug = ?", param).First(&project).Error
+	if err != nil {
+		// Try by ID as fallback
+		err = database.DB.Preload("Owners").First(&project, param).Error
+		if err != nil {
+			c.JSON(http.StatusNotFound, gin.H{"error": "Projeto não encontrado."})
+			return
+		}
+	}
+
+	// Block owners (main + co-owners) from applying to their own project
+	if project.OwnerID == user.ID {
+		c.JSON(http.StatusForbidden, gin.H{"error": "Não podes candidatar-te a um projeto que criaste."})
+		return
+	}
+	for _, o := range project.Owners {
+		if o.UserID == user.ID {
+			c.JSON(http.StatusForbidden, gin.H{"error": "Não podes candidatar-te a um projeto em que és co-proprietário."})
+			return
+		}
+	}
+
+	// Verificar candidatura duplicada
+	var existing models.ProjectMember
+	if database.DB.Where("project_id = ? AND user_id = ?", project.ID, user.ID).First(&existing).Error == nil {
+		c.JSON(http.StatusConflict, gin.H{"error": "Já tens uma candidatura neste projeto.", "status": existing.Status})
+		return
+	}
+
+	var input struct {
+		RoleID uint `json:"role_id"`
+	}
+	c.ShouldBindJSON(&input)
+
+	member := models.ProjectMember{
+		ProjectID: project.ID,
+		UserID:    user.ID,
+		RoleID:    input.RoleID,
+		Status:    "pending",
+	}
+	database.DB.Create(&member)
+
+	// Create (or reuse) conversation between applicant and project owner,
+	// then post a system message so the owner can accept/reject in-chat.
+	var projectOwner models.User
+	if database.DB.First(&projectOwner, project.OwnerID).Error == nil && projectOwner.ID != user.ID {
+		userAID, userBID := user.ID, projectOwner.ID
+		if userAID > userBID {
+			userAID, userBID = userBID, userAID
+		}
+		var conv models.Conversation
+		if database.DB.Where("user_a_id = ? AND user_b_id = ?", userAID, userBID).First(&conv).Error != nil {
+			conv = models.Conversation{UserAID: userAID, UserBID: userBID}
+			database.DB.Create(&conv)
+		}
+
+		// Build the notification text
+		roleName := ""
+		if input.RoleID != 0 {
+			var role models.ProjectRole
+			if database.DB.First(&role, input.RoleID).Error == nil {
+				roleName = role.Title
+			}
+		}
+		text := fmt.Sprintf("Olá! Quero juntar-me ao projeto \"%s\"", project.Title)
+		if roleName != "" {
+			text += fmt.Sprintf(" para a função \"%s\"", roleName)
+		}
+		text += ". Podes aceitar ou rejeitar a minha candidatura diretamente aqui."
+		encoded := base64.StdEncoding.EncodeToString([]byte(text))
+		memberID := member.ID
+		database.DB.Create(&models.Message{
+			ConversationID:   conv.ID,
+			SenderID:         user.ID,
+			EncryptedContent: encoded,
+			EphemeralKey:     "plain",
+			IsSystem:         true,
+			MessageType:      "application",
+			MetaProjectID:    &project.ID,
+			MetaMemberID:     &memberID,
+			MetaStatus:       "pending",
+		})
+	}
+
+	c.JSON(http.StatusCreated, gin.H{"message": "Candidatura enviada. Aguarda aprovação do proprietário."})
+}
+
+// AddProjectOwner - Adiciona um co-proprietário ao projeto
+//
+// @Summary      Adicionar co-proprietário
+// @Description  Um proprietário existente pode adicionar outro utilizador como co-proprietário
+// @Tags         projects
+// @Accept       json
+// @Produce      json
+// @Security     BearerAuth
+// @Param        id     path  int                      true  "ID do projeto"
+// @Param        input  body  object{user_id=integer}  true  "ID do utilizador a adicionar"
+// @Success      201  {object}  map[string]string
+// @Failure      403  {object}  map[string]string
+// @Failure      404  {object}  map[string]string
+// @Failure      409  {object}  map[string]string
+// @Router       /projects/{id}/owners [post]
+func AddProjectOwner(c *gin.Context) {
+	project, ok := ownerGuard(c)
+	if !ok {
+		return
+	}
+
+	var input struct {
+		UserID uint `json:"user_id" binding:"required"`
+	}
+	if err := c.ShouldBindJSON(&input); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	var newOwner models.User
+	if err := database.DB.First(&newOwner, input.UserID).Error; err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "Utilizador não encontrado."})
+		return
+	}
+
+	var existing models.ProjectOwner
+	if database.DB.Where("project_id = ? AND user_id = ?", project.ID, input.UserID).First(&existing).Error == nil {
+		c.JSON(http.StatusConflict, gin.H{"error": "Utilizador já é proprietário deste projeto."})
+		return
+	}
+
+	database.DB.Create(&models.ProjectOwner{ProjectID: project.ID, UserID: input.UserID})
+	c.JSON(http.StatusCreated, gin.H{"message": "Co-proprietário adicionado com sucesso."})
+}
+
+// UpdateProject - Atualiza um projeto (owner)
+//
+// @Summary      Atualizar projeto
+// @Description  Atualiza título ou descrição — apenas proprietários
+// @Tags         projects
+// @Accept       json
+// @Produce      json
+// @Security     BearerAuth
+// @Param        id     path  int                                         true  "ID do projeto"
+// @Param        input  body  object{title=string,description=string}  false "Campos a atualizar"
+// @Success      200  {object}  map[string]interface{}
+// @Failure      403  {object}  map[string]string
+// @Failure      404  {object}  map[string]string
+// @Router       /projects/{id} [put]
+func UpdateProject(c *gin.Context) {
+	project, ok := ownerGuard(c)
+	if !ok {
+		return
+	}
+	var input struct {
+		Title       string `json:"title"`
+		Description string `json:"description"`
+		ImageURL    string `json:"image_url"`
+		Status      string `json:"status"`
+		Roles       []struct {
+			Title       string `json:"title"`
+			SkillName   string `json:"skill_name"`
+			Description string `json:"description"`
+			Spots       int    `json:"spots"`
+		} `json:"roles"`
+	}
+	if err := c.ShouldBindJSON(&input); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+	if input.Title != "" {
+		project.Title = input.Title
+		// Regenerate slug when title changes
+		newSlug := models.GenerateSlug(input.Title)
+		project.Slug = ensureUniqueSlug(newSlug, project.ID)
+	}
+	if input.Description != "" {
+		project.Description = input.Description
+	}
+	if input.ImageURL != "" {
+		project.ImageURL = input.ImageURL
+	}
+	if input.Status != "" {
+		project.Status = input.Status
+	}
+	database.DB.Save(&project)
+
+	// Sync roles: delete all existing then re-insert
+	if input.Roles != nil {
+		database.DB.Where("project_id = ?", project.ID).Delete(&models.ProjectRole{})
+		for _, r := range input.Roles {
+			if r.Title == "" && r.SkillName == "" {
+				continue
+			}
+			spots := r.Spots
+			if spots < 1 {
+				spots = 1
+			}
+			role := models.ProjectRole{
+				ProjectID:   project.ID,
+				Title:       r.Title,
+				SkillName:   r.SkillName,
+				Description: r.Description,
+				Spots:       spots,
+			}
+			database.DB.Create(&role)
+		}
+	}
+
+	database.DB.Preload("Roles").First(&project, project.ID)
+	c.JSON(http.StatusOK, gin.H{"message": "Projeto atualizado.", "project": project})
+}
+
+// DeleteProject - Elimina um projeto (owner)
+//
+// @Summary      Eliminar projeto
+// @Description  Remove permanentemente um projeto — apenas proprietários
+// @Tags         projects
+// @Produce      json
+// @Security     BearerAuth
+// @Param        id  path  int  true  "ID do projeto"
+// @Success      200  {object}  map[string]string
+// @Failure      403  {object}  map[string]string
+// @Failure      404  {object}  map[string]string
+// @Router       /projects/{id} [delete]
+func DeleteProject(c *gin.Context) {
+	project, ok := ownerGuard(c)
+	if !ok {
+		return
+	}
+	// Delete child records first to avoid FK constraint violations
+	database.DB.Where("project_id = ?", project.ID).Delete(&models.ProjectOwner{})
+	database.DB.Where("project_id = ?", project.ID).Delete(&models.ProjectRole{})
+	database.DB.Where("project_id = ?", project.ID).Delete(&models.ProjectMember{})
+	database.DB.Where("project_id = ?", project.ID).Delete(&models.Review{})
+	if err := database.DB.Delete(&project).Error; err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Erro ao eliminar projeto."})
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"message": "Projeto eliminado."})
+}
+
+// UpdateProjectStatus - Altera o estado de um projeto (owner)
+//
+// @Summary      Alterar estado do projeto
+// @Description  Muda o estado: open / in_progress / completed — apenas proprietários
+// @Tags         projects
+// @Accept       json
+// @Produce      json
+// @Security     BearerAuth
+// @Param        id     path  int                       true  "ID do projeto"
+// @Param        input  body  object{status=string}  true  "Novo estado"
+// @Success      200  {object}  map[string]interface{}
+// @Failure      400  {object}  map[string]string
+// @Failure      403  {object}  map[string]string
+// @Router       /projects/{id}/status [put]
+func UpdateProjectStatus(c *gin.Context) {
+	project, ok := ownerGuard(c)
+	if !ok {
+		return
+	}
+	var input struct {
+		Status string `json:"status" binding:"required"`
+	}
+	if err := c.ShouldBindJSON(&input); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+	allowed := map[string]bool{"open": true, "in_progress": true, "completed": true}
+	if !allowed[input.Status] {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Estado inválido. Use: open, in_progress ou completed."})
+		return
+	}
+	database.DB.Model(&project).Update("status", input.Status)
+	c.JSON(http.StatusOK, gin.H{"message": "Estado atualizado.", "status": input.Status})
+}
+
+// CreateProjectRole - Adiciona uma role ao projeto (owner)
+//
+// @Summary      Criar role no projeto
+// @Description  Define um perfil que o projeto procura — apenas proprietários
+// @Tags         projects
+// @Accept       json
+// @Produce      json
+// @Security     BearerAuth
+// @Param        id     path  int                                               true  "ID do projeto"
+// @Param        input  body  object{skill_id=integer,description=string}  true  "Dados da role"
+// @Success      201  {object}  models.ProjectRole
+// @Failure      400  {object}  map[string]string
+// @Failure      403  {object}  map[string]string
+// @Router       /projects/{id}/roles [post]
+func CreateProjectRole(c *gin.Context) {
+	project, ok := ownerGuard(c)
+	if !ok {
+		return
+	}
+	var input struct {
+		Title       string `json:"title"`
+		SkillName   string `json:"skill_name" binding:"required"`
+		Description string `json:"description"`
+		Spots       int    `json:"spots"`
+	}
+	if err := c.ShouldBindJSON(&input); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+	// Validate against predefined skill list
+	valid := false
+	for _, s := range config.Skills {
+		if s == input.SkillName {
+			valid = true
+			break
+		}
+	}
+	if !valid {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Competência não reconhecida."})
+		return
+	}
+	spots := input.Spots
+	if spots <= 0 {
+		spots = 1
+	}
+	role := models.ProjectRole{
+		ProjectID:   project.ID,
+		Title:       input.Title,
+		SkillName:   input.SkillName,
+		Description: input.Description,
+		Spots:       spots,
+	}
+	database.DB.Create(&role)
+	c.JSON(http.StatusCreated, role)
+}
+
+// DeleteProjectRole - Remove uma role do projeto (owner)
+//
+// @Summary      Remover role do projeto
+// @Tags         projects
+// @Produce      json
+// @Security     BearerAuth
+// @Param        id       path  int  true  "ID do projeto"
+// @Param        role_id  path  int  true  "ID da role"
+// @Success      200  {object}  map[string]string
+// @Failure      403  {object}  map[string]string
+// @Failure      404  {object}  map[string]string
+// @Router       /projects/{id}/roles/{role_id} [delete]
+func DeleteProjectRole(c *gin.Context) {
+	project, ok := ownerGuard(c)
+	if !ok {
+		return
+	}
+	result := database.DB.Where("id = ? AND project_id = ?", c.Param("role_id"), project.ID).Delete(&models.ProjectRole{})
+	if result.RowsAffected == 0 {
+		c.JSON(http.StatusNotFound, gin.H{"error": "Role não encontrada."})
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"message": "Role removida."})
+}
+
+// GetApplications - Lista candidaturas de um projeto (owner)
+//
+// @Summary      Listar candidaturas
+// @Description  Devolve as candidaturas do projeto filtráveis por estado — apenas proprietários
+// @Tags         projects
+// @Produce      json
+// @Security     BearerAuth
+// @Param        id      path   int     true   "ID do projeto"
+// @Param        status  query  string  false  "pending (default) / accepted / rejected / all"
+// @Success      200  {array}   models.ProjectMember
+// @Failure      403  {object}  map[string]string
+// @Failure      404  {object}  map[string]string
+// @Router       /projects/{id}/applications [get]
+func GetApplications(c *gin.Context) {
+	project, ok := ownerGuard(c)
+	if !ok {
+		return
+	}
+	status := c.DefaultQuery("status", "pending")
+	query := database.DB.Preload("User").Where("project_id = ?", project.ID)
+	if status != "all" {
+		query = query.Where("status = ?", status)
+	}
+	var members []models.ProjectMember
+	query.Find(&members)
+	for i := range members {
+		members[i].User.Email = ""
+	}
+	c.JSON(http.StatusOK, members)
+}
+
+// RespondApplication - Aceita ou rejeita uma candidatura (owner)
+//
+// @Summary      Responder a candidatura
+// @Description  Aceita ou rejeita a candidatura de um utilizador — apenas proprietários
+// @Tags         projects
+// @Accept       json
+// @Produce      json
+// @Security     BearerAuth
+// @Param        id         path  int                       true  "ID do projeto"
+// @Param        member_id  path  int                       true  "ID da candidatura"
+// @Param        input      body  object{action=string}  true  "accept ou reject"
+// @Success      200  {object}  map[string]string
+// @Failure      400  {object}  map[string]string
+// @Failure      403  {object}  map[string]string
+// @Failure      404  {object}  map[string]string
+// @Router       /projects/{id}/applications/{member_id} [put]
+func RespondApplication(c *gin.Context) {
+	project, ok := ownerGuard(c)
+	if !ok {
+		return
+	}
+	var input struct {
+		Action string `json:"action" binding:"required"`
+	}
+	if err := c.ShouldBindJSON(&input); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+	if input.Action != "accept" && input.Action != "reject" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Ação inválida. Use 'accept' ou 'reject'."})
+		return
+	}
+	var member models.ProjectMember
+	if err := database.DB.Where("id = ? AND project_id = ?", c.Param("member_id"), project.ID).First(&member).Error; err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "Candidatura não encontrada."})
+		return
+	}
+	
+	// Não permitir mudanças se já foi aceite
+	if member.Status == "accepted" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Esta candidatura já foi aceite e não pode ser alterada."})
+		return
+	}
+	
+	newStatus := "accepted"
+	if input.Action == "reject" {
+		newStatus = "rejected"
+	}
+	
+	database.DB.Model(&member).Update("status", newStatus)
+	
+	// Atualizar o status na mensagem de candidatura
+	database.DB.Model(&models.Message{}).
+		Where("meta_member_id = ? AND message_type = ?", member.ID, "application").
+		Update("meta_status", newStatus)
+	
+	if newStatus == "accepted" && member.RoleID != 0 {
+		database.DB.Model(&models.ProjectRole{}).Where("id = ? AND filled < spots", member.RoleID).UpdateColumn("filled", gorm.Expr("filled + 1"))
+	} else if newStatus == "rejected" && member.RoleID != 0 {
+		// Se estava accepted antes e agora rejeitou, decrementa filled
+		if member.Status == "accepted" {
+			database.DB.Model(&models.ProjectRole{}).Where("id = ? AND filled > 0", member.RoleID).UpdateColumn("filled", gorm.Expr("filled - 1"))
+		}
+	}
+	
+	// Verificar se o projeto ficou cheio
+	checkAndUpdateProjectFullStatus(project.ID)
+	
+	c.JSON(http.StatusOK, gin.H{"message": "Candidatura " + newStatus + ".", "status": newStatus})
+}
+
+// ownerGuard carrega o projeto e verifica que o utilizador autenticado é proprietário.
+func ownerGuard(c *gin.Context) (models.Project, bool) {
+	firebaseUID := c.GetString("firebase_uid")
+	var user models.User
+	if err := database.DB.Where("firebase_uid = ?", firebaseUID).First(&user).Error; err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "Utilizador não encontrado."})
+		return models.Project{}, false
+	}
+	var project models.Project
+	param := c.Param("id")
+	
+	// Try to find by slug first, fallback to ID
+	err := database.DB.Preload("Owners").Where("slug = ?", param).First(&project).Error
+	if err != nil {
+		// Try by ID as fallback
+		err = database.DB.Preload("Owners").First(&project, param).Error
+		if err != nil {
+			c.JSON(http.StatusNotFound, gin.H{"error": "Projeto não encontrado."})
+			return models.Project{}, false
+		}
+	}
+	
+	for _, o := range project.Owners {
+		if o.UserID == user.ID {
+			return project, true
+		}
+	}
+	c.JSON(http.StatusForbidden, gin.H{"error": "Não tens permissão para gerir este projeto."})
+	return models.Project{}, false
+}
+
+// checkAndUpdateProjectFullStatus verifica se todas as vagas estão preenchidas e atualiza o status
+func checkAndUpdateProjectFullStatus(projectID uint) {
+	var roles []models.ProjectRole
+	database.DB.Where("project_id = ?", projectID).Find(&roles)
+	
+	if len(roles) == 0 {
+		return
+	}
+	
+	allFull := true
+	for _, role := range roles {
+		if role.Filled < role.Spots {
+			allFull = false
+			break
+		}
+	}
+	
+	var project models.Project
+	database.DB.First(&project, projectID)
+	
+	// Atualizar status para "full" se todas as vagas estão preenchidas e status é "open"
+	if allFull && project.Status == "open" {
+		database.DB.Model(&project).Update("status", "full")
+	} else if !allFull && project.Status == "full" {
+		// Voltar a "open" se havia vagas cheias mas agora há vagas livres
+		database.DB.Model(&project).Update("status", "open")
+	}
+}
+
+// RemoveProjectMember - Remove um membro do projeto (owner only)
+//
+// @Summary      Remover membro
+// @Description  Remove um membro aceite do projeto — apenas proprietários
+// @Tags         projects
+// @Accept       json
+// @Produce      json
+// @Security     BearerAuth
+// @Param        id         path  int  true  "ID do projeto"
+// @Param        member_id  path  int  true  "ID do membro"
+// @Success      200  {object}  map[string]string
+// @Failure      400  {object}  map[string]string
+// @Failure      403  {object}  map[string]string
+// @Failure      404  {object}  map[string]string
+// @Router       /projects/{id}/members/{member_id} [delete]
+func RemoveProjectMember(c *gin.Context) {
+	project, ok := ownerGuard(c)
+	if !ok {
+		return
+	}
+	
+	var member models.ProjectMember
+	if err := database.DB.Where("id = ? AND project_id = ?", c.Param("member_id"), project.ID).First(&member).Error; err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "Membro não encontrado."})
+		return
+	}
+	
+	// Não permitir remover se não está aceite
+	if member.Status != "accepted" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Apenas membros aceites podem ser removidos."})
+		return
+	}
+	
+	// Decrementar filled se o membro estava numa role
+	if member.RoleID != 0 {
+		database.DB.Model(&models.ProjectRole{}).Where("id = ? AND filled > 0", member.RoleID).UpdateColumn("filled", gorm.Expr("filled - 1"))
+	}
+	
+	// Remover o membro
+	database.DB.Delete(&member)
+	
+	// Verificar se o projeto ainda está cheio
+	checkAndUpdateProjectFullStatus(project.ID)
+	
+	c.JSON(http.StatusOK, gin.H{"message": "Membro removido com sucesso."})
+}

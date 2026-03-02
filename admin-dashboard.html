@@ -1,0 +1,625 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>SkillBridge Admin</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: sans-serif; background: #f1f5f9; color: #1e293b; }
+
+    /* Layout */
+    .layout { display: flex; min-height: 100vh; }
+    nav {
+      width: 220px; background: #1e293b; color: #94a3b8;
+      display: flex; flex-direction: column; padding: 24px 0; flex-shrink: 0;
+    }
+    nav h1 { color: #fff; font-size: 16px; padding: 0 20px 24px; border-bottom: 1px solid #334155; }
+    nav a {
+      display: block; padding: 12px 20px; cursor: pointer;
+      text-decoration: none; color: #94a3b8; font-size: 14px;
+    }
+    nav a:hover, nav a.active { background: #334155; color: #fff; }
+    main { flex: 1; padding: 32px; overflow-y: auto; }
+
+    /* Login */
+    #login-screen {
+      position: fixed; inset: 0; background: #f1f5f9;
+      display: flex; align-items: center; justify-content: center; z-index: 100;
+    }
+    .login-box {
+      background: #fff; border-radius: 12px; padding: 40px;
+      width: 360px; box-shadow: 0 4px 24px rgba(0,0,0,.1); text-align: center;
+    }
+    .login-box h2 { margin-bottom: 8px; color: #1e293b; }
+    .login-box p { color: #64748b; margin-bottom: 24px; font-size: 14px; }
+
+    /* Cards / Sections */
+    .page { display: none; }
+    .page.active { display: block; }
+    h2.page-title { font-size: 22px; margin-bottom: 20px; color: #0f172a; }
+
+    /* Stats row */
+    .stats { display: flex; gap: 16px; margin-bottom: 24px; flex-wrap: wrap; }
+    .stat-card {
+      background: #fff; border-radius: 10px; padding: 20px 28px;
+      flex: 1; min-width: 140px; box-shadow: 0 1px 4px rgba(0,0,0,.06);
+    }
+    .stat-card .num { font-size: 32px; font-weight: 700; color: #4f46e5; }
+    .stat-card .lbl { font-size: 13px; color: #64748b; margin-top: 4px; }
+
+    /* Table */
+    .card { background: #fff; border-radius: 10px; box-shadow: 0 1px 4px rgba(0,0,0,.06); overflow: hidden; }
+    table { width: 100%; border-collapse: collapse; font-size: 14px; }
+    th { background: #f8fafc; text-align: left; padding: 12px 16px; font-size: 12px; text-transform: uppercase; color: #64748b; border-bottom: 1px solid #e2e8f0; }
+    td { padding: 12px 16px; border-bottom: 1px solid #f1f5f9; vertical-align: middle; }
+    tr:last-child td { border-bottom: none; }
+    tr:hover td { background: #f8fafc; }
+
+    /* Buttons */
+    button, .btn {
+      border: none; border-radius: 6px; padding: 7px 14px;
+      font-size: 13px; cursor: pointer; font-weight: 500;
+    }
+    .btn-primary { background: #4f46e5; color: #fff; }
+    .btn-primary:hover { background: #4338ca; }
+    .btn-success { background: #22c55e; color: #fff; }
+    .btn-success:hover { background: #16a34a; }
+    .btn-danger  { background: #ef4444; color: #fff; }
+    .btn-danger:hover  { background: #dc2626; }
+    .btn-ghost { background: #e2e8f0; color: #475569; }
+    .btn-ghost:hover { background: #cbd5e1; }
+    .btn-google { background: #fff; border: 1px solid #d1d5db; color: #374151; padding: 12px 20px; font-size: 15px; display: flex; align-items: center; gap: 10px; margin: auto; }
+    .btn-google:hover { background: #f9fafb; }
+
+    /* Badge */
+    .badge { display: inline-block; padding: 2px 10px; border-radius: 999px; font-size: 11px; font-weight: 600; }
+    .badge-pending  { background: #fef3c7; color: #d97706; }
+    .badge-approved { background: #dcfce7; color: #16a34a; }
+    .badge-rejected { background: #fee2e2; color: #dc2626; }
+
+    /* Toolbar */
+    .toolbar { display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; flex-wrap: wrap; gap: 10px; }
+    .toolbar input, .toolbar select {
+      border: 1px solid #e2e8f0; border-radius: 6px; padding: 8px 12px; font-size: 13px; outline: none;
+    }
+    .toolbar input:focus, .toolbar select:focus { border-color: #4f46e5; }
+
+    /* Toast */
+    #toast {
+      position: fixed; bottom: 24px; left: 50%; transform: translateX(-50%);
+      background: #1e293b; color: #fff; padding: 12px 20px;
+      border-radius: 8px; font-size: 14px; opacity: 0;
+      transition: opacity .3s; pointer-events: none; z-index: 999;
+      min-width: 240px; text-align: center;
+    }
+    #toast.show { opacity: 1; }
+
+    /* Skills form */
+    .inline-form { display: flex; gap: 10px; margin-bottom: 16px; }
+    .inline-form input { flex: 1; border: 1px solid #e2e8f0; border-radius: 6px; padding: 8px 12px; font-size: 13px; }
+
+    /* Empty state */
+    .empty { text-align: center; padding: 48px; color: #94a3b8; }
+    .loading { text-align: center; padding: 48px; color: #94a3b8; }
+
+    /* Detail drawer */
+    #detail-overlay {
+      position: fixed; inset: 0; background: rgba(0,0,0,.35);
+      z-index: 200; display: none; align-items: stretch; justify-content: flex-end;
+    }
+    #detail-overlay.open { display: flex; }
+    #detail-panel {
+      background: #fff; width: 420px; max-width: 95vw;
+      height: 100%; overflow-y: auto; padding: 28px 28px 40px;
+      box-shadow: -4px 0 24px rgba(0,0,0,.15);
+      display: flex; flex-direction: column; gap: 0;
+    }
+    #detail-panel h3 { font-size: 17px; color: #0f172a; margin-bottom: 4px; }
+    #detail-panel .detail-sub { font-size: 12px; color: #94a3b8; margin-bottom: 20px; }
+    #detail-panel .close-btn {
+      position: absolute; top: 16px; right: 16px;
+      background: none; border: none; font-size: 22px; cursor: pointer; color: #64748b;
+    }
+    .detail-section { margin-bottom: 20px; }
+    .detail-section h4 {
+      font-size: 11px; text-transform: uppercase; color: #94a3b8;
+      letter-spacing: .06em; margin-bottom: 10px; padding-bottom: 6px;
+      border-bottom: 1px solid #f1f5f9;
+    }
+    .kv { display: flex; gap: 10px; padding: 6px 0; border-bottom: 1px solid #f8fafc; font-size: 13px; }
+    .kv:last-child { border-bottom: none; }
+    .kv .k { width: 130px; flex-shrink: 0; color: #64748b; font-weight: 500; }
+    .kv .v { color: #1e293b; word-break: break-all; }
+    .kv .v a { color: #4f46e5; text-decoration: none; }
+    .kv .v a:hover { text-decoration: underline; }
+    tr.clickable { cursor: pointer; }
+    tr.clickable:hover td { background: #eef2ff !important; }
+  </style>
+</head>
+<body>
+
+<!-- LOGIN -->
+<div id="login-screen">
+  <div class="login-box">
+    <h2>SkillBridge Admin</h2>
+    <p>Sign in with your Google account to access the admin panel.</p>
+    <button class="btn btn-google" onclick="signIn()">
+      <svg width="18" height="18" viewBox="0 0 48 48"><path fill="#EA4335" d="M24 9.5c3.54 0 6.71 1.22 9.21 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0 14.62 0 6.51 5.38 2.56 13.22l7.98 6.19C12.43 13.72 17.74 9.5 24 9.5z"/><path fill="#4285F4" d="M46.98 24.55c0-1.57-.15-3.09-.38-4.55H24v9.02h12.94c-.58 2.96-2.26 5.48-4.78 7.18l7.73 6c4.51-4.18 7.09-10.36 7.09-17.65z"/><path fill="#FBBC05" d="M10.53 28.59c-.48-1.45-.76-2.99-.76-4.59s.27-3.14.76-4.59l-7.98-6.19C.92 16.46 0 20.12 0 24c0 3.88.92 7.54 2.56 10.78l7.97-6.19z"/><path fill="#34A853" d="M24 48c6.48 0 11.93-2.13 15.89-5.81l-7.73-6c-2.18 1.48-4.97 2.29-8.16 2.29-6.26 0-11.57-4.22-13.47-9.91l-7.98 6.19C6.51 42.62 14.62 48 24 48z"/></svg>
+      Sign in with Google
+    </button>
+    <p id="login-error" style="color:#ef4444;margin-top:12px;font-size:13px;"></p>
+  </div>
+</div>
+
+<!-- MAIN APP -->
+<div class="layout" id="app" style="display:none">
+  <nav>
+    <h1>SkillBridge Admin</h1>
+    <a onclick="showPage('overview')" class="active" data-page="overview">Overview</a>
+    <a onclick="showPage('users')"    data-page="users">Users</a>
+    <a onclick="showPage('projects')" data-page="projects">Projects</a>
+    <a onclick="showPage('reviews')"  data-page="reviews">Reviews</a>
+    <a onclick="showPage('donations')"data-page="donations">Donations</a>
+    <a onclick="signOut()" style="margin-top:auto;color:#ef4444">Sign out</a>
+  </nav>
+  <main>
+
+    <!-- OVERVIEW -->
+    <div id="page-overview" class="page active">
+      <h2 class="page-title">Overview</h2>
+      <div class="stats" id="overview-stats">
+        <div class="stat-card"><div class="num" id="stat-users">—</div><div class="lbl">Users</div></div>
+        <div class="stat-card"><div class="num" id="stat-projects">—</div><div class="lbl">Projects</div></div>
+        <div class="stat-card"><div class="num" id="stat-reviews">—</div><div class="lbl">Pending Reviews</div></div>
+        <div class="stat-card"><div class="num" id="stat-donations">—</div><div class="lbl">Total Donations (€)</div></div>
+      </div>
+    </div>
+
+    <!-- USERS -->
+    <div id="page-users" class="page">
+      <h2 class="page-title">Users</h2>
+      <div class="toolbar">
+        <input id="user-search" placeholder="Search by name or email..." oninput="filterUsers()" style="width:280px">
+        <button class="btn btn-ghost" onclick="loadUsers()">Refresh</button>
+      </div>
+      <div class="card">
+        <table>
+          <thead><tr><th>ID</th><th>Name</th><th>Email</th><th>University</th><th>Skills</th><th>Joined</th><th></th></tr></thead>
+          <tbody id="users-body"><tr><td colspan="7" class="loading">Loading...</td></tr></tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- PROJECTS -->
+    <div id="page-projects" class="page">
+      <h2 class="page-title">Projects</h2>
+      <div class="toolbar">
+        <input id="project-search" placeholder="Search projects..." oninput="filterProjects()" style="width:280px">
+        <button class="btn btn-ghost" onclick="loadProjects()">Refresh</button>
+      </div>
+      <div class="card">
+        <table>
+          <thead><tr><th>ID</th><th>Title</th><th>Status</th><th>Owner ID</th><th>Created</th><th></th></tr></thead>
+          <tbody id="projects-body"><tr><td colspan="6" class="loading">Loading...</td></tr></tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- REVIEWS -->
+    <div id="page-reviews" class="page">
+      <h2 class="page-title">Reviews</h2>
+      <div class="toolbar">
+        <select id="review-filter" onchange="loadReviews()">
+          <option value="pending">Pending</option>
+          <option value="approved">Approved</option>
+          <option value="rejected">Rejected</option>
+          <option value="all">All</option>
+        </select>
+        <button class="btn btn-ghost" onclick="loadReviews()">Refresh</button>
+      </div>
+      <div class="card">
+        <table>
+          <thead><tr><th>ID</th><th>Reviewer</th><th>Reviewed</th><th>Rating</th><th>Comment</th><th>Status</th><th></th></tr></thead>
+          <tbody id="reviews-body"><tr><td colspan="7" class="loading">Loading...</td></tr></tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- DONATIONS -->
+    <div id="page-donations" class="page">
+      <h2 class="page-title">Donations</h2>
+      <div class="toolbar">
+        <span id="donations-total" style="font-size:14px;color:#64748b"></span>
+        <button class="btn btn-ghost" onclick="loadDonations()">Refresh</button>
+      </div>
+      <div class="card">
+        <table>
+          <thead><tr><th>ID</th><th>Email</th><th>Amount</th><th>Status</th><th>Date</th></tr></thead>
+          <tbody id="donations-body"><tr><td colspan="5" class="loading">Loading...</td></tr></tbody>
+        </table>
+      </div>
+    </div>
+
+  </main>
+</div>
+
+<div id="toast"></div>
+
+<!-- DETAIL DRAWER -->
+<div id="detail-overlay" onclick="closeDetail(event)">
+  <div id="detail-panel" style="position:relative">
+    <button class="close-btn" onclick="closeDetail(null)">&times;</button>
+    <h3 id="detail-title">Details</h3>
+    <div class="detail-sub" id="detail-sub"></div>
+    <div id="detail-content"></div>
+  </div>
+</div>
+
+<!-- CONFIG injected by Go server from .env — do not edit -->
+<script>
+  const CONFIG = {
+    BASE_URL:         "{{.BaseURL}}",
+    ADMIN_KEY:        "{{.AdminKey}}",
+    FIREBASE_API_KEY: "{{.FirebaseAPIKey}}"
+  };
+</script>
+
+<!-- Firebase SDK -->
+<script type="module">
+  import { initializeApp }                  from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
+  import { getAuth, signInWithPopup,
+           signOut as fbSignOut,
+           GoogleAuthProvider }             from "https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js";
+
+  const firebaseConfig = {
+    apiKey:            CONFIG.FIREBASE_API_KEY,
+    authDomain:        "{{.FirebaseAuthDomain}}",
+    projectId:         "{{.FirebaseProjectID}}",
+  };
+
+  const app      = initializeApp(firebaseConfig);
+  const auth     = getAuth(app);
+  const provider = new GoogleAuthProvider();
+
+  window._auth = auth;
+
+  window.signIn = async function() {
+    document.getElementById("login-error").textContent = "";
+    try {
+      await signInWithPopup(auth, provider);
+      document.getElementById("login-screen").style.display = "none";
+      document.getElementById("app").style.display = "flex";
+      loadOverview();
+    } catch(e) {
+      document.getElementById("login-error").textContent = e.message;
+    }
+  };
+
+  window.signOut = async function() {
+    await fbSignOut(auth);
+    location.reload();
+  };
+
+  // Get fresh token before every API call
+  window.getToken = async function() {
+    const user = auth.currentUser;
+    if (!user) throw new Error("Not signed in");
+    return user.getIdToken(); // auto-refreshes when expired
+  };
+</script>
+
+<script>
+  // ── DETAIL DRAWER ────────────────────────────────────────
+  function openDetail(title, sub, sections) {
+    document.getElementById("detail-title").textContent = title;
+    document.getElementById("detail-sub").textContent   = sub || "";
+    var html = "";
+    sections.forEach(function(sec) {
+      html += '<div class="detail-section"><h4>' + sec.heading + '</h4>';
+      sec.rows.forEach(function(row) {
+        var val = row.value;
+        if (val === null || val === undefined || val === "") val = "<span style='color:#cbd5e1'>—</span>";
+        else if (typeof val === "boolean") val = val ? "Yes" : "No";
+        else if (Array.isArray(val)) {
+          val = val.length
+            ? val.map(function(s) {
+                return '<span style="display:inline-block;background:#eff6ff;color:#3b82f6;border:1px solid #bfdbfe;border-radius:9999px;padding:1px 8px;font-size:11px;margin:1px 2px">' + s + '</span>';
+              }).join("")
+            : "<span style='color:#cbd5e1'>—</span>";
+        } else if (typeof val === "object") {
+          val = '<pre style="font-size:11px;white-space:pre-wrap;background:#f8fafc;padding:6px;border-radius:4px">' + JSON.stringify(val, null, 2) + '</pre>';
+        } else if (row.link) {
+          val = '<a href="' + val + '" target="_blank">' + val + '</a>';
+        } else {
+          val = String(val);
+        }
+        html += '<div class="kv"><span class="k">' + row.label + '</span><span class="v">' + val + '</span></div>';
+      });
+      html += '</div>';
+    });
+    document.getElementById("detail-content").innerHTML = html;
+    document.getElementById("detail-overlay").classList.add("open");
+  }
+  function closeDetail(e) {
+    if (e && e.target !== document.getElementById("detail-overlay")) return;
+    document.getElementById("detail-overlay").classList.remove("open");
+  }
+  document.addEventListener("keydown", function(e) { if (e.key === "Escape") document.getElementById("detail-overlay").classList.remove("open"); });
+
+  // ── API HELPER ──────────────────────────────────────────────
+  async function api(method, path, body) {
+    const token = await getToken();
+    const opts = {
+      method: method,
+      headers: {
+        "Content-Type":  "application/json",
+        "Authorization": "Bearer " + token,
+        "X-Admin-Key":   CONFIG.ADMIN_KEY
+      }
+    };
+    if (body) opts.body = JSON.stringify(body);
+    const res = await fetch(CONFIG.BASE_URL + path, opts);
+    if (!res.ok) {
+      const err = await res.json().catch(function() { return {}; });
+      throw new Error((err.error || res.statusText));
+    }
+    return res.json();
+  }
+
+  // ── TOAST ───────────────────────────────────────────────────
+  function toast(msg, isError) {
+    const el = document.getElementById("toast");
+    el.textContent = msg;
+    el.style.background = isError ? "#dc2626" : "#1e293b";
+    el.classList.add("show");
+    setTimeout(function() { el.classList.remove("show"); }, 3000);
+  }
+
+  // ── NAVIGATION ──────────────────────────────────────────────
+  function showPage(name) {
+    document.querySelectorAll(".page").forEach(function(p) { p.classList.remove("active"); });
+    document.querySelectorAll("nav a").forEach(function(a) { a.classList.remove("active"); });
+    document.getElementById("page-" + name).classList.add("active");
+    document.querySelector("[data-page=" + name + "]").classList.add("active");
+    if (name === "users")     loadUsers();
+    if (name === "projects")  loadProjects();
+    if (name === "reviews")   loadReviews();
+    if (name === "donations") loadDonations();
+    if (name === "overview")  loadOverview();
+  }
+
+  function fmt(dateStr) {
+    if (!dateStr) return "—";
+    return new Date(dateStr).toLocaleDateString();
+  }
+
+  // ── OVERVIEW ────────────────────────────────────────────────
+  async function loadOverview() {
+    try {
+      const [users, projects, reviews, donations] = await Promise.all([
+        api("GET", "/admin/users"),
+        api("GET", "/admin/projects"),
+        api("GET", "/admin/reviews?status=pending"),
+        api("GET", "/admin/donations")
+      ]);
+      document.getElementById("stat-users").textContent    = users.length;
+      document.getElementById("stat-projects").textContent = projects.length;
+      document.getElementById("stat-reviews").textContent  = reviews.length;
+      const total = donations
+        .filter(function(d) { return d.status === "succeeded"; })
+        .reduce(function(s, d) { return s + d.amount; }, 0);
+      document.getElementById("stat-donations").textContent = (total / 100).toFixed(2);
+    } catch(e) { toast(e.message, true); }
+  }
+
+  // ── USERS ───────────────────────────────────────────────────
+  var _users = [];
+  async function loadUsers() {
+    document.getElementById("users-body").innerHTML = '<tr><td colspan="7" class="loading">Loading...</td></tr>';
+    try {
+      _users = await api("GET", "/admin/users");
+      renderUsers(_users);
+    } catch(e) { toast(e.message, true); }
+  }
+  function filterUsers() {
+    const q = document.getElementById("user-search").value.toLowerCase();
+    renderUsers(_users.filter(function(u) {
+      return (u.name||"").toLowerCase().includes(q) || (u.email||"").toLowerCase().includes(q);
+    }));
+  }
+  function skillTags(skills) {
+    if (!skills || !skills.length) return '<span style="color:#94a3b8;font-size:12px">—</span>';
+    return skills.map(function(s) {
+      return '<span style="display:inline-block;background:#eff6ff;color:#3b82f6;border:1px solid #bfdbfe;border-radius:9999px;padding:1px 8px;font-size:11px;margin:1px 2px">' + s + '</span>';
+    }).join("");
+  }
+  function renderUsers(list) {
+    if (!list.length) { document.getElementById("users-body").innerHTML = '<tr><td colspan="7" class="empty">No users found</td></tr>'; return; }
+    document.getElementById("users-body").innerHTML = list.map(function(u) {
+      return '<tr class="clickable" onclick="showUser(' + u.id + ')">' +
+        '<td>' + u.id + '</td>' +
+        '<td>' + (u.name || '\u2014') + '</td>' +
+        '<td>' + (u.email || '\u2014') + '</td>' +
+        '<td>' + (u.university || '\u2014') + '</td>' +
+        '<td style="max-width:220px">' + skillTags(u.skills) + '</td>' +
+        '<td>' + fmt(u.created_at) + '</td>' +
+        '<td><button class="btn btn-danger" onclick="event.stopPropagation();deleteUser(' + u.id + ')">Delete</button></td>' +
+        '</tr>';
+    }).join("");
+  }
+  function showUser(id) {
+    var u = _users.find(function(x) { return x.id === id; });
+    if (!u) return;
+    openDetail(
+      u.name || "User #" + u.id,
+      "User profile",
+      [
+        { heading: "Identity", rows: [
+          { label: "ID",           value: u.id },
+          { label: "Firebase UID", value: u.firebase_uid },
+          { label: "Name",         value: u.name },
+          { label: "Email",        value: u.email },
+        ]},
+        { heading: "Profile", rows: [
+          { label: "Username",     value: u.username },
+          { label: "University",   value: u.university },
+          { label: "Course",       value: u.course },
+          { label: "Year",         value: u.year },
+          { label: "Bio",          value: u.bio },
+          { label: "Location",     value: u.location },
+          { label: "Website",      value: u.website, link: true },
+          { label: "LinkedIn",     value: u.linkedin, link: true },
+          { label: "GitHub",       value: u.github, link: true },
+        ]},
+        { heading: "Skills", rows: [
+          { label: "Skills",       value: u.skills },
+        ]},
+        { heading: "Avatar", rows: [
+          { label: "Avatar URL",   value: u.avatar_url, link: true },
+        ]},
+        { heading: "Timestamps", rows: [
+          { label: "Joined",       value: u.created_at ? new Date(u.created_at).toLocaleString() : null },
+          { label: "Updated",      value: u.updated_at ? new Date(u.updated_at).toLocaleString() : null },
+        ]},
+      ]
+    );
+  }
+  async function deleteUser(id) {
+    var u = _users.find(function(x) { return x.id === id; });
+    var name = u ? (u.name || "this user") : "this user";
+    if (!confirm("Delete user \"" + name + "\"? This cannot be undone.")) return;
+    try { await api("DELETE", "/admin/users/" + id); toast("User deleted"); loadUsers(); }
+    catch(e) { toast(e.message, true); }
+  }
+
+  // ── PROJECTS ────────────────────────────────────────────────
+  var _projects = [];
+  async function loadProjects() {
+    document.getElementById("projects-body").innerHTML = '<tr><td colspan="6" class="loading">Loading...</td></tr>';
+    try {
+      _projects = await api("GET", "/admin/projects");
+      renderProjects(_projects);
+    } catch(e) { toast(e.message, true); }
+  }
+  function filterProjects() {
+    const q = document.getElementById("project-search").value.toLowerCase();
+    renderProjects(_projects.filter(function(p) {
+      return (p.title||"").toLowerCase().includes(q);
+    }));
+  }
+  function renderProjects(list) {
+    if (!list.length) { document.getElementById("projects-body").innerHTML = '<tr><td colspan="6" class="empty">No projects found</td></tr>'; return; }
+    document.getElementById("projects-body").innerHTML = list.map(function(p) {
+      return '<tr class="clickable" onclick="showProject(' + p.id + ')">' +
+        '<td>' + p.id + '</td>' +
+        '<td>' + (p.title || '\u2014') + '</td>' +
+        '<td>' + (p.status || '\u2014') + '</td>' +
+        '<td>' + (p.owner_id || '\u2014') + '</td>' +
+        '<td>' + fmt(p.created_at) + '</td>' +
+        '<td><button class="btn btn-danger" onclick="event.stopPropagation();deleteProject(' + p.id + ')">Delete</button></td>' +
+        '</tr>';
+    }).join("");
+  }
+  function showProject(id) {
+    var p = _projects.find(function(x) { return x.id === id; });
+    if (!p) return;
+    openDetail(
+      p.title || "Project #" + p.id,
+      "Project details",
+      [
+        { heading: "Overview", rows: [
+          { label: "ID",          value: p.id },
+          { label: "Title",       value: p.title },
+          { label: "Status",      value: p.status },
+          { label: "Owner ID",    value: p.owner_id },
+          { label: "Category",    value: p.category },
+          { label: "Tags",        value: Array.isArray(p.tags) ? p.tags : p.tags ? [p.tags] : [] },
+        ]},
+        { heading: "Description", rows: [
+          { label: "Short desc.", value: p.short_description || p.description },
+          { label: "Long desc.",  value: p.long_description },
+        ]},
+        { heading: "Media", rows: [
+          { label: "Cover URL",   value: p.cover_url, link: true },
+          { label: "Repo URL",    value: p.repo_url, link: true },
+          { label: "Demo URL",    value: p.demo_url, link: true },
+        ]},
+        { heading: "Roles needed", rows: [
+          { label: "Roles",       value: p.roles },
+        ]},
+        { heading: "Members", rows: [
+          { label: "Members",     value: p.members },
+        ]},
+        { heading: "Timestamps", rows: [
+          { label: "Created",     value: p.created_at ? new Date(p.created_at).toLocaleString() : null },
+          { label: "Updated",     value: p.updated_at ? new Date(p.updated_at).toLocaleString() : null },
+        ]},
+      ]
+    );
+  }
+  async function deleteProject(id) {
+    var p = _projects.find(function(x) { return x.id === id; });
+    var title = p ? (p.title || "this project") : "this project";
+    if (!confirm("Delete project \"" + title + "\"? This cannot be undone.")) return;
+    try { await api("DELETE", "/admin/projects/" + id); toast("Project deleted"); loadProjects(); }
+    catch(e) { toast(e.message, true); }
+  }
+
+  // ── REVIEWS ─────────────────────────────────────────────────
+  async function loadReviews() {
+    document.getElementById("reviews-body").innerHTML = '<tr><td colspan="7" class="loading">Loading...</td></tr>';
+    const status = document.getElementById("review-filter").value;
+    try {
+      const reviews = await api("GET", "/admin/reviews?status=" + status);
+      if (!reviews.length) { document.getElementById("reviews-body").innerHTML = '<tr><td colspan="7" class="empty">No reviews</td></tr>'; return; }
+      document.getElementById("reviews-body").innerHTML = reviews.map(function(r) {
+        const actions = r.status === "pending"
+          ? '<button class="btn btn-success" onclick="decideReview(' + r.id + ',\'approved\')">Approve</button> ' +
+            '<button class="btn btn-danger"  onclick="decideReview(' + r.id + ',\'rejected\')">Reject</button>'
+          : '<button class="btn btn-danger" onclick="deleteReview(' + r.id + ')">Delete</button>';
+        return '<tr>' +
+          '<td>' + r.id + '</td>' +
+          '<td>' + r.reviewer_id + '</td>' +
+          '<td>' + r.reviewed_id + '</td>' +
+          '<td>' + r.rating + '/5</td>' +
+          '<td style="max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">' + (r.comment || "—") + '</td>' +
+          '<td><span class="badge badge-' + r.status + '">' + r.status + '</span></td>' +
+          '<td>' + actions + '</td>' +
+          '</tr>';
+      }).join("");
+    } catch(e) { toast(e.message, true); }
+  }
+  async function decideReview(id, status) {
+    try { await api("PUT", "/admin/reviews/" + id, { status: status }); toast("Review " + status); loadReviews(); }
+    catch(e) { toast(e.message, true); }
+  }
+  async function deleteReview(id) {
+    if (!confirm("Delete this review? This cannot be undone.")) return;
+    try { await api("DELETE", "/admin/reviews/" + id); toast("Review deleted"); loadReviews(); }
+    catch(e) { toast(e.message, true); }
+  }
+
+  // ── DONATIONS ───────────────────────────────────────────────
+  async function loadDonations() {
+    document.getElementById("donations-body").innerHTML = '<tr><td colspan="5" class="loading">Loading...</td></tr>';
+    try {
+      const list = await api("GET", "/admin/donations");
+      const total = list.filter(function(d) { return d.status === "succeeded"; })
+                        .reduce(function(s, d) { return s + d.amount; }, 0);
+      document.getElementById("donations-total").textContent = "Total confirmed: €" + (total/100).toFixed(2);
+      if (!list.length) { document.getElementById("donations-body").innerHTML = '<tr><td colspan="5" class="empty">No donations</td></tr>'; return; }
+      document.getElementById("donations-body").innerHTML = list.map(function(d) {
+        return '<tr>' +
+          '<td>' + d.id + '</td>' +
+          '<td>' + (d.donor_email || "—") + '</td>' +
+          '<td>€' + (d.amount/100).toFixed(2) + '</td>' +
+          '<td><span class="badge badge-' + (d.status==="succeeded"?"approved":d.status==="failed"?"rejected":"pending") + '">' + d.status + '</span></td>' +
+          '<td>' + fmt(d.created_at) + '</td>' +
+          '</tr>';
+      }).join("");
+    } catch(e) { toast(e.message, true); }
+  }
+
+</script>
+</body>
+</html>
