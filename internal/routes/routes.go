@@ -8,17 +8,9 @@ import (
 	"github.com/paiva/SkillBridge/Backend/internal/middleware"
 
 	"github.com/gin-gonic/gin"
-
-	ginSwagger "github.com/swaggo/gin-swagger"
-    swaggerFiles "github.com/swaggo/files"
 )
 
 func Setup(r *gin.Engine) {
-
-	// Swagger only in development/testing — acesso em /swagger/index.html
-	if config.AppConfig.Env != "production" {
-		r.GET("/swagger/*any", ginSwagger.WrapHandler(swaggerFiles.Handler))
-	}
 
 	// Admin dashboard — first visit: /admin-dashboard?key=<ADMIN_SECRET_KEY>
 	// After that the browser uses a session cookie automatically.

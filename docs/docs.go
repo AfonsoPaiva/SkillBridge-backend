@@ -33,7 +33,8 @@ const docTemplate = `{
                 "responses": {
                     "200": {
                         "description": "OK",
-                        "schema": {
+                        "schema": {go mod tidy
+
                             "type": "array",
                             "items": {
                                 "$ref": "#/definitions/models.Conversation"
