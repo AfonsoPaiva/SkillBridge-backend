@@ -278,11 +278,14 @@ type Message struct {
 // --------------------------------------------------
 
 // GenerateSlug creates a URL-friendly slug from a project title.
-// It converts to lowercase, replaces spaces/special chars with hyphens,
-// and removes any duplicate hyphens.
+// It normalizes accented characters, converts to lowercase, 
+// replaces spaces/special chars with hyphens, and removes any duplicate hyphens.
 func GenerateSlug(title string) string {
+	// Normalize accented characters
+	slug := normalizeAccents(title)
+	
 	// Convert to lowercase
-	slug := strings.ToLower(title)
+	slug = strings.ToLower(slug)
 	
 	// Replace spaces and non-alphanumeric characters with hyphens
 	reg := regexp.MustCompile(`[^a-z0-9]+`)
@@ -293,3 +296,38 @@ func GenerateSlug(title string) string {
 	
 	return slug
 }
+
+// normalizeAccents converts accented characters to their ASCII equivalents.
+func normalizeAccents(s string) string {
+	// Map of accented characters to their ASCII equivalents
+	replacements := map[rune]string{
+		'à': "a", 'á': "a", 'â': "a", 'ã': "a", 'ä': "a", 'å': "a",
+		'À': "A", 'Á': "A", 'Â': "A", 'Ã': "A", 'Ä': "A", 'Å': "A",
+		'è': "e", 'é': "e", 'ê': "e", 'ë': "e",
+		'È': "E", 'É': "E", 'Ê': "E", 'Ë': "E",
+		'ì': "i", 'í': "i", 'î': "i", 'ï': "i",
+		'Ì': "I", 'Í': "I", 'Î': "I", 'Ï': "I",
+		'ò': "o", 'ó': "o", 'ô': "o", 'õ': "o", 'ö': "o",
+		'Ò': "O", 'Ó': "O", 'Ô': "O", 'Õ': "O", 'Ö': "O",
+		'ù': "u", 'ú': "u", 'û': "u", 'ü': "u",
+		'Ù': "U", 'Ú': "U", 'Û': "U", 'Ü': "U",
+		'ñ': "n", 'Ñ': "N",
+		'ç': "c", 'Ç': "C",
+		'ý': "y", 'ÿ': "y", 'Ý': "Y",
+		'ß': "ss",
+		'æ': "ae", 'Æ': "AE",
+		'œ': "oe", 'Œ': "OE",
+	}
+	
+	var result strings.Builder
+	for _, char := range s {
+		if replacement, found := replacements[char]; found {
+			result.WriteString(replacement)
+		} else {
+			result.WriteRune(char)
+		}
+	}
+	
+	return result.String()
+}
+
