@@ -30,14 +30,63 @@ package handlers
 //      c. AES-256-GCM decrypt base64-decoded encrypted_content.
 
 import (
+	"encoding/base64"
 	"fmt"
 	"net/http"
+	"sync"
 	"time"
 
 	"github.com/gin-gonic/gin"
 	"github.com/paiva/SkillBridge/Backend/internal/database"
 	"github.com/paiva/SkillBridge/Backend/internal/models"
 )
+
+// ─────────────────────────────────────────────────────────────
+// CONSTANTS AND RATE LIMITING
+// ─────────────────────────────────────────────────────────────
+
+const (
+	MaxMessageLength          = 100 // Maximum plaintext message length
+	MaxEncryptedContentLength = 300 // Maximum encrypted content length (base64)
+	MaxMessagesPerMinute      = 15  // Maximum messages per user per minute
+)
+
+// Rate limiter: tracks message counts per user
+var (
+	messageCounts = make(map[uint][]time.Time)
+	countsMutex   sync.Mutex
+)
+
+// checkRateLimit verifies if user can send a message
+func checkRateLimit(userID uint) bool {
+	countsMutex.Lock()
+	defer countsMutex.Unlock()
+
+	now := time.Now()
+	cutoff := now.Add(-1 * time.Minute)
+
+	// Get user's message timestamps
+	timestamps := messageCounts[userID]
+
+	// Remove timestamps older than 1 minute
+	validTimestamps := []time.Time{}
+	for _, ts := range timestamps {
+		if ts.After(cutoff) {
+			validTimestamps = append(validTimestamps, ts)
+		}
+	}
+
+	// Check if limit exceeded
+	if len(validTimestamps) >= MaxMessagesPerMinute {
+		return false
+	}
+
+	// Add current timestamp
+	validTimestamps = append(validTimestamps, now)
+	messageCounts[userID] = validTimestamps
+
+	return true
+}
 
 // ─────────────────────────────────────────────────────────────
 // PUBLIC KEY MANAGEMENT
@@ -288,6 +337,38 @@ func SendMessage(c *gin.Context) {
 	if err := c.ShouldBindJSON(&input); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
+	}
+
+	// Rate limiting: check if user exceeded message limit
+	if !checkRateLimit(me.ID) {
+		c.JSON(http.StatusTooManyRequests, gin.H{
+			"error": fmt.Sprintf("Limite de mensagens excedido. Máximo: %d mensagens por minuto.", MaxMessagesPerMinute),
+		})
+		return
+	}
+
+	// Validate message length
+	// For plain messages (ephemeral_key='plain'), decode and check plaintext length
+	if input.EphemeralKey == "plain" {
+		decoded, err := base64.StdEncoding.DecodeString(input.EncryptedContent)
+		if err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "Conteúdo inválido."})
+			return
+		}
+		if len(decoded) > MaxMessageLength {
+			c.JSON(http.StatusBadRequest, gin.H{
+				"error": fmt.Sprintf("Mensagem demasiado longa. Máximo: %d caracteres.", MaxMessageLength),
+			})
+			return
+		}
+	} else {
+		// For encrypted messages, check encrypted content length
+		if len(input.EncryptedContent) > MaxEncryptedContentLength {
+			c.JSON(http.StatusBadRequest, gin.H{
+				"error": fmt.Sprintf("Conteúdo cifrado demasiado longo. Máximo: %d caracteres.", MaxEncryptedContentLength),
+			})
+			return
+		}
 	}
 
 	msg := models.Message{
