@@ -1,6 +1,7 @@
 package routes
 
 import (
+	"log"
 	"net/http"
 
 	"github.com/paiva/SkillBridge/Backend/config"
@@ -38,7 +39,9 @@ func Setup(r *gin.Engine) {
 		}
 
 		// Set/renew cookie (7 days, HttpOnly, SameSite=Strict)
-		c.SetCookie("admin_session", secret, 7*24*3600, "/", "", c.Request.TLS != nil, true)
+		// Secure flag: true in production (HTTPS), auto-detect based on TLS
+		isSecure := c.Request.TLS != nil || config.AppConfig.Env == "production"
+		c.SetCookie("admin_session", secret, 7*24*3600, "/", "", isSecure, true)
 
 		handlers.AdminDashboard(c)
 	})
@@ -47,38 +50,46 @@ func Setup(r *gin.Engine) {
 	// Servir imagens guardadas localmente
 	r.Static("/uploads", config.AppConfig.UploadsDir)
 
-	// CORS - permite pedidos do frontend Angular
+	// CORS - permite pedidos do frontend Angular (production-safe)
 	r.Use(func(c *gin.Context) {
 		origin := c.Request.Header.Get("Origin")
 		
-		// List of allowed origins
+		// List of allowed origins (always explicitly defined)
 		allowedOrigins := []string{
 			config.AppConfig.FrontendURL,
 			"https://skillbridge-frontend-zeta.vercel.app",
-			"http://localhost:4200",
 		}
 		
-		// Check if the origin is allowed
+		// In development, add localhost
+		if config.AppConfig.Env == "development" {
+			allowedOrigins = append(allowedOrigins, "http://localhost:4200")
+		}
+		
+		// Check if the origin is allowed (reject if empty or not in list)
 		isAllowed := false
-		for _, allowed := range allowedOrigins {
-			if origin == allowed {
-				isAllowed = true
-				break
+		if origin != "" {
+			for _, allowed := range allowedOrigins {
+				if origin == allowed {
+					isAllowed = true
+					break
+				}
 			}
 		}
 		
-		// Set CORS headers
+		// Log rejected CORS requests for security monitoring
+		if !isAllowed && origin != "" && config.AppConfig.Env != "development" {
+			log.Printf("[CORS] Rejected request from unauthorized origin: %s (method: %s, path: %s)", 
+				origin, c.Request.Method, c.Request.URL.Path)
+		}
+		
+		// Only set CORS headers if origin is explicitly allowed
 		if isAllowed {
 			c.Header("Access-Control-Allow-Origin", origin)
 			c.Header("Access-Control-Allow-Credentials", "true")
-		} else if config.AppConfig.Env == "development" {
-			// In development, allow all origins
-			c.Header("Access-Control-Allow-Origin", "*")
+			c.Header("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS, PATCH")
+			c.Header("Access-Control-Allow-Headers", "Content-Type, Authorization, X-Admin-Key, Origin, Accept")
+			c.Header("Access-Control-Max-Age", "86400") // Cache preflight for 24 hours
 		}
-		
-		c.Header("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS, PATCH")
-		c.Header("Access-Control-Allow-Headers", "Content-Type, Authorization, X-Admin-Key, Origin, Accept")
-		c.Header("Access-Control-Max-Age", "86400") // Cache preflight for 24 hours
 		
 		// Required for Firebase signInWithPopup to work across same origin
 		c.Header("Cross-Origin-Opener-Policy", "same-origin-allow-popups")
@@ -86,9 +97,15 @@ func Setup(r *gin.Engine) {
 		
 		// Handle preflight OPTIONS request
 		if c.Request.Method == "OPTIONS" {
-			c.AbortWithStatus(204)
+			// Return 204 if allowed, 403 if not
+			if isAllowed {
+				c.AbortWithStatus(204)
+			} else {
+				c.AbortWithStatus(403)
+			}
 			return
 		}
+		
 		c.Next()
 	})
 
