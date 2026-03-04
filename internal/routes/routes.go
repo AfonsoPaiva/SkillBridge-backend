@@ -12,6 +12,9 @@ import (
 
 func Setup(r *gin.Engine) {
 
+	// Health check endpoint (no authentication required)
+	r.GET("/health", handlers.HealthCheck)
+
 	// Admin dashboard — first visit: /admin-dashboard?key=<ADMIN_SECRET_KEY>
 	// After that the browser uses a session cookie automatically.
 	r.GET("/admin-dashboard", func(c *gin.Context) {
@@ -69,6 +72,10 @@ func Setup(r *gin.Engine) {
 	})
 
 	api := r.Group("/api")
+
+	// API information endpoint (no authentication required)
+	api.GET("", handlers.APIInfo)
+	api.GET("/", handlers.APIInfo)
 
 	// --------------------------------------------------
 	// ROTAS PROTEGIDAS (requerem token Firebase)

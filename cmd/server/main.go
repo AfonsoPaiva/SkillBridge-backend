@@ -6,6 +6,7 @@ import (
 	"os"
 	"github.com/paiva/SkillBridge/Backend/config"
 	"github.com/paiva/SkillBridge/Backend/internal/database"
+	"github.com/paiva/SkillBridge/Backend/internal/handlers"
 	"github.com/paiva/SkillBridge/Backend/internal/middleware"
 	"github.com/paiva/SkillBridge/Backend/internal/routes"
 
@@ -40,8 +41,18 @@ func main() {
 
 	// 7. Iniciar servidor
 	port := config.AppConfig.Port
-	log.Printf("Servidor Portus a correr em http://localhost:%s", port)
-	log.Printf("Ambiente: %s", config.AppConfig.Env)
+	log.Printf("╔══════════════════════════════════════════════════════════╗")
+	log.Printf("║  %s v%s", handlers.APIName, handlers.APIVersion)
+	log.Printf("║  Build: %s", handlers.APIBuildDate)
+	log.Printf("║  Environment: %s", config.AppConfig.Env)
+	log.Printf("╠══════════════════════════════════════════════════════════╣")
+	log.Printf("║  Server running on: http://localhost:%s", port)
+	log.Printf("║  Health Check:      http://localhost:%s/health", port)
+	log.Printf("║  API Info:          http://localhost:%s/api", port)
+	if config.AppConfig.Env != "production" {
+		log.Printf("║  Swagger Docs:      http://localhost:%s/swagger/index.html", port)
+	}
+	log.Printf("╚══════════════════════════════════════════════════════════╝")
 
 	if err := r.Run(":" + port); err != nil {
 		log.Fatalf("Erro ao iniciar servidor: %v", err)
