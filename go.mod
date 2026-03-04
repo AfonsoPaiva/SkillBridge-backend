@@ -3,6 +3,7 @@ module github.com/paiva/SkillBridge/Backend
 go 1.25.7
 
 require (
+	cloud.google.com/go/storage v1.60.0
 	firebase.google.com/go/v4 v4.19.0
 	github.com/disintegration/imaging v1.6.2
 	github.com/gin-gonic/gin v1.11.0
@@ -26,7 +27,6 @@ require (
 	cloud.google.com/go/iam v1.5.3 // indirect
 	cloud.google.com/go/longrunning v0.8.0 // indirect
 	cloud.google.com/go/monitoring v1.24.3 // indirect
-	cloud.google.com/go/storage v1.60.0 // indirect
 	github.com/GoogleCloudPlatform/opentelemetry-operations-go/detectors/gcp v1.30.0 // indirect
 	github.com/GoogleCloudPlatform/opentelemetry-operations-go/exporter/metric v0.55.0 // indirect
 	github.com/GoogleCloudPlatform/opentelemetry-operations-go/internal/resourcemapping v0.55.0 // indirect
