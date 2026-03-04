@@ -14,7 +14,6 @@ import (
 
 	"github.com/disintegration/imaging"
 	"github.com/gin-gonic/gin"
-	"github.com/paiva/SkillBridge/Backend/config"
 	"github.com/paiva/SkillBridge/Backend/internal/storage"
 )
 
@@ -155,9 +154,11 @@ func DeleteImage(c *gin.Context) {
 	// Delete from GCS
 	if err := storage.DeleteFile(filename); err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{
-			"error": "Erro ao remover imagem.",
+			"error":   "Erro ao remover imagem.",
 			"details": err.Error(),
-		
+		})
+		return
+	}
 
 	c.JSON(http.StatusOK, gin.H{"message": "Imagem removida com sucesso."})
 }
