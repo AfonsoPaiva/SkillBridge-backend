@@ -1,13 +1,13 @@
 package handlers
 
 import (
+	"bytes"
 	"fmt"
 	"image"
 	_ "image/gif"
 	_ "image/jpeg"
 	_ "image/png"
 	"net/http"
-	"os"
 	"path/filepath"
 	"strings"
 	"time"
@@ -15,6 +15,7 @@ import (
 	"github.com/disintegration/imaging"
 	"github.com/gin-gonic/gin"
 	"github.com/paiva/SkillBridge/Backend/config"
+	"github.com/paiva/SkillBridge/Backend/internal/storage"
 )
 
 // imageType defines resize behaviour per use case.
@@ -33,10 +34,10 @@ var imageTypes = map[string]imageType{
 	"project": {subDir: "projects", width: 1280, height: 720, fill: false, quality: 82},
 }
 
-// UploadImage - Faz upload e redimensiona uma imagem, guardando-a localmente.
+// UploadImage - Faz upload e redimensiona uma imagem, guardando-a no Google Cloud Storage.
 //
 // @Summary      Upload de imagem
-// @Description  Faz upload e redimensiona uma imagem (avatar 400x400 ou projeto 1280x720)
+// @Description  Faz upload e redimensiona uma imagem (avatar 400x400 ou projeto 1280x720), guardando no GCS
 // @Tags         upload
 // @Accept       multipart/form-data
 // @Produce      json
@@ -95,30 +96,28 @@ func UploadImage(c *gin.Context) {
 		resized = imaging.Fit(src, imgType.width, imgType.height, imaging.Lanczos)
 	}
 
-	// --- 5. Criar diretoria de destino ---
-	destDir := filepath.Join(config.AppConfig.UploadsDir, imgType.subDir)
-	if err := os.MkdirAll(destDir, 0755); err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Erro ao criar diretoria de uploads."})
-		return
-	}
-
-	// --- 6. Guardar sempre como JPEG (melhor compressão) ---
+	// --- 5. Encode image to JPEG in memory ---
 	firebaseUID := c.GetString("firebase_uid")
 	filename := fmt.Sprintf("%d_%s.jpg", time.Now().UnixMilli(), firebaseUID)
-	destPath := filepath.Join(destDir, filename)
+	objectName := fmt.Sprintf("%s/%s", imgType.subDir, filename)
 
-	if err := imaging.Save(resized, destPath, imaging.JPEGQuality(imgType.quality)); err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Erro ao guardar imagem."})
+	// Encode to JPEG in a buffer
+	buf := new(bytes.Buffer)
+	if err := imaging.Encode(buf, resized, imaging.JPEG, imaging.JPEGQuality(imgType.quality)); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Erro ao processar imagem."})
 		return
 	}
 
-	// URL pública: /uploads/avatars/<filename>.jpg  ou  /uploads/projects/<filename>.jpg
-	relativePath := fmt.Sprintf("/uploads/%s/%s", imgType.subDir, filename)
-	// In production, prefix with the backend base URL so the frontend (on a different domain) can resolve images
-	publicURL := relativePath
-	if config.AppConfig.Env == "production" && config.AppConfig.BackendURL != "" {
-		publicURL = config.AppConfig.BackendURL + relativePath
+	// --- 6. Upload to Google Cloud Storage ---
+	publicURL, err := storage.UploadFile(objectName, buf, "image/jpeg")
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{
+			"error": "Erro ao fazer upload da imagem.",
+			"details": err.Error(),
+		})
+		return
 	}
+
 	c.JSON(http.StatusCreated, gin.H{
 		"url":      publicURL,
 		"type":     typeName,
@@ -128,8 +127,10 @@ func UploadImage(c *gin.Context) {
 
 // DeleteImage - Remove uma imagem local
 //
+// @Summary      Remover imagemdo Google Cloud Storage
+//
 // @Summary      Remover imagem
-// @Description  Remove uma imagem local do servidor
+// @Description  Remove uma imagem do GCS
 // @Tags         upload
 // @Produce      json
 // @Security     BearerAuth
@@ -151,15 +152,12 @@ func DeleteImage(c *gin.Context) {
 		return
 	}
 
-	fullPath := filepath.Join(config.AppConfig.UploadsDir, filename)
-	if err := os.Remove(fullPath); err != nil {
-		if os.IsNotExist(err) {
-			c.JSON(http.StatusNotFound, gin.H{"error": "Imagem não encontrada."})
-			return
-		}
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Erro ao remover imagem."})
-		return
-	}
+	// Delete from GCS
+	if err := storage.DeleteFile(filename); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{
+			"error": "Erro ao remover imagem.",
+			"details": err.Error(),
+		
 
 	c.JSON(http.StatusOK, gin.H{"message": "Imagem removida com sucesso."})
 }

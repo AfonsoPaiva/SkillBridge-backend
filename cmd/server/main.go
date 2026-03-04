@@ -9,6 +9,7 @@ import (
 	"github.com/paiva/SkillBridge/Backend/internal/handlers"
 	"github.com/paiva/SkillBridge/Backend/internal/middleware"
 	"github.com/paiva/SkillBridge/Backend/internal/routes"
+	"github.com/paiva/SkillBridge/Backend/internal/storage"
 
 	"github.com/gin-gonic/gin"
 )
@@ -30,16 +31,23 @@ func main() {
 	// 3. Inicializar Firebase Auth
 	middleware.InitFirebase()
 
-	// 4. Conectar ao CockroachDB e aplicar migrações
+	// 4. Inicializar Google Cloud Storage
+	if err := storage.InitGCS(); err != nil {
+		log.Printf("⚠ Warning: GCS initialization failed: %v", err)
+		log.Println("  Image uploads will not work. Set GCS_BUCKET_NAME and GCS_PROJECT_ID env vars.")
+	}
+	defer storage.CloseGCS()
+
+	// 5. Conectar ao CockroachDB e aplicar migrações
 	database.Connect()
 
-	// 5. Criar servidor Gin
+	// 6. Criar servidor Gin
 	r := gin.Default()
 
-	// 6. Registar todas as rotas
+	// 7. Registar todas as rotas
 	routes.Setup(r)
 
-	// 7. Iniciar servidor
+	// 8. Iniciar servidor
 	port := config.AppConfig.Port
 	log.Printf("╔══════════════════════════════════════════════════════════╗")
 	log.Printf("║  %s v%s", handlers.APIName, handlers.APIVersion)

@@ -96,6 +96,8 @@ type Config struct {
 	BackendURL              string // Base URL of this backend (for generating absolute image URLs)
 	UploadsDir              string
 	Env                     string
+	GCSBucketName           string // Google Cloud Storage bucket name
+	GCSProjectID            string // GCP Project ID
 	MailgunAPIKey           string
 	MailgunDomain           string
 	MailgunSender           string
@@ -130,6 +132,8 @@ func Load() {
 		BackendURL:              getEnv("BACKEND_URL", ""),
 		UploadsDir:              getEnv("UPLOADS_DIR", "./uploads"),
 		Env:                     getEnv("ENV", "development"),
+		GCSBucketName:           getEnv("GCS_BUCKET_NAME", ""),
+		GCSProjectID:            getEnv("GCS_PROJECT_ID", ""),
 		MailgunAPIKey:           getEnv("MAILGUN_API_KEY", ""),
 		MailgunDomain:           getEnv("MAILGUN_DOMAIN", ""),
 		MailgunSender:           getEnv("MAILGUN_SENDER", "noreply@skillbridge.pt"),

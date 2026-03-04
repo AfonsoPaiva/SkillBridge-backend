@@ -46,10 +46,6 @@ func Setup(r *gin.Engine) {
 		handlers.AdminDashboard(c)
 	})
 
-
-	// Servir imagens guardadas localmente
-	r.Static("/uploads", config.AppConfig.UploadsDir)
-
 	// CORS - permite pedidos do frontend Angular (production-safe)
 	r.Use(func(c *gin.Context) {
 		origin := c.Request.Header.Get("Origin")
