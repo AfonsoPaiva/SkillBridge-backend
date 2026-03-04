@@ -50,20 +50,41 @@ func Setup(r *gin.Engine) {
 	// CORS - permite pedidos do frontend Angular
 	r.Use(func(c *gin.Context) {
 		origin := c.Request.Header.Get("Origin")
-		allowedOrigin := config.AppConfig.FrontendURL
-		if origin == allowedOrigin || config.AppConfig.Env == "development" {
-			if config.AppConfig.Env == "development" {
-				c.Header("Access-Control-Allow-Origin", "*")
-			} else {
-				c.Header("Access-Control-Allow-Origin", allowedOrigin)
+		
+		// List of allowed origins
+		allowedOrigins := []string{
+			config.AppConfig.FrontendURL,
+			"https://skillbridge-frontend-zeta.vercel.app",
+			"http://localhost:4200",
+		}
+		
+		// Check if the origin is allowed
+		isAllowed := false
+		for _, allowed := range allowedOrigins {
+			if origin == allowed {
+				isAllowed = true
+				break
 			}
 		}
-		c.Header("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS")
-		c.Header("Access-Control-Allow-Headers", "Content-Type, Authorization, X-Admin-Key")
-		c.Header("Access-Control-Allow-Credentials", "true")
+		
+		// Set CORS headers
+		if isAllowed {
+			c.Header("Access-Control-Allow-Origin", origin)
+			c.Header("Access-Control-Allow-Credentials", "true")
+		} else if config.AppConfig.Env == "development" {
+			// In development, allow all origins
+			c.Header("Access-Control-Allow-Origin", "*")
+		}
+		
+		c.Header("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS, PATCH")
+		c.Header("Access-Control-Allow-Headers", "Content-Type, Authorization, X-Admin-Key, Origin, Accept")
+		c.Header("Access-Control-Max-Age", "86400") // Cache preflight for 24 hours
+		
 		// Required for Firebase signInWithPopup to work across same origin
 		c.Header("Cross-Origin-Opener-Policy", "same-origin-allow-popups")
 		c.Header("Cross-Origin-Embedder-Policy", "unsafe-none")
+		
+		// Handle preflight OPTIONS request
 		if c.Request.Method == "OPTIONS" {
 			c.AbortWithStatus(204)
 			return
