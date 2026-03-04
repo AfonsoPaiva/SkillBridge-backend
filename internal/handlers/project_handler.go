@@ -3,6 +3,7 @@ package handlers
 import (
 	"encoding/base64"
 	"fmt"
+	"log"
 	"net/http"
 
 	"gorm.io/gorm"
@@ -10,6 +11,7 @@ import (
 	"github.com/paiva/SkillBridge/Backend/config"
 	"github.com/paiva/SkillBridge/Backend/internal/database"
 	"github.com/paiva/SkillBridge/Backend/internal/models"
+	"github.com/paiva/SkillBridge/Backend/internal/storage"
 )
 
 // ensureUniqueSlug checks if a slug is unique and appends a counter if needed.
@@ -417,6 +419,15 @@ func UpdateProject(c *gin.Context) {
 		project.Description = input.Description
 	}
 	if input.ImageURL != "" {
+		// Delete old image from GCS if it's being replaced
+		if project.ImageURL != "" && input.ImageURL != project.ImageURL {
+			oldObjectName := extractGCSObjectName(project.ImageURL)
+			if oldObjectName != "" {
+				if err := storage.DeleteFile(oldObjectName); err != nil {
+					log.Printf("Warning: Failed to delete old project image %s: %v", oldObjectName, err)
+				}
+			}
+		}
 		project.ImageURL = input.ImageURL
 	}
 	if input.Status != "" {
@@ -466,6 +477,15 @@ func DeleteProject(c *gin.Context) {
 	project, ok := ownerGuard(c)
 	if !ok {
 		return
+	}
+	// Delete project image from GCS
+	if project.ImageURL != "" {
+		objectName := extractGCSObjectName(project.ImageURL)
+		if objectName != "" {
+			if err := storage.DeleteFile(objectName); err != nil {
+				log.Printf("Warning: Failed to delete project image %s: %v", objectName, err)
+			}
+		}
 	}
 	// Delete child records first to avoid FK constraint violations
 	database.DB.Where("project_id = ?", project.ID).Delete(&models.ProjectOwner{})

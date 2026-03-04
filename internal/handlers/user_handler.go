@@ -4,14 +4,32 @@ import (
 	"fmt"
 	"log"
 	"net/http"
+	"strings"
 	"time"
 	"github.com/paiva/SkillBridge/Backend/internal/database"
 	"github.com/paiva/SkillBridge/Backend/internal/email"
 	"github.com/paiva/SkillBridge/Backend/internal/middleware"
 	"github.com/paiva/SkillBridge/Backend/internal/models"
+	"github.com/paiva/SkillBridge/Backend/internal/storage"
 
 	"github.com/gin-gonic/gin"
 )
+
+// extractGCSObjectName extracts the object path from a GCS URL
+// Example: https://storage.googleapis.com/skillbridge-uploads/avatars/file.jpg -> avatars/file.jpg
+func extractGCSObjectName(url string) string {
+	if url == "" {
+		return ""
+	}
+	// Handle GCS URL format
+	if strings.Contains(url, "storage.googleapis.com/") {
+		parts := strings.SplitN(url, "/", 5)
+		if len(parts) >= 5 {
+			return parts[4] // avatars/filename.jpg or projects/filename.jpg
+		}
+	}
+	return ""
+}
 
 // RegisterUser - Cria perfil após registo no Firebase
 //
@@ -196,6 +214,16 @@ func UpdateProfile(c *gin.Context) {
 		return
 	}
 
+	// If avatar is being updated, delete old avatar from GCS
+	if input.AvatarURL != "" && user.AvatarURL != "" && input.AvatarURL != user.AvatarURL {
+		oldObjectName := extractGCSObjectName(user.AvatarURL)
+		if oldObjectName != "" {
+			if err := storage.DeleteFile(oldObjectName); err != nil {
+				log.Printf("Warning: Failed to delete old avatar %s: %v", oldObjectName, err)
+			}
+		}
+	}
+
 	database.DB.Model(&user).Updates(input)
 	database.DB.First(&user, user.ID)
 	c.JSON(http.StatusOK, gin.H{"message": "Perfil atualizado.", "user": user})
@@ -224,6 +252,15 @@ func DeleteMyProfile(c *gin.Context) {
 	var ownedProjects []models.Project
 	database.DB.Where("owner_id = ?", user.ID).Find(&ownedProjects)
 	for _, proj := range ownedProjects {
+		// Delete project image from GCS
+		if proj.ImageURL != "" {
+			objectName := extractGCSObjectName(proj.ImageURL)
+			if objectName != "" {
+				if err := storage.DeleteFile(objectName); err != nil {
+					log.Printf("Warning: Failed to delete project image %s: %v", objectName, err)
+				}
+			}
+		}
 		database.DB.Where("project_id = ?", proj.ID).Delete(&models.ProjectRole{})
 		database.DB.Where("project_id = ?", proj.ID).Delete(&models.ProjectMember{})
 		database.DB.Where("project_id = ?", proj.ID).Delete(&models.ProjectOwner{})
@@ -244,6 +281,17 @@ func DeleteMyProfile(c *gin.Context) {
 	}
 	database.DB.Where("user_id = ?", user.ID).Delete(&models.UserPublicKey{})
 	database.DB.Where("user_id = ?", user.ID).Delete(&models.GuestSession{})
+	
+	// Delete user avatar from GCS
+	if user.AvatarURL != "" {
+		objectName := extractGCSObjectName(user.AvatarURL)
+		if objectName != "" {
+			if err := storage.DeleteFile(objectName); err != nil {
+				log.Printf("Warning: Failed to delete user avatar %s: %v", objectName, err)
+			}
+		}
+	}
+	
 	if err := middleware.DeleteUser(firebaseUID); err != nil {
 		log.Printf("erro a eliminar utilizador firebase uid=%s: %v", firebaseUID, err)
 	}

@@ -8,6 +8,7 @@ import (
 	"github.com/paiva/SkillBridge/Backend/internal/database"
 	"github.com/paiva/SkillBridge/Backend/internal/models"
 	"github.com/paiva/SkillBridge/Backend/internal/middleware"
+	"github.com/paiva/SkillBridge/Backend/internal/storage"
 )
 
 // AdminListUsers - Lista todos os utilizadores (admin)
@@ -64,6 +65,25 @@ func AdminDeleteUser(c *gin.Context) {
 		return
 	}
 	// perform the same cleanup as DeleteMyProfile
+	// Delete owned projects and their images from GCS
+	var ownedProjects []models.Project
+	database.DB.Where("owner_id = ?", user.ID).Find(&ownedProjects)
+	for _, proj := range ownedProjects {
+		// Delete project image from GCS
+		if proj.ImageURL != "" {
+			objectName := extractGCSObjectName(proj.ImageURL)
+			if objectName != "" {
+				if err := storage.DeleteFile(objectName); err != nil {
+					log.Printf("Warning: Failed to delete project image %s: %v", objectName, err)
+				}
+			}
+		}
+		database.DB.Where("project_id = ?", proj.ID).Delete(&models.ProjectRole{})
+		database.DB.Where("project_id = ?", proj.ID).Delete(&models.ProjectMember{})
+		database.DB.Where("project_id = ?", proj.ID).Delete(&models.ProjectOwner{})
+		database.DB.Delete(&proj)
+	}
+	
 	database.DB.Where("user_id = ?", user.ID).Delete(&models.ProjectOwner{})
 	database.DB.Where("user_id = ?", user.ID).Delete(&models.ProjectMember{})
 	database.DB.Where("reviewer_id = ? OR reviewed_id = ?", user.ID, user.ID).Delete(&models.Review{})
@@ -78,6 +98,17 @@ func AdminDeleteUser(c *gin.Context) {
 	}
 	database.DB.Where("user_id = ?", user.ID).Delete(&models.UserPublicKey{})
 	database.DB.Where("user_id = ?", user.ID).Delete(&models.GuestSession{})
+	
+	// Delete user avatar from GCS
+	if user.AvatarURL != "" {
+		objectName := extractGCSObjectName(user.AvatarURL)
+		if objectName != "" {
+			if err := storage.DeleteFile(objectName); err != nil {
+				log.Printf("Warning: Failed to delete user avatar %s: %v", objectName, err)
+			}
+		}
+	}
+	
 	// delete firebase record if possible
 	firebaseUID := user.FirebaseUID
   if firebaseUID != "" {
