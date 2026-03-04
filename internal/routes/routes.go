@@ -15,6 +15,33 @@ func Setup(r *gin.Engine) {
 
 	// Health check endpoint (no authentication required)
 	r.GET("/health", handlers.HealthCheck)
+	
+	// Cache headers middleware for static and public resources
+	r.Use(func(c *gin.Context) {
+		path := c.Request.URL.Path
+		
+		// Long cache for static assets (images, fonts, etc.)
+		if strings.HasPrefix(path, "/api/upload/") || 
+		   strings.HasPrefix(path, "/assets/") ||
+		   strings.HasSuffix(path, ".js") || 
+		   strings.HasSuffix(path, ".css") ||
+		   strings.HasSuffix(path, ".woff") ||
+		   strings.HasSuffix(path, ".woff2") ||
+		   strings.HasSuffix(path, ".ttf") ||
+		   strings.HasSuffix(path, ".svg") ||
+		   strings.HasSuffix(path, ".png") ||
+		   strings.HasSuffix(path, ".jpg") ||
+		   strings.HasSuffix(path, ".jpeg") ||
+		   strings.HasSuffix(path, ".webp") {
+			// 1 year cache for immutable assets
+			c.Header("Cache-Control", "public, max-age=31536000, immutable")
+		} else if strings.HasPrefix(path, "/api/") {
+			// Short cache for API responses
+			c.Header("Cache-Control", "no-cache, must-revalidate")
+		}
+		
+		c.Next()
+	})
 
 	// Admin dashboard — first visit: /admin-dashboard?key=<ADMIN_SECRET_KEY>
 	// After that the browser uses a session cookie automatically.

@@ -37,6 +37,29 @@ func ensureUniqueSlug(baseSlug string, excludeID uint) string {
 	}
 }
 
+// ensureUniqueUserSlug checks if a user slug is unique and appends a counter if needed.
+// excludeID allows updating a user without conflicting with itself.
+func ensureUniqueUserSlug(baseSlug string, excludeID uint) string {
+	slug := baseSlug
+	counter := 1
+	
+	for {
+		var count int64
+		query := database.DB.Model(&models.User{}).Where("slug = ?", slug)
+		if excludeID != 0 {
+			query = query.Where("id != ?", excludeID)
+		}
+		query.Count(&count)
+		
+		if count == 0 {
+			return slug
+		}
+		
+		slug = fmt.Sprintf("%s-%d", baseSlug, counter)
+		counter++
+	}
+}
+
 // CreateProject - Cria um novo projeto
 //
 // @Summary      Criar projeto

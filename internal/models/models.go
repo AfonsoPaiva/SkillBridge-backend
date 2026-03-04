@@ -71,6 +71,7 @@ type User struct {
 	ID           uint         `gorm:"primaryKey;autoIncrement" json:"id"`
 	FirebaseUID  string       `gorm:"uniqueIndex:idx_users_firebase_uid;not null" json:"firebase_uid"`
 	Name         string       `gorm:"not null" json:"name"`
+	Slug         string       `gorm:"uniqueIndex:idx_users_slug;not null" json:"slug"`
 	Email        string       `gorm:"uniqueIndex:idx_users_email;not null" json:"email"`
 	ContactLinks ContactLinks `gorm:"type:jsonb" json:"contact_links"`
 	University   string       `json:"university"`

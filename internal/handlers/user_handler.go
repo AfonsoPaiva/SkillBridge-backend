@@ -15,6 +15,25 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
+// getUserByIDOrSlug is a helper that resolves a user by ID (numeric) or slug.
+// Returns the user and true if found, or nil and false if not found.
+func getUserByIDOrSlug(idOrSlug string) (*models.User, bool) {
+	var user models.User
+	
+	// Try to find by slug first
+	err := database.DB.Where("slug = ?", idOrSlug).First(&user).Error
+	if err == nil {
+		return &user, true
+	}
+	
+	// If not found by slug, try by numeric ID
+	if err := database.DB.First(&user, idOrSlug).Error; err != nil {
+		return nil, false
+	}
+	
+	return &user, true
+}
+
 // extractGCSObjectName extracts the object path from a GCS URL
 // Example: https://storage.googleapis.com/skillbridge-uploads/avatars/file.jpg -> avatars/file.jpg
 func extractGCSObjectName(url string) string {
@@ -74,9 +93,14 @@ func RegisterUser(c *gin.Context) {
 		return
 	}
 
+	// Generate unique slug from name
+	baseSlug := models.GenerateSlug(input.Name)
+	slug := ensureUniqueUserSlug(baseSlug, 0)
+
 	user := models.User{
 		FirebaseUID:  firebaseUID,
 		Name:         input.Name,
+		Slug:         slug,
 		Email:        emailStr,
 		University:   input.University,
 		Course:       input.Course,
@@ -156,20 +180,21 @@ func GetMyProfile(c *gin.Context) {
 
 // GetUserByID - Devolve o perfil público de um utilizador
 //
-// @Summary      Obter utilizador por ID
-// @Description  Devolve o perfil público de um utilizador
+// @Summary      Obter utilizador por ID ou slug
+// @Description  Devolve o perfil público de um utilizador (busca por slug ou ID numérico)
 // @Tags         users
 // @Produce      json
-// @Param        id   path      int  true  "ID do utilizador"
+// @Param        id   path      string  true  "ID numérico ou slug do utilizador"
 // @Success      200  {object}  models.User
 // @Failure      404  {object}  map[string]string
 // @Router       /users/{id} [get]
 func GetUserByID(c *gin.Context) {
-	var user models.User
-	if err := database.DB.First(&user, c.Param("id")).Error; err != nil {
+	user, found := getUserByIDOrSlug(c.Param("id"))
+	if !found {
 		c.JSON(http.StatusNotFound, gin.H{"error": "Utilizador não encontrado."})
 		return
 	}
+	
 	// Omitir email do perfil público
 	user.Email = ""
 	c.JSON(http.StatusOK, user)
@@ -222,6 +247,13 @@ func UpdateProfile(c *gin.Context) {
 				log.Printf("Warning: Failed to delete old avatar %s: %v", oldObjectName, err)
 			}
 		}
+	}
+
+	// If name is being updated, regenerate slug
+	if input.Name != "" && input.Name != user.Name {
+		baseSlug := models.GenerateSlug(input.Name)
+		newSlug := ensureUniqueUserSlug(baseSlug, user.ID)
+		user.Slug = newSlug
 	}
 
 	database.DB.Model(&user).Updates(input)

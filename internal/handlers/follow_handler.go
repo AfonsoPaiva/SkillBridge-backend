@@ -23,11 +23,11 @@ func getActorUser(c *gin.Context) (*models.User, bool) {
 // FollowUser - Seguir um utilizador
 //
 // @Summary      Seguir utilizador
-// @Description  O utilizador autenticado passa a seguir o utilizador com o ID indicado
+// @Description  O utilizador autenticado passa a seguir o utilizador com o ID ou slug indicado
 // @Tags         users
 // @Produce      json
 // @Security     BearerAuth
-// @Param        id   path  int  true  "ID do utilizador a seguir"
+// @Param        id   path  string  true  "ID ou slug do utilizador a seguir"
 // @Success      200  {object}  map[string]string
 // @Failure      400  {object}  map[string]string
 // @Failure      404  {object}  map[string]string
@@ -38,27 +38,25 @@ func FollowUser(c *gin.Context) {
 		return
 	}
 
-	targetID, err := strconv.ParseUint(c.Param("id"), 10, 64)
-	if err != nil || uint(targetID) == me.ID {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "ID inválido."})
+	target, found := getUserByIDOrSlug(c.Param("id"))
+	if !found {
+		c.JSON(http.StatusNotFound, gin.H{"error": "Utilizador não encontrado."})
 		return
 	}
 
-	// Confirm target exists
-	var target models.User
-	if err := database.DB.First(&target, targetID).Error; err != nil {
-		c.JSON(http.StatusNotFound, gin.H{"error": "Utilizador não encontrado."})
+	if target.ID == me.ID {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Não pode seguir-se a si próprio."})
 		return
 	}
 
 	// Idempotent: do nothing if already following
 	var existing models.Follow
-	if database.DB.Where("follower_id = ? AND following_id = ?", me.ID, targetID).First(&existing).Error == nil {
+	if database.DB.Where("follower_id = ? AND following_id = ?", me.ID, target.ID).First(&existing).Error == nil {
 		c.JSON(http.StatusOK, gin.H{"message": "Já está a seguir este utilizador."})
 		return
 	}
 
-	follow := models.Follow{FollowerID: me.ID, FollowingID: uint(targetID)}
+	follow := models.Follow{FollowerID: me.ID, FollowingID: target.ID}
 	if err := database.DB.Create(&follow).Error; err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Erro ao seguir utilizador."})
 		return
@@ -70,11 +68,11 @@ func FollowUser(c *gin.Context) {
 // UnfollowUser - Deixar de seguir um utilizador
 //
 // @Summary      Deixar de seguir utilizador
-// @Description  O utilizador autenticado deixa de seguir o utilizador com o ID indicado
+// @Description  O utilizador autenticado deixa de seguir o utilizador com o ID ou slug indicado
 // @Tags         users
 // @Produce      json
 // @Security     BearerAuth
-// @Param        id   path  int  true  "ID do utilizador"
+// @Param        id   path  string  true  "ID ou slug do utilizador"
 // @Success      200  {object}  map[string]string
 // @Failure      404  {object}  map[string]string
 // @Router       /users/{id}/follow [delete]
@@ -84,13 +82,13 @@ func UnfollowUser(c *gin.Context) {
 		return
 	}
 
-	targetID, err := strconv.ParseUint(c.Param("id"), 10, 64)
-	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "ID inválido."})
+	target, found := getUserByIDOrSlug(c.Param("id"))
+	if !found {
+		c.JSON(http.StatusNotFound, gin.H{"error": "Utilizador não encontrado."})
 		return
 	}
 
-	database.DB.Where("follower_id = ? AND following_id = ?", me.ID, targetID).Delete(&models.Follow{})
+	database.DB.Where("follower_id = ? AND following_id = ?", me.ID, target.ID).Delete(&models.Follow{})
 	c.JSON(http.StatusOK, gin.H{"message": "Deixou de seguir o utilizador."})
 }
 
@@ -101,7 +99,7 @@ func UnfollowUser(c *gin.Context) {
 // @Tags         users
 // @Produce      json
 // @Security     BearerAuth
-// @Param        id   path  int  true  "ID do utilizador alvo"
+// @Param        id   path  string  true  "ID ou slug do utilizador alvo"
 // @Success      200  {object}  map[string]interface{}
 // @Router       /users/{id}/follow/status [get]
 func GetFollowStatus(c *gin.Context) {
@@ -110,9 +108,14 @@ func GetFollowStatus(c *gin.Context) {
 		return
 	}
 
-	targetID, _ := strconv.ParseUint(c.Param("id"), 10, 64)
+	target, found := getUserByIDOrSlug(c.Param("id"))
+	if !found {
+		c.JSON(http.StatusOK, gin.H{"is_following": false})
+		return
+	}
+
 	var existing models.Follow
-	isFollowing := database.DB.Where("follower_id = ? AND following_id = ?", me.ID, targetID).First(&existing).Error == nil
+	isFollowing := database.DB.Where("follower_id = ? AND following_id = ?", me.ID, target.ID).First(&existing).Error == nil
 
 	c.JSON(http.StatusOK, gin.H{"is_following": isFollowing})
 }
@@ -123,18 +126,18 @@ func GetFollowStatus(c *gin.Context) {
 // @Description  Devolve a lista de utilizadores que seguem o utilizador indicado
 // @Tags         users
 // @Produce      json
-// @Param        id   path  int  true  "ID do utilizador"
+// @Param        id   path  string  true  "ID ou slug do utilizador"
 // @Success      200  {object}  map[string]interface{}
 // @Router       /users/{id}/followers [get]
 func GetFollowers(c *gin.Context) {
-	userID, err := strconv.ParseUint(c.Param("id"), 10, 64)
-	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "ID inválido."})
+	user, found := getUserByIDOrSlug(c.Param("id"))
+	if !found {
+		c.JSON(http.StatusNotFound, gin.H{"error": "Utilizador não encontrado."})
 		return
 	}
 
 	var follows []models.Follow
-	database.DB.Preload("Follower").Where("following_id = ?", userID).Find(&follows)
+	database.DB.Preload("Follower").Where("following_id = ?", user.ID).Find(&follows)
 
 	users := make([]models.User, 0, len(follows))
 	for _, f := range follows {
@@ -152,18 +155,18 @@ func GetFollowers(c *gin.Context) {
 // @Description  Devolve a lista de utilizadores que o utilizador indicado está a seguir
 // @Tags         users
 // @Produce      json
-// @Param        id   path  int  true  "ID do utilizador"
+// @Param        id   path  string  true  "ID ou slug do utilizador"
 // @Success      200  {object}  map[string]interface{}
 // @Router       /users/{id}/following [get]
 func GetFollowing(c *gin.Context) {
-	userID, err := strconv.ParseUint(c.Param("id"), 10, 64)
-	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "ID inválido."})
+	user, found := getUserByIDOrSlug(c.Param("id"))
+	if !found {
+		c.JSON(http.StatusNotFound, gin.H{"error": "Utilizador não encontrado."})
 		return
 	}
 
 	var follows []models.Follow
-	database.DB.Preload("Following").Where("follower_id = ?", userID).Find(&follows)
+	database.DB.Preload("Following").Where("follower_id = ?", user.ID).Find(&follows)
 
 	users := make([]models.User, 0, len(follows))
 	for _, f := range follows {
@@ -181,19 +184,19 @@ func GetFollowing(c *gin.Context) {
 // @Description  Devolve o número de seguidores e de utilizadores seguidos
 // @Tags         users
 // @Produce      json
-// @Param        id   path  int  true  "ID do utilizador"
+// @Param        id   path  string  true  "ID ou slug do utilizador"
 // @Success      200  {object}  map[string]interface{}
 // @Router       /users/{id}/follow/counts [get]
 func GetFollowCounts(c *gin.Context) {
-	userID, err := strconv.ParseUint(c.Param("id"), 10, 64)
-	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "ID inválido."})
+	user, found := getUserByIDOrSlug(c.Param("id"))
+	if !found {
+		c.JSON(http.StatusNotFound, gin.H{"error": "Utilizador não encontrado."})
 		return
 	}
 
 	var followers, following int64
-	database.DB.Model(&models.Follow{}).Where("following_id = ?", userID).Count(&followers)
-	database.DB.Model(&models.Follow{}).Where("follower_id = ?", userID).Count(&following)
+	database.DB.Model(&models.Follow{}).Where("following_id = ?", user.ID).Count(&followers)
+	database.DB.Model(&models.Follow{}).Where("follower_id = ?", user.ID).Count(&following)
 
 	c.JSON(http.StatusOK, gin.H{"followers": followers, "following": following})
 }
