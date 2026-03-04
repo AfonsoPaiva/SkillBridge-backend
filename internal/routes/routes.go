@@ -3,6 +3,7 @@ package routes
 import (
 	"log"
 	"net/http"
+	"strings"
 
 	"github.com/paiva/SkillBridge/Backend/config"
 	"github.com/paiva/SkillBridge/Backend/internal/handlers"
