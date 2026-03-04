@@ -26,9 +26,6 @@ COPY --from=builder /app/server .
 COPY --from=builder /app/config ./config
 COPY --from=builder /app/admin-dashboard.html .
 
-# Create uploads directory
-RUN mkdir -p /app/uploads
-
 EXPOSE 8080
 
 CMD ["./server"]

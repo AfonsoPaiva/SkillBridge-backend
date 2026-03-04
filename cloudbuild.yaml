@@ -20,6 +20,8 @@ steps:
       - 'europe-west1'
       - '--platform'
       - 'managed'
+      - '--set-env-vars'
+      - 'GCS_BUCKET_NAME=skillbridge-uploads,GCS_PROJECT_ID=$PROJECT_ID'
 
 images:
   - 'europe-west1-docker.pkg.dev/$PROJECT_ID/skillbridge/backend:$COMMIT_SHA'
