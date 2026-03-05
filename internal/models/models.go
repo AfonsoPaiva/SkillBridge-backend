@@ -85,6 +85,7 @@ type User struct {
 	// TOTP two-factor authentication
 	TOTPSecret   string       `gorm:"type:varchar(255);default:''" json:"-"` // TOTP secret (never sent to client)
 	TOTPEnabled  bool         `gorm:"default:false" json:"totp_enabled"`
+	TOTPVerifiedAt *time.Time `json:"totp_verified_at,omitempty"` // Last successful TOTP verification (persists across restarts)
 	CreatedAt    time.Time    `json:"created_at"`
 
 	// Relações

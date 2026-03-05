@@ -124,11 +124,12 @@ func AdminRequired() gin.HandlerFunc {
 			return
 		}
 
-		// 4. Se TOTP está ativado, verificar se tem sessão TOTP válida
+		// 4. Se TOTP está ativado, verificar se já foi verificado pelo menos uma vez
 		if user.TOTPEnabled {
-			if !ValidateTOTPSession(uid) {
+			if user.TOTPVerifiedAt == nil {
 				audit.LogAction(c, audit.ActionUnauthorized,
-					"TOTP session expired or missing | Path: %s", c.Request.URL.Path)
+					"TOTP not verified | Path: %s", c.Request.URL.Path)
+				log.Printf("[Admin] TOTP not verified for UID=%s - requires verification", uid)
 				c.JSON(http.StatusForbidden, gin.H{
 					"error":         "Autenticação TOTP necessária.",
 					"requires_totp": true,
@@ -136,6 +137,7 @@ func AdminRequired() gin.HandlerFunc {
 				c.Abort()
 				return
 			}
+			log.Printf("[Admin] TOTP verified for UID=%s (last verified: %s)", uid, user.TOTPVerifiedAt.Format("2006-01-02 15:04:05"))
 		}
 
 		// All checks passed - log successful admin access

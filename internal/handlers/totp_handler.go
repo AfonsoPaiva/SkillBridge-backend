@@ -11,7 +11,6 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/paiva/SkillBridge/Backend/internal/audit"
 	"github.com/paiva/SkillBridge/Backend/internal/database"
-	"github.com/paiva/SkillBridge/Backend/internal/middleware"
 	"github.com/paiva/SkillBridge/Backend/internal/models"
 	"github.com/pquerna/otp/totp"
 )
@@ -188,8 +187,10 @@ func TOTPVerify(c *gin.Context) {
 	}
 
 	// If first verification, enable TOTP
+	now := time.Now()
 	if !user.TOTPEnabled {
 		user.TOTPEnabled = true
+		user.TOTPVerifiedAt = &now
 		if err := database.DB.Save(&user).Error; err != nil {
 			log.Printf("[TOTP Verify] Failed to enable TOTP for UID %s: %v", firebaseUID, err)
 			audit.LogFailure(c, audit.ActionTOTPVerify, "Failed to enable TOTP")
@@ -197,13 +198,17 @@ func TOTPVerify(c *gin.Context) {
 			return
 		}
 		audit.LogAction(c, audit.ActionTOTPEnabled, "TOTP enabled for user ID=%d", user.ID)
-		log.Printf("[TOTP Verify] TOTP enabled for UID %s", firebaseUID)
+		log.Printf("[TOTP Verify] TOTP enabled and verified for UID %s", firebaseUID)
+	} else {
+		// Update verification timestamp
+		user.TOTPVerifiedAt = &now
+		if err := database.DB.Save(&user).Error; err != nil {
+			log.Printf("[TOTP Verify] Failed to update verification timestamp for UID %s: %v", firebaseUID, err)
+		}
+		log.Printf("[TOTP Verify] TOTP verification timestamp updated for UID %s", firebaseUID)
 	}
 
-	// Create TOTP session
-	middleware.CreateTOTPSession(firebaseUID, clientIP, c.Request.UserAgent())
 	audit.LogAction(c, audit.ActionTOTPVerify, "TOTP verification successful for user ID=%d", user.ID)
-	log.Printf("[TOTP Verify] Session created for UID %s", firebaseUID)
 
 	c.JSON(http.StatusOK, gin.H{
 		"success": true,
@@ -231,6 +236,7 @@ func TOTPDisable(c *gin.Context) {
 	// Disable TOTP
 	user.TOTPSecret = ""
 	user.TOTPEnabled = false
+	user.TOTPVerifiedAt = nil
 	if err := database.DB.Save(&user).Error; err != nil {
 		log.Printf("[TOTP Disable] Failed to disable TOTP for UID %s: %v", firebaseUID, err)
 		audit.LogFailure(c, audit.ActionTOTPDisable, "Failed to save")
@@ -238,10 +244,8 @@ func TOTPDisable(c *gin.Context) {
 		return
 	}
 
-	// Clear TOTP session
-	middleware.ClearTOTPSession(firebaseUID)
 	audit.LogAction(c, audit.ActionTOTPDisable, "TOTP disabled for user ID=%d", user.ID)
-	log.Printf("[TOTP Disable] TOTP disabled for UID %s", firebaseUID)
+	log.Printf("[TOTP Disable] TOTP disabled and verification cleared for UID %s", firebaseUID)
 
 	c.JSON(http.StatusOK, gin.H{"success": true})
 }
@@ -264,5 +268,7 @@ func TOTPStatus(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{
 		"totp_enabled": user.TOTPEnabled,
 		"has_secret":   user.TOTPSecret != "",
+		"verified":     user.TOTPVerifiedAt != nil,
+		"verified_at":  user.TOTPVerifiedAt,
 	})
 }

@@ -71,6 +71,8 @@ func Connect() {
 	alterIfMissing("messages", "meta_project_id", "INT")
 	alterIfMissing("messages", "meta_member_id", "INT")
 	alterIfMissing("messages", "meta_status", "VARCHAR(20) NOT NULL DEFAULT ''")
+	// TOTP persistent verification timestamp
+	alterIfMissing("users", "totp_verified_at", "TIMESTAMP")
 }
 
 // alterIfMissing adiciona uma coluna a uma tabela se ela ainda não existir.
