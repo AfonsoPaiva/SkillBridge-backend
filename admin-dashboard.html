@@ -151,6 +151,34 @@
   </div>
 </div>
 
+<!-- TOTP SETUP -->
+<div id="totp-setup-screen" style="display:none;position:fixed;inset:0;background:#f1f5f9;z-index:101;display:none;align-items:center;justify-content:center;">
+  <div class="login-box" style="max-width:420px;">
+    <h2>Setup Two-Factor Authentication</h2>
+    <p style="margin-bottom:20px;">Scan this QR code with Google Authenticator to enable 2FA:</p>
+    <div style="text-align:center;margin:20px 0;">
+      <img id="totp-qr" src="" alt="QR Code" style="max-width:100%;border:1px solid #e2e8f0;border-radius:8px;" />
+    </div>
+    <p style="font-size:13px;color:#64748b;margin-bottom:16px;">Or enter this secret manually:</p>
+    <input id="totp-secret-display" readonly style="width:100%;padding:8px;font-family:monospace;font-size:12px;border:1px solid #e2e8f0;border-radius:6px;margin-bottom:20px;text-align:center;" />
+    <p style="font-size:13px;color:#64748b;margin-bottom:12px;">Enter the 6-digit code from your authenticator app to verify:</p>
+    <input id="totp-verify-code" type="text" maxlength="6" placeholder="000000" style="width:100%;padding:12px;font-size:18px;text-align:center;border:1px solid #e2e8f0;border-radius:6px;margin-bottom:16px;" />
+    <button class="btn btn-primary" onclick="verifyTOTPSetup()" style="width:100%;">Verify & Enable TOTP</button>
+    <p id="totp-setup-error" style="color:#ef4444;margin-top:12px;font-size:13px;text-align:center;"></p>
+  </div>
+</div>
+
+<!-- TOTP VERIFICATION -->
+<div id="totp-verify-screen" style="display:none;position:fixed;inset:0;background:#f1f5f9;z-index:101;display:none;align-items:center;justify-content:center;">
+  <div class="login-box">
+    <h2>Two-Factor Authentication</h2>
+    <p style="margin-bottom:20px;">Enter the 6-digit code from your authenticator app:</p>
+    <input id="totp-code-input" type="text" maxlength="6" placeholder="000000" style="width:100%;padding:12px;font-size:18px;text-align:center;border:1px solid #e2e8f0;border-radius:6px;margin-bottom:16px;" />
+    <button class="btn btn-primary" onclick="verifyTOTP()" style="width:100%;">Verify</button>
+    <p id="totp-verify-error" style="color:#ef4444;margin-top:12px;font-size:13px;text-align:center;"></p>
+  </div>
+</div>
+
 <!-- MAIN APP -->
 <div class="layout" id="app" style="display:none">
   <nav>
@@ -160,6 +188,7 @@
     <a onclick="showPage('projects')" data-page="projects">Projects</a>
     <a onclick="showPage('reviews')"  data-page="reviews">Reviews</a>
     <a onclick="showPage('donations')"data-page="donations">Donations</a>
+    <a onclick="showPage('security')" data-page="security">Security (TOTP)</a>
     <a onclick="signOut()" style="margin-top:auto;color:#ef4444">Sign out</a>
   </nav>
   <main>
@@ -240,6 +269,18 @@
       </div>
     </div>
 
+    <!-- SECURITY / TOTP -->
+    <div id="page-security" class="page">
+      <h2 class="page-title">Security Settings</h2>
+      <div class="card" style="padding:24px;">
+        <h3 style="font-size:16px;margin-bottom:12px;">Two-Factor Authentication (TOTP)</h3>
+        <p style="color:#64748b;margin-bottom:20px;font-size:14px;">Secure your admin account with Google Authenticator.</p>
+        <div id="totp-status-container">
+          <p class="loading">Loading TOTP status...</p>
+        </div>
+      </div>
+    </div>
+
   </main>
 </div>
 
@@ -259,7 +300,6 @@
 <script>
   const CONFIG = {
     BASE_URL:         "{{.BaseURL}}",
-    ADMIN_KEY:        "{{.AdminKey}}",
     FIREBASE_API_KEY: "{{.FirebaseAPIKey}}"
   };
 </script>
@@ -287,9 +327,24 @@
     document.getElementById("login-error").textContent = "";
     try {
       await signInWithPopup(auth, provider);
-      document.getElementById("login-screen").style.display = "none";
-      document.getElementById("app").style.display = "flex";
-      loadOverview();
+      // Check TOTP status
+      const token = await getToken();
+      const statusRes = await fetch(CONFIG.BASE_URL + "/admin/totp/status", {
+        headers: { "Authorization": "Bearer " + token }
+      });
+      const status = await statusRes.json();
+      
+      if (!status.totp_enabled && !status.has_secret) {
+        // First time - setup TOTP
+        await setupTOTP();
+      } else if (status.totp_enabled) {
+        // TOTP is enabled - require verification
+        document.getElementById("login-screen").style.display = "none";
+        document.getElementById("totp-verify-screen").style.display = "flex";
+      } else {
+        // Has secret but not enabled yet - show setup
+        await setupTOTP();
+      }
     } catch(e) {
       document.getElementById("login-error").textContent = e.message;
     }
@@ -353,14 +408,19 @@
       method: method,
       headers: {
         "Content-Type":  "application/json",
-        "Authorization": "Bearer " + token,
-        "X-Admin-Key":   CONFIG.ADMIN_KEY
+        "Authorization": "Bearer " + token
       }
     };
     if (body) opts.body = JSON.stringify(body);
     const res = await fetch(CONFIG.BASE_URL + path, opts);
     if (!res.ok) {
       const err = await res.json().catch(function() { return {}; });
+      // If TOTP is required, show verification screen
+      if (err.requires_totp) {
+        document.getElementById("app").style.display = "none";
+        document.getElementById("totp-verify-screen").style.display = "flex";
+        throw new Error("TOTP verification required");
+      }
       throw new Error((err.error || res.statusText));
     }
     return res.json();
@@ -386,6 +446,7 @@
     if (name === "reviews")   loadReviews();
     if (name === "donations") loadDonations();
     if (name === "overview")  loadOverview();
+    if (name === "security")  loadSecurityPage();
   }
 
   function fmt(dateStr) {
@@ -619,6 +680,157 @@
       }).join("");
     } catch(e) { toast(e.message, true); }
   }
+
+  // ── TOTP / SECURITY ─────────────────────────────────────────
+  async function setupTOTP() {
+    try {
+      const token = await getToken();
+      const res = await fetch(CONFIG.BASE_URL + "/admin/totp/setup", {
+        method: "POST",
+        headers: { "Authorization": "Bearer " + token }
+      });
+      const data = await res.json();
+      
+      document.getElementById("totp-qr").src = data.qr_code;
+      document.getElementById("totp-secret-display").value = data.secret;
+      document.getElementById("login-screen").style.display = "none";
+      document.getElementById("totp-setup-screen").style.display = "flex";
+    } catch(e) {
+      toast("Failed to setup TOTP: " + e.message, true);
+    }
+  }
+
+  async function verifyTOTPSetup() {
+    const code = document.getElementById("totp-verify-code").value.trim();
+    if (!code || code.length !== 6) {
+      document.getElementById("totp-setup-error").textContent = "Please enter a 6-digit code";
+      return;
+    }
+    
+    try {
+      const token = await getToken();
+      const res = await fetch(CONFIG.BASE_URL + "/admin/totp/verify", {
+        method: "POST",
+        headers: {
+          "Authorization": "Bearer " + token,
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify({ code: code })
+      });
+      
+      if (!res.ok) {
+        const err = await res.json();
+        throw new Error(err.error || "Verification failed");
+      }
+      
+      document.getElementById("totp-setup-screen").style.display = "none";
+      document.getElementById("app").style.display = "flex";
+      toast("TOTP enabled successfully!");
+      loadOverview();
+    } catch(e) {
+      document.getElementById("totp-setup-error").textContent = e.message;
+    }
+  }
+
+  async function verifyTOTP() {
+    const code = document.getElementById("totp-code-input").value.trim();
+    if (!code || code.length !== 6) {
+      document.getElementById("totp-verify-error").textContent = "Please enter a 6-digit code";
+      return;
+    }
+    
+    try {
+      const token = await getToken();
+      const res = await fetch(CONFIG.BASE_URL + "/admin/totp/verify", {
+        method: "POST",
+        headers: {
+          "Authorization": "Bearer " + token,
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify({ code: code })
+      });
+      
+      if (!res.ok) {
+        const err = await res.json();
+        throw new Error(err.error || "Invalid code");
+      }
+      
+      document.getElementById("totp-verify-screen").style.display = "none";
+      document.getElementById("app").style.display = "flex";
+      toast("Verified successfully!");
+      loadOverview();
+    } catch(e) {
+      document.getElementById("totp-verify-error").textContent = e.message;
+    }
+  }
+
+  async function loadSecurityPage() {
+    const container = document.getElementById("totp-status-container");
+    try {
+      const token = await getToken();
+      const res = await fetch(CONFIG.BASE_URL + "/admin/totp/status", {
+        headers: { "Authorization": "Bearer " + token }
+      });
+      const status = await res.json();
+      
+      if (status.totp_enabled) {
+        container.innerHTML = `
+          <div style="display:flex;align-items:center;gap:12px;padding:16px;background:#dcfce7;border:1px solid #86efac;border-radius:8px;margin-bottom:16px;">
+            <svg width="20" height="20" viewBox="0 0 20 20" fill="#16a34a"><path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd"/></svg>
+            <span style="color:#16a34a;font-weight:500;">TOTP is enabled and active</span>
+          </div>
+          <button class="btn btn-danger" onclick="disableTOTP()">Disable TOTP</button>
+        `;
+      } else {
+        container.innerHTML = `
+          <div style="display:flex;align-items:center;gap:12px;padding:16px;background:#fee2e2;border:1px solid #fca5a5;border-radius:8px;margin-bottom:16px;">
+            <svg width="20" height="20" viewBox="0 0 20 20" fill="#dc2626"><path fill-rule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7 4a1 1 0 11-2 0 1 1 0 012 0zm-1-9a1 1 0 00-1 1v4a1 1 0 102 0V6a1 1 0 00-1-1z" clip-rule="evenodd"/></svg>
+            <span style="color:#dc2626;font-weight:500;">TOTP is not enabled</span>
+          </div>
+          <button class="btn btn-primary" onclick="setupTOTP()">Enable TOTP</button>
+        `;
+      }
+    } catch(e) {
+      container.innerHTML = '<p style="color:#ef4444;">Failed to load TOTP status</p>';
+    }
+  }
+
+  async function disableTOTP() {
+    const code = prompt("Enter your current TOTP code to disable 2FA:");
+    if (!code) return;
+    
+    try {
+      const token = await getToken();
+      const res = await fetch(CONFIG.BASE_URL + "/admin/totp/disable", {
+        method: "POST",
+        headers: {
+          "Authorization": "Bearer " + token,
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify({ code: code })
+      });
+      
+      if (!res.ok) {
+        const err = await res.json();
+        throw new Error(err.error || "Failed to disable TOTP");
+      }
+      
+      toast("TOTP disabled successfully");
+      loadSecurityPage();
+    } catch(e) {
+      toast(e.message, true);
+    }
+  }
+
+  // Enable TOTP code input on Enter key
+  document.addEventListener('DOMContentLoaded', function() {
+    document.getElementById('totp-code-input')?.addEventListener('keypress', function(e) {
+      if (e.key === 'Enter') verifyTOTP();
+    });
+    document.getElementById('totp-verify-code')?.addEventListener('keypress', function(e) {
+      if (e.key === 'Enter') verifyTOTPSetup();
+    });
+  });
 
 </script>
 </body>

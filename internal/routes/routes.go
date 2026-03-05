@@ -2,7 +2,6 @@ package routes
 
 import (
 	"log"
-	"net/http"
 	"strings"
 
 	"github.com/paiva/SkillBridge/Backend/config"
@@ -44,35 +43,8 @@ func Setup(r *gin.Engine) {
 		c.Next()
 	})
 
-	// Admin dashboard — first visit: /admin-dashboard?key=<ADMIN_SECRET_KEY>
-	// After that the browser uses a session cookie automatically.
-	r.GET("/admin-dashboard", func(c *gin.Context) {
-		secret := config.AppConfig.AdminSecretKey
-		if secret == "" {
-			c.AbortWithStatus(http.StatusServiceUnavailable)
-			return
-		}
-
-		// Check cookie first
-		cookie, err := c.Cookie("admin_session")
-		validCookie := err == nil && cookie == secret
-
-		// Check query param
-		queryKey := c.Query("key")
-		validKey := queryKey != "" && queryKey == secret
-
-		if !validCookie && !validKey {
-			c.AbortWithStatus(http.StatusForbidden)
-			return
-		}
-
-		// Set/renew cookie (7 days, HttpOnly, SameSite=Strict)
-		// Secure flag: true in production (HTTPS), auto-detect based on TLS
-		isSecure := c.Request.TLS != nil || config.AppConfig.Env == "production"
-		c.SetCookie("admin_session", secret, 7*24*3600, "/", "", isSecure, true)
-
-		handlers.AdminDashboard(c)
-	})
+	// Admin dashboard — now secured with Firebase Auth + TOTP only
+	r.GET("/admin-dashboard", handlers.AdminDashboard)
 
 	// CORS - permite pedidos do frontend Angular (production-safe)
 	r.Use(func(c *gin.Context) {
@@ -111,7 +83,7 @@ func Setup(r *gin.Engine) {
 			c.Header("Access-Control-Allow-Origin", origin)
 			c.Header("Access-Control-Allow-Credentials", "true")
 			c.Header("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS, PATCH")
-			c.Header("Access-Control-Allow-Headers", "Content-Type, Authorization, X-Admin-Key, Origin, Accept")
+			c.Header("Access-Control-Allow-Headers", "Content-Type, Authorization, Origin, Accept")
 			c.Header("Access-Control-Max-Age", "86400") // Cache preflight for 24 hours
 		}
 		
@@ -233,7 +205,20 @@ func Setup(r *gin.Engine) {
 	}
 
 	// --------------------------------------------------
-	// ROTAS DE ADMINISTRAÇÃO (requerem token + UID admin)
+	// ROTAS DE TOTP (requerem apenas token Firebase, não TOTP)
+	// Estas permitem configurar e verificar TOTP antes de enforçar
+	// --------------------------------------------------
+	totp := api.Group("/admin/totp")
+	totp.Use(middleware.AuthRequired())
+	{
+		totp.GET("/status", handlers.CheckTOTPStatus)
+		totp.POST("/setup", handlers.SetupTOTP)
+		totp.POST("/verify", handlers.VerifyTOTP)
+		totp.POST("/disable", handlers.DisableTOTP)
+	}
+
+	// --------------------------------------------------
+	// ROTAS DE ADMINISTRAÇÃO (requerem token + UID admin + TOTP válido)
 	// --------------------------------------------------
 	admin := api.Group("/admin")
 	admin.Use(middleware.AuthRequired(), middleware.AdminRequired())
@@ -247,5 +232,6 @@ func Setup(r *gin.Engine) {
 		admin.GET("/reviews", handlers.AdminListReviews)
 		admin.PUT("/reviews/:id", handlers.AdminDecideReview)
 		admin.DELETE("/reviews/:id", handlers.AdminDeleteReview)
+		admin.GET("/audit-logs", handlers.AdminGetAuditLogs)
 	}
 }

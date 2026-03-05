@@ -3,8 +3,10 @@ package handlers
 import (
 	"log"
 	"net/http"
+	"strconv"
 
 	"github.com/gin-gonic/gin"
+	"github.com/paiva/SkillBridge/Backend/internal/audit"
 	"github.com/paiva/SkillBridge/Backend/internal/database"
 	"github.com/paiva/SkillBridge/Backend/internal/models"
 	"github.com/paiva/SkillBridge/Backend/internal/middleware"
@@ -61,9 +63,15 @@ func AdminGetUser(c *gin.Context) {
 func AdminDeleteUser(c *gin.Context) {
 	var user models.User
 	if err := database.DB.First(&user, c.Param("id")).Error; err != nil {
+		audit.LogFailure(c, audit.ActionUserDelete, "User not found")
 		c.JSON(http.StatusNotFound, gin.H{"error": "Utilizador não encontrado."})
 		return
 	}
+	
+	userID := user.ID
+	userName := user.Name
+	userEmail := user.Email
+	
 	// perform the same cleanup as DeleteMyProfile
 	// Delete owned projects and their images from GCS
 	var ownedProjects []models.Project
@@ -117,7 +125,11 @@ func AdminDeleteUser(c *gin.Context) {
     }
   }
 	database.DB.Delete(&user)
-	c.JSON(http.StatusOK, gin.H{"message": "Utilizador eliminado."})
+	
+	audit.LogAction(c, audit.ActionUserDelete, 
+		"Deleted user ID=%d Name=%s Email=%s", userID, userName, userEmail)
+	
+	c.JSON(http.StatusOK, gin.H{"message": "Utilizador eliminado com sucesso."})
 }
 
 // AdminListProjects - Lista todos os projetos (admin)
@@ -149,18 +161,28 @@ func AdminListProjects(c *gin.Context) {
 func AdminDeleteProject(c *gin.Context) {
 	var project models.Project
 	if err := database.DB.First(&project, c.Param("id")).Error; err != nil {
+		audit.LogFailure(c, audit.ActionProjectDelete, "Project not found")
 		c.JSON(http.StatusNotFound, gin.H{"error": "Projeto não encontrado."})
 		return
 	}
+	
+	projectID := project.ID
+	projectTitle := project.Title
+	
 	// Delete child records first to avoid FK constraint violations
 	database.DB.Where("project_id = ?", project.ID).Delete(&models.ProjectOwner{})
 	database.DB.Where("project_id = ?", project.ID).Delete(&models.ProjectRole{})
 	database.DB.Where("project_id = ?", project.ID).Delete(&models.ProjectMember{})
 	database.DB.Where("project_id = ?", project.ID).Delete(&models.Review{})
 	if err := database.DB.Delete(&project).Error; err != nil {
+		audit.LogFailure(c, audit.ActionProjectDelete, "Database error")
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Erro ao eliminar projeto."})
 		return
 	}
+	
+	audit.LogAction(c, audit.ActionProjectDelete, 
+		"Deleted project ID=%d Title=%s", projectID, projectTitle)
+	
 	c.JSON(http.StatusOK, gin.H{"message": "Projeto eliminado."})
 }
 
@@ -217,6 +239,7 @@ func AdminListReviews(c *gin.Context) {
 func AdminDecideReview(c *gin.Context) {
 	var review models.Review
 	if err := database.DB.First(&review, c.Param("id")).Error; err != nil {
+		audit.LogFailure(c, audit.ActionReviewApprove, "Review not found")
 		c.JSON(http.StatusNotFound, gin.H{"error": "Avaliação não encontrada."})
 		return
 	}
@@ -225,15 +248,24 @@ func AdminDecideReview(c *gin.Context) {
 		Status string `json:"status" binding:"required"`
 	}
 	if err := c.ShouldBindJSON(&input); err != nil {
+		audit.LogFailure(c, audit.ActionReviewApprove, "Invalid input")
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
 	if input.Status != "approved" && input.Status != "rejected" {
+		audit.LogFailure(c, audit.ActionReviewApprove, "Invalid status: "+input.Status)
 		c.JSON(http.StatusBadRequest, gin.H{"error": "Estado inválido. Use 'approved' ou 'rejected'."})
 		return
 	}
 
 	database.DB.Model(&review).Update("status", input.Status)
+	
+	if input.Status == "approved" {
+		audit.LogAction(c, audit.ActionReviewApprove, "Approved review ID=%d", review.ID)
+	} else {
+		audit.LogAction(c, audit.ActionReviewReject, "Rejected review ID=%d", review.ID)
+	}
+	
 	c.JSON(http.StatusOK, gin.H{"message": "Avaliação " + input.Status + ".", "review_id": review.ID})
 }
 
@@ -251,9 +283,54 @@ func AdminDecideReview(c *gin.Context) {
 func AdminDeleteReview(c *gin.Context) {
 	var review models.Review
 	if err := database.DB.First(&review, c.Param("id")).Error; err != nil {
+		audit.LogFailure(c, audit.ActionReviewDelete, "Review not found")
 		c.JSON(http.StatusNotFound, gin.H{"error": "Avaliação não encontrada."})
 		return
 	}
+	
+	reviewID := review.ID
+	
 	database.DB.Delete(&review)
+	
+	audit.LogAction(c, audit.ActionReviewDelete, "Deleted review ID=%d", reviewID)
+	
 	c.JSON(http.StatusOK, gin.H{"message": "Avaliação eliminada."})
+}
+
+// AdminGetAuditLogs - Lista registos de auditoria (admin)
+//
+// @Summary      [Admin] Listar audit logs
+// @Description  Devolve registos de auditoria de ações administrativas
+// @Tags         admin
+// @Produce      json
+// @Security     BearerAuth
+// @Param        uid     query  string  false  "Filtrar por Firebase UID"
+// @Param        action  query  string  false  "Filtrar por tipo de ação"
+// @Param        limit   query  int     false  "Número máximo de registos (default: 100)"
+// @Success      200  {array}   models.AuditLog
+// @Router       /admin/audit-logs [get]
+func AdminGetAuditLogs(c *gin.Context) {
+	uid := c.Query("uid")
+	action := c.Query("action")
+	limit := 100
+	if l := c.Query("limit"); l != "" {
+		if parsed, err := strconv.Atoi(l); err == nil && parsed > 0 && parsed <= 1000 {
+			limit = parsed
+		}
+	}
+
+	var logs []models.AuditLog
+	query := database.DB.Order("timestamp DESC")
+
+	if uid != "" {
+		query = query.Where("firebase_uid = ?", uid)
+	}
+	if action != "" {
+		query = query.Where("action = ?", action)
+	}
+
+	query = query.Limit(limit)
+	query.Find(&logs)
+
+	c.JSON(http.StatusOK, logs)
 }

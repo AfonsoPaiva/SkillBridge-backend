@@ -82,6 +82,9 @@ type User struct {
 	Skills       StringList   `gorm:"type:jsonb;default:'[]'" json:"skills"`
 	// Onboarding preferences — collected on first visit (guest or registered)
 	Role         string       `gorm:"type:varchar(20);default:''" json:"role"` // needs_help | helper
+	// TOTP two-factor authentication
+	TOTPSecret   string       `gorm:"type:varchar(255);default:''" json:"-"` // TOTP secret (never sent to client)
+	TOTPEnabled  bool         `gorm:"default:false" json:"totp_enabled"`
 	CreatedAt    time.Time    `json:"created_at"`
 
 	// Relações
@@ -330,5 +333,18 @@ func normalizeAccents(s string) string {
 	}
 	
 	return result.String()
+}
+
+// --------------------------------------------------
+// AUDIT_LOG - Admin action audit trail
+// --------------------------------------------------
+type AuditLog struct {
+	ID          uint      `gorm:"primaryKey;autoIncrement" json:"id"`
+	FirebaseUID string    `gorm:"index;not null" json:"firebase_uid"`
+	Action      string    `gorm:"type:varchar(50);not null" json:"action"`
+	Details     string    `json:"details"`
+	IPAddress   string    `gorm:"type:varchar(100)" json:"ip_address"`
+	UserAgent   string    `json:"user_agent"`
+	Timestamp   time.Time `gorm:"index;not null" json:"timestamp"`
 }
 

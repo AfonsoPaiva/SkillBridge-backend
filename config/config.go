@@ -6,6 +6,7 @@ import (
 	"log"
 	"os"
 	"sort"
+	"strconv"
 	"strings"
 
 	"github.com/joho/godotenv"
@@ -102,10 +103,14 @@ type Config struct {
 	MailgunDomain           string
 	MailgunSender           string
 	AdminUIDs               []string // Firebase UIDs com acesso admin
-	AdminSecretKey          string   // Chave secreta adicional para rotas de admin
+	AdminSecretKey          string   // Chave secreta adicional para rotas de admin (deprecated)
+	AdminAllowedIPs         []string // Lista de IPs permitidos para acesso admin (opcional)
 	FirebaseAPIKey          string   // Web API Key (para o dashboard admin)
 	FirebaseAuthDomain      string   // <project>.firebaseapp.com
 	FirebaseProjectID       string   // Project ID
+	// Rate limiting
+	TOTPMaxAttempts         int      // Máximo de tentativas TOTP por período
+	TOTPRateLimitWindow     int      // Janela de tempo em segundos para rate limit
 }
 
 var AppConfig Config
@@ -139,15 +144,29 @@ func Load() {
 		MailgunSender:           getEnv("MAILGUN_SENDER", "noreply@skillbridge.pt"),
 		AdminUIDs:               parseList(getEnv("ADMIN_UIDS", "")),
 		AdminSecretKey:          getEnv("ADMIN_SECRET_KEY", ""),
+		AdminAllowedIPs:         parseList(getEnv("ADMIN_ALLOWED_IPS", "")),
 		FirebaseAPIKey:          getEnv("FIREBASE_API_KEY", ""),
 		FirebaseAuthDomain:      getEnv("FIREBASE_AUTH_DOMAIN", ""),
 		FirebaseProjectID:       getEnv("FIREBASE_PROJECT_ID", ""),
+		TOTPMaxAttempts:         getEnvInt("TOTP_MAX_ATTEMPTS", 5),
+		TOTPRateLimitWindow:     getEnvInt("TOTP_RATE_LIMIT_WINDOW", 60),
 	}
 }
 
 func getEnv(key, fallback string) string {
 	if value, exists := os.LookupEnv(key); exists {
 		return value
+	}
+	return fallback
+}
+
+// getEnvInt retrieves an environment variable as an integer with a fallback.
+func getEnvInt(key string, fallback int) int {
+	if value, exists := os.LookupEnv(key); exists {
+		if intVal, err := strconv.Atoi(value); err == nil {
+			return intVal
+		}
+		log.Printf("Warning: Invalid integer value for %s, using default %d", key, fallback)
 	}
 	return fallback
 }

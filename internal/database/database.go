@@ -165,6 +165,8 @@ func migrate() error {
 		&models.GuestSession{},
 		// Follow relationships
 		&models.Follow{},
+		// Audit logging
+		&models.AuditLog{},
 	}
 	for _, t := range tables {
 		if !DB.Migrator().HasTable(t) {
