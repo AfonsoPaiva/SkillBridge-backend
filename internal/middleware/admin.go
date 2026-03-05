@@ -1,6 +1,7 @@
 package middleware
 
 import (
+	"log"
 	"net/http"
 	"strings"
 
@@ -37,19 +38,52 @@ func getClientIP(c *gin.Context) string {
 func isIPAllowed(ip string) bool {
 	// If no IP whitelist is configured, allow all
 	if len(config.AppConfig.AdminAllowedIPs) == 0 {
+		log.Printf("[IP Whitelist] No IP restrictions configured - allowing all IPs")
 		return true
 	}
+
+	log.Printf("[IP Whitelist] Checking IP %s against whitelist: %v", ip, config.AppConfig.AdminAllowedIPs)
 
 	// Check if IP is in the whitelist
 	for _, allowedIP := range config.AppConfig.AdminAllowedIPs {
 		if allowedIP == ip {
+			log.Printf("[IP Whitelist] IP %s matched whitelist entry %s - ALLOWED", ip, allowedIP)
 			return true
 		}
 		// Support CIDR notation or wildcard patterns in the future
 		// For now, exact match only
 	}
 
+	log.Printf("[IP Whitelist] IP %s not found in whitelist - DENIED", ip)
 	return false
+}
+
+// IPWhitelistRequired checks if the client IP is in the admin whitelist
+// Use this before AuthRequired for routes that should only be accessible from whitelisted IPs
+func IPWhitelistRequired() gin.HandlerFunc {
+	return func(c *gin.Context) {
+		clientIP := getClientIP(c)
+		
+		// Skip check if no whitelist is configured
+		if len(config.AppConfig.AdminAllowedIPs) == 0 {
+			c.Next()
+			return
+		}
+		
+		log.Printf("[IP Whitelist] Checking access to %s from IP %s", c.Request.URL.Path, clientIP)
+		
+		if !isIPAllowed(clientIP) {
+			log.Printf("[IP Whitelist] Access DENIED to %s from IP %s (not in whitelist)", c.Request.URL.Path, clientIP)
+			c.JSON(http.StatusForbidden, gin.H{
+				"error": "Acesso negado. Seu IP não está autorizado.",
+			})
+			c.Abort()
+			return
+		}
+		
+		log.Printf("[IP Whitelist] Access ALLOWED to %s from IP %s", c.Request.URL.Path, clientIP)
+		c.Next()
+	}
 }
 
 // AdminRequired verifica se o utilizador é administrador e tem TOTP válido (se ativado).
@@ -69,11 +103,13 @@ func AdminRequired() gin.HandlerFunc {
 		}
 
 		// 2. IP Whitelisting (if configured)
+		log.Printf("[Admin] Checking IP whitelist for UID=%s IP=%s Path=%s", uid, clientIP, c.Request.URL.Path)
 		if !isIPAllowed(clientIP) {
 			audit.LogAction(c, audit.ActionUnauthorized,
 				"IP not whitelisted: %s | Path: %s", clientIP, c.Request.URL.Path)
+			log.Printf("[Admin] Access DENIED for UID=%s from IP=%s (not in whitelist)", uid, clientIP)
 			c.JSON(http.StatusForbidden, gin.H{
-				"error": "Acesso negado. IP não autorizado.",
+				"error": "Acesso negado. Seu IP não está autorizado a acessar o painel administrativo.",
 			})
 			c.Abort()
 			return

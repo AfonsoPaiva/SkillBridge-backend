@@ -43,8 +43,8 @@ func Setup(r *gin.Engine) {
 		c.Next()
 	})
 
-	// Admin dashboard — now secured with Firebase Auth + TOTP only
-	r.GET("/admin-dashboard", handlers.AdminDashboard)
+	// Admin dashboard — protected by IP whitelist (if configured)
+	r.GET("/admin-dashboard", middleware.IPWhitelistRequired(), handlers.AdminDashboard)
 
 	// CORS - permite pedidos do frontend Angular (production-safe)
 	r.Use(func(c *gin.Context) {
@@ -205,11 +205,11 @@ func Setup(r *gin.Engine) {
 	}
 
 	// --------------------------------------------------
-	// ROTAS DE TOTP (requerem apenas token Firebase, não TOTP)
-	// Estas permitem configurar e verificar TOTP antes de enforçar
+	// ROTAS DE TOTP (requerem IP whitelist + token Firebase, não TOTP)
+	// Estas permitem configurar e verificar TOTP antes de enforcar
 	// --------------------------------------------------
 	totp := api.Group("/admin/totp")
-	totp.Use(middleware.AuthRequired())
+	totp.Use(middleware.IPWhitelistRequired(), middleware.AuthRequired())
 	{
 		totp.GET("/status", handlers.TOTPStatus)
 		totp.POST("/setup", handlers.TOTPSetup)

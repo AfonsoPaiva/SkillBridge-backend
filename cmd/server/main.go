@@ -60,6 +60,17 @@ func main() {
 	if config.AppConfig.Env != "production" {
 		log.Printf("║  Swagger Docs:      http://localhost:%s/swagger/index.html", port)
 	}
+	log.Printf("╠══════════════════════════════════════════════════════════╣")
+	log.Printf("║  Admin Configuration:")
+	log.Printf("║    Allowed UIDs:  %d configured", len(config.AppConfig.AdminUIDs))
+	if len(config.AppConfig.AdminAllowedIPs) > 0 {
+		log.Printf("║    IP Whitelist:  %d IPs configured", len(config.AppConfig.AdminAllowedIPs))
+		for _, ip := range config.AppConfig.AdminAllowedIPs {
+			log.Printf("║      - %s", ip)
+		}
+	} else {
+		log.Printf("║    IP Whitelist:  DISABLED (all IPs allowed)")
+	}
 	log.Printf("╚══════════════════════════════════════════════════════════╝")
 
 	if err := r.Run(":" + port); err != nil {
