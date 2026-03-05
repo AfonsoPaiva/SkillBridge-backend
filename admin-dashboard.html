@@ -155,13 +155,14 @@
 <div id="totp-setup-screen" style="display:none;position:fixed;inset:0;background:#f1f5f9;z-index:101;display:none;align-items:center;justify-content:center;">
   <div class="login-box" style="max-width:420px;">
     <h2>Setup Two-Factor Authentication</h2>
-    <p style="margin-bottom:20px;">Scan this QR code with Google Authenticator to enable 2FA:</p>
+    <p style="margin-bottom:20px;">Add this account to Google Authenticator:</p>
     <div style="text-align:center;margin:20px 0;">
-      <img id="totp-qr" src="" alt="QR Code" style="max-width:100%;border:1px solid #e2e8f0;border-radius:8px;" />
+      <p style="font-size:13px;color:#64748b;margin-bottom:8px;font-weight:600;">Manual Entry Secret:</p>
+      <input id="totp-secret-display" readonly style="width:100%;padding:12px;font-family:monospace;font-size:14px;border:1px solid #e2e8f0;border-radius:6px;text-align:center;background:#f8fafc;" />
+      <p style="font-size:12px;color:#94a3b8;margin-top:8px;">Open Google Authenticator → Add account → Enter a setup key</p>
+      <p style="font-size:12px;color:#94a3b8;">Account: Your email | Key: Copy the secret above</p>
     </div>
-    <p style="font-size:13px;color:#64748b;margin-bottom:16px;">Or enter this secret manually:</p>
-    <input id="totp-secret-display" readonly style="width:100%;padding:8px;font-family:monospace;font-size:12px;border:1px solid #e2e8f0;border-radius:6px;margin-bottom:20px;text-align:center;" />
-    <p style="font-size:13px;color:#64748b;margin-bottom:12px;">Enter the 6-digit code from your authenticator app to verify:</p>
+    <p style="font-size:13px;color:#64748b;margin-bottom:12px;margin-top:24px;">Enter the 6-digit code from your authenticator app to verify:</p>
     <input id="totp-verify-code" type="text" maxlength="6" placeholder="000000" style="width:100%;padding:12px;font-size:18px;text-align:center;border:1px solid #e2e8f0;border-radius:6px;margin-bottom:16px;" />
     <button class="btn btn-primary" onclick="verifyTOTPSetup()" style="width:100%;">Verify & Enable TOTP</button>
     <p id="totp-setup-error" style="color:#ef4444;margin-top:12px;font-size:13px;text-align:center;"></p>
@@ -326,9 +327,22 @@
   window.signIn = async function() {
     document.getElementById("login-error").textContent = "";
     try {
-      await signInWithPopup(auth, provider);
+      const result = await signInWithPopup(auth, provider);
+      const token = await result.user.getIdToken();
+      
+      // Immediate admin UID check
+      const adminCheckRes = await fetch(CONFIG.BASE_URL + "/admin/users", {
+        headers: { "Authorization": "Bearer " + token }
+      });
+      
+      if (!adminCheckRes.ok) {
+        // Not an admin - sign out immediately
+        await fbSignOut(auth);
+        document.getElementById("login-error").textContent = "Access denied. You are not authorized as an administrator.";
+        return;
+      }
+      
       // Check TOTP status
-      const token = await getToken();
       const statusRes = await fetch(CONFIG.BASE_URL + "/admin/totp/status", {
         headers: { "Authorization": "Bearer " + token }
       });
@@ -691,7 +705,7 @@
       });
       const data = await res.json();
       
-      document.getElementById("totp-qr").src = data.qr_code;
+      // Only show the manual secret (no QR code)
       document.getElementById("totp-secret-display").value = data.secret;
       document.getElementById("login-screen").style.display = "none";
       document.getElementById("totp-setup-screen").style.display = "flex";
@@ -781,6 +795,14 @@
           </div>
           <button class="btn btn-danger" onclick="disableTOTP()">Disable TOTP</button>
         `;
+      } else if (status.has_secret) {
+        container.innerHTML = `
+          <div style="display:flex;align-items:center;gap:12px;padding:16px;background:#fef3c7;border:1px solid #fcd34d;border-radius:8px;margin-bottom:16px;">
+            <svg width="20" height="20" viewBox="0 0 20 20" fill="#d97706"><path fill-rule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clip-rule="evenodd"/></svg>
+            <span style="color:#d97706;font-weight:500;">TOTP setup incomplete - verification required</span>
+          </div>
+          <button class="btn btn-primary" onclick="setupTOTP()">Complete TOTP Setup</button>
+        `;
       } else {
         container.innerHTML = `
           <div style="display:flex;align-items:center;gap:12px;padding:16px;background:#fee2e2;border:1px solid #fca5a5;border-radius:8px;margin-bottom:16px;">
@@ -796,8 +818,9 @@
   }
 
   async function disableTOTP() {
-    const code = prompt("Enter your current TOTP code to disable 2FA:");
-    if (!code) return;
+    if (!confirm("Are you sure you want to disable two-factor authentication? This will make your account less secure.")) {
+      return;
+    }
     
     try {
       const token = await getToken();
@@ -806,8 +829,7 @@
         headers: {
           "Authorization": "Bearer " + token,
           "Content-Type": "application/json"
-        },
-        body: JSON.stringify({ code: code })
+        }
       });
       
       if (!res.ok) {

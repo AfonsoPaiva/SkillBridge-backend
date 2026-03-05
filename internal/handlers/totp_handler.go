@@ -68,7 +68,7 @@ func checkTOTPRateLimit(uid, ip string) bool {
 	return true // Within rate limit
 }
 
-// TOTPSetup gera um novo segredo TOTP e retorna o QR code
+// TOTPSetup gera um novo segredo TOTP (apenas se não existir) e retorna o segredo
 func TOTPSetup(c *gin.Context) {
 	firebaseUID := c.GetString("firebase_uid")
 	if firebaseUID == "" {
@@ -77,7 +77,7 @@ func TOTPSetup(c *gin.Context) {
 		return
 	}
 
-	// Get user info for better QR code labeling
+	// Get user
 	var user models.User
 	if err := database.DB.Where("firebase_uid = ?", firebaseUID).First(&user).Error; err != nil {
 		log.Printf("[TOTP Setup] User not found for UID %s: %v", firebaseUID, err)
@@ -86,7 +86,17 @@ func TOTPSetup(c *gin.Context) {
 		return
 	}
 
-	// Generate TOTP key
+	// If user already has a TOTP secret, return it (don't regenerate)
+	if user.TOTPSecret != "" {
+		log.Printf("[TOTP Setup] Returning existing TOTP secret for UID %s", firebaseUID)
+		c.JSON(http.StatusOK, gin.H{
+			"secret":      user.TOTPSecret,
+			"totp_enabled": user.TOTPEnabled,
+		})
+		return
+	}
+
+	// Generate new TOTP key (first time only)
 	issuer := "SkillBridge"
 	if customIssuer := os.Getenv("TOTP_ISSUER"); customIssuer != "" {
 		issuer = customIssuer
@@ -118,10 +128,10 @@ func TOTPSetup(c *gin.Context) {
 	audit.LogAction(c, audit.ActionTOTPSetup, "TOTP setup initiated for user ID=%d", user.ID)
 	log.Printf("[TOTP Setup] Successfully generated TOTP for UID %s", firebaseUID)
 
-	// Return QR code URL and secret
+	// Return only the secret (no QR code)
 	c.JSON(http.StatusOK, gin.H{
-		"qr_code": key.URL(),
-		"secret":  key.Secret(),
+		"secret":      key.Secret(),
+		"totp_enabled": false,
 	})
 }
 
@@ -251,5 +261,8 @@ func TOTPStatus(c *gin.Context) {
 		return
 	}
 
-	c.JSON(http.StatusOK, gin.H{"enabled": user.TOTPEnabled})
+	c.JSON(http.StatusOK, gin.H{
+		"totp_enabled": user.TOTPEnabled,
+		"has_secret":   user.TOTPSecret != "",
+	})
 }
