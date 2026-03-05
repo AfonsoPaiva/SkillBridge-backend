@@ -18,6 +18,8 @@ const (
 	ActionLogout         ActionType = "LOGOUT"
 	ActionTOTPSetup      ActionType = "TOTP_SETUP"
 	ActionTOTPVerify     ActionType = "TOTP_VERIFY"
+	ActionTOTPVerifyFailed ActionType = "TOTP_VERIFY_FAILED"
+	ActionTOTPEnabled    ActionType = "TOTP_ENABLED"
 	ActionTOTPDisable    ActionType = "TOTP_DISABLE"
 	ActionUserDelete     ActionType = "USER_DELETE"
 	ActionProjectDelete  ActionType = "PROJECT_DELETE"

@@ -211,10 +211,10 @@ func Setup(r *gin.Engine) {
 	totp := api.Group("/admin/totp")
 	totp.Use(middleware.AuthRequired())
 	{
-		totp.GET("/status", handlers.CheckTOTPStatus)
-		totp.POST("/setup", handlers.SetupTOTP)
-		totp.POST("/verify", handlers.VerifyTOTP)
-		totp.POST("/disable", handlers.DisableTOTP)
+		totp.GET("/status", handlers.TOTPStatus)
+		totp.POST("/setup", handlers.TOTPSetup)
+		totp.POST("/verify", handlers.TOTPVerify)
+		totp.POST("/disable", handlers.TOTPDisable)
 	}
 
 	// --------------------------------------------------
