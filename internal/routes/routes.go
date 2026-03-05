@@ -218,6 +218,12 @@ func Setup(r *gin.Engine) {
 	}
 
 	// --------------------------------------------------
+	// LIGHTWEIGHT ADMIN CHECK (requires Firebase token only, no IP/TOTP)
+	// Used by frontend to determine if user is admin before TOTP flow
+	// --------------------------------------------------
+	api.GET("/admin/check-access", middleware.AuthRequired(), handlers.AdminCheckAccess)
+
+	// --------------------------------------------------
 	// ROTAS DE ADMINISTRAÇÃO (requerem token + UID admin + TOTP válido)
 	// --------------------------------------------------
 	admin := api.Group("/admin")

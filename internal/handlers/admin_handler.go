@@ -4,14 +4,111 @@ import (
 	"log"
 	"net/http"
 	"strconv"
+	"strings"
 
 	"github.com/gin-gonic/gin"
+	"github.com/paiva/SkillBridge/Backend/config"
 	"github.com/paiva/SkillBridge/Backend/internal/audit"
 	"github.com/paiva/SkillBridge/Backend/internal/database"
 	"github.com/paiva/SkillBridge/Backend/internal/models"
 	"github.com/paiva/SkillBridge/Backend/internal/middleware"
 	"github.com/paiva/SkillBridge/Backend/internal/storage"
 )
+
+// AdminCheckAccess - Lightweight endpoint to check if user is admin
+// Only checks UID, returns info about IP whitelist and TOTP requirements
+//
+// @Summary      [Admin] Check admin access
+// @Description  Verifies if the authenticated user is an admin (UID only check)
+// @Tags         admin
+// @Produce      json
+// @Security     BearerAuth
+// @Success      200  {object}  map[string]interface{}
+// @Failure      403  {object}  map[string]string
+// @Router       /admin/check-access [get]
+func AdminCheckAccess(c *gin.Context) {
+	uid := c.GetString("firebase_uid")
+	
+	// Check UID - is this user in the admin list?
+	if !config.IsAdmin(uid) {
+		audit.LogAction(c, audit.ActionUnauthorized, "UID %s not in admin list", uid)
+		c.JSON(http.StatusForbidden, gin.H{
+			"error":    "Not an administrator. Your Firebase UID is not in the admin whitelist.",
+			"is_admin": false,
+			"uid":      uid,
+		})
+		return
+	}
+
+	// User is admin - now check IP whitelist if configured
+	clientIP := getClientIP(c)
+	ipWhitelistEnabled := len(config.AppConfig.AdminAllowedIPs) > 0
+	ipAllowed := true
+
+	if ipWhitelistEnabled {
+		ipAllowed = isIPInWhitelist(clientIP, config.AppConfig.AdminAllowedIPs)
+		if !ipAllowed {
+			log.Printf("[Admin Check] UID=%s is admin but IP=%s not in whitelist %v", uid, clientIP, config.AppConfig.AdminAllowedIPs)
+			audit.LogAction(c, audit.ActionUnauthorized, "Admin UID=%s with non-whitelisted IP=%s", uid, clientIP)
+			c.JSON(http.StatusForbidden, gin.H{
+				"error":                 "Your IP address is not authorized for admin access.",
+				"is_admin":              true,
+				"uid":                   uid,
+				"ip_whitelist_enabled":  true,
+				"your_ip":               clientIP,
+				"allowed_ips":           config.AppConfig.AdminAllowedIPs,
+			})
+			return
+		}
+	}
+
+	log.Printf("[Admin Check] Access granted for UID=%s IP=%s", uid, clientIP)
+	audit.LogAction(c, audit.ActionLogin, "Admin check passed for UID=%s IP=%s", uid, clientIP)
+
+	// All checks passed
+	c.JSON(http.StatusOK, gin.H{
+		"is_admin":              true,
+		"uid":                   uid,
+		"ip_whitelist_enabled":  ipWhitelistEnabled,
+		"your_ip":               clientIP,
+		"ip_allowed":            ipAllowed,
+	})
+}
+
+// Helper function to check IP against whitelist
+func getClientIP(c *gin.Context) string {
+	// Check X-Forwarded-For header (proxy/load balancer)
+	xff := c.GetHeader("X-Forwarded-For")
+	if xff != "" {
+		// Take the first IP if multiple are present
+		ips := strings.Split(xff, ",")
+		if len(ips) > 0 {
+			return strings.TrimSpace(ips[0])
+		}
+	}
+
+	// Check X-Real-IP header
+	xri := c.GetHeader("X-Real-IP")
+	if xri != "" {
+		return xri
+	}
+
+	// Fallback to direct client IP
+	return c.ClientIP()
+}
+
+func isIPInWhitelist(ip string, whitelist []string) bool {
+	if len(whitelist) == 0 {
+		return true // No whitelist = all IPs allowed
+	}
+	
+	for _, allowedIP := range whitelist {
+		if allowedIP == ip {
+			return true
+		}
+	}
+	return false
+}
 
 // AdminListUsers - Lista todos os utilizadores (admin)
 //

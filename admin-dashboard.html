@@ -330,22 +330,45 @@
       const result = await signInWithPopup(auth, provider);
       const token = await result.user.getIdToken();
       
-      // Immediate admin UID check
-      const adminCheckRes = await fetch(CONFIG.BASE_URL + "/admin/users", {
+      // Immediate admin UID and IP check (lightweight - no TOTP required)
+      const adminCheckRes = await fetch(CONFIG.BASE_URL + "/admin/check-access", {
         headers: { "Authorization": "Bearer " + token }
       });
       
       if (!adminCheckRes.ok) {
-        // Not an admin - sign out immediately
+        // Not an admin or IP not allowed - get details and sign out
+        const errorData = await adminCheckRes.json().catch(() => ({}));
         await fbSignOut(auth);
-        document.getElementById("login-error").textContent = "Access denied. You are not authorized as an administrator.";
+        
+        // Show specific error message
+        let errorMsg = "Access denied. ";
+        if (errorData.is_admin === false) {
+          errorMsg += "Your Firebase account is not authorized as an administrator.";
+        } else if (errorData.ip_whitelist_enabled && errorData.your_ip) {
+          errorMsg += `Your IP address (${errorData.your_ip}) is not in the admin whitelist. `;
+          if (errorData.allowed_ips && errorData.allowed_ips.length > 0) {
+            errorMsg += `Allowed IPs: ${errorData.allowed_ips.join(", ")}`;
+          }
+        } else {
+          errorMsg += errorData.error || "You are not authorized as an administrator.";
+        }
+        
+        document.getElementById("login-error").textContent = errorMsg;
+        console.error("Admin access denied:", errorData);
         return;
       }
       
-      // Check TOTP status
+      // User is admin and IP is allowed - check TOTP status
       const statusRes = await fetch(CONFIG.BASE_URL + "/admin/totp/status", {
         headers: { "Authorization": "Bearer " + token }
       });
+      
+      if (!statusRes.ok) {
+        await fbSignOut(auth);
+        document.getElementById("login-error").textContent = "Failed to check TOTP status. Please try again.";
+        return;
+      }
+      
       const status = await statusRes.json();
       
       if (!status.totp_enabled && !status.has_secret) {
@@ -361,6 +384,7 @@
       }
     } catch(e) {
       document.getElementById("login-error").textContent = e.message;
+      console.error("Sign in error:", e);
     }
   };
 
