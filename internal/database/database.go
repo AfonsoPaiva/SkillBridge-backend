@@ -73,6 +73,8 @@ func Connect() {
 	alterIfMissing("messages", "meta_status", "VARCHAR(20) NOT NULL DEFAULT ''")
 	// TOTP persistent verification timestamp
 	alterIfMissing("users", "totp_verified_at", "TIMESTAMP")
+	// Email verification status (OAuth accounts are auto-verified)
+	alterIfMissing("users", "email_verified", "BOOL NOT NULL DEFAULT FALSE")
 }
 
 // alterIfMissing adiciona uma coluna a uma tabela se ela ainda não existir.

@@ -96,11 +96,24 @@ func RegisterUser(c *gin.Context) {
 	baseSlug := models.GenerateSlug(input.Name)
 	slug := ensureUniqueUserSlug(baseSlug, 0)
 
+	// Check if this is an OAuth account (Google, GitHub, Microsoft)
+	// OAuth accounts are automatically verified
+	emailVerified := false
+	if provider, exists := c.Get("sign_in_provider"); exists {
+		if providerStr, ok := provider.(string); ok {
+			if providerStr == "google.com" || providerStr == "github.com" || providerStr == "microsoft.com" {
+				emailVerified = true
+				log.Printf("[register] Auto-verifying OAuth account (provider: %s) for UID=%s", providerStr, firebaseUID)
+			}
+		}
+	}
+
 	user := models.User{
 		FirebaseUID:  firebaseUID,
 		Name:         input.Name,
 		Slug:         slug,
 		Email:        emailStr,
+		EmailVerified: emailVerified,
 		University:   input.University,
 		Course:       input.Course,
 		Year:         input.Year,
@@ -365,4 +378,62 @@ func RequestPasswordReset(c *gin.Context) {
 
 	log.Printf("[auth] Email de reset enviado com sucesso para %s", input.Email)
 	c.JSON(http.StatusOK, gin.H{"message": "Se o email existir, receberás um link de redefinição."})
+}
+
+// UpdateEmailVerification - Marca o email como verificado após confirmação via Firebase
+//
+// @Summary      Atualizar estado de verificação de email
+// @Description  Marca o email do utilizador como verificado após verificação via Firebase
+// @Tags         users
+// @Produce      json
+// @Security     BearerAuth
+// @Success      200  {object}  map[string]interface{}
+// @Failure      404  {object}  map[string]string
+// @Router       /users/me/verify-email [post]
+func UpdateEmailVerification(c *gin.Context) {
+	firebaseUID := c.GetString("firebase_uid")
+
+	var user models.User
+	if err := database.DB.Where("firebase_uid = ?", firebaseUID).First(&user).Error; err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "Utilizador não encontrado."})
+		return
+	}
+
+	// Update email_verified to true
+	user.EmailVerified = true
+	if err := database.DB.Save(&user).Error; err != nil {
+		log.Printf("[verify-email] Erro ao atualizar verificação para UID=%s: %v", firebaseUID, err)
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Erro ao atualizar verificação."})
+		return
+	}
+
+	log.Printf("[verify-email] Email verificado para UID=%s", firebaseUID)
+	c.JSON(http.StatusOK, gin.H{
+		"message": "Email verificado com sucesso.",
+		"email_verified": true,
+	})
+}
+
+// CheckEmailVerification - Verifica se o email está verificado
+//
+// @Summary      Verificar estado de verificação de email
+// @Description  Retorna se o email do utilizador está verificado
+// @Tags         users
+// @Produce      json
+// @Security     BearerAuth
+// @Success      200  {object}  map[string]interface{}
+// @Failure      404  {object}  map[string]string
+// @Router       /users/me/email-verified [get]
+func CheckEmailVerification(c *gin.Context) {
+	firebaseUID := c.GetString("firebase_uid")
+
+	var user models.User
+	if err := database.DB.Where("firebase_uid = ?", firebaseUID).First(&user).Error; err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "Utilizador não encontrado."})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"email_verified": user.EmailVerified,
+	})
 }

@@ -131,6 +131,9 @@ func Setup(r *gin.Engine) {
 		protected.DELETE("/users/me", handlers.DeleteMyProfile)
 		// Claim an anonymous guest session into the authenticated profile
 		protected.POST("/users/me/claim-guest-session", handlers.ClaimGuestSession)
+		// Email verification
+		protected.POST("/users/me/verify-email", handlers.UpdateEmailVerification)
+		protected.GET("/users/me/email-verified", handlers.CheckEmailVerification)
 
 		// Seguidores
 		protected.POST("/users/:id/follow", handlers.FollowUser)

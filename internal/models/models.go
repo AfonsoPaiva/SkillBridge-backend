@@ -73,6 +73,7 @@ type User struct {
 	Name         string       `gorm:"not null" json:"name"`
 	Slug         string       `gorm:"uniqueIndex:idx_users_slug;not null" json:"slug"`
 	Email        string       `gorm:"uniqueIndex:idx_users_email;not null" json:"email"`
+	EmailVerified bool        `gorm:"default:false" json:"email_verified"`
 	ContactLinks ContactLinks `gorm:"type:jsonb" json:"contact_links"`
 	University   string       `json:"university"`
 	Course       string       `json:"course"`

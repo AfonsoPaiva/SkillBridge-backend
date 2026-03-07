@@ -68,6 +68,12 @@ func AuthRequired() gin.HandlerFunc {
 		if name, ok := token.Claims["name"]; ok {
 			c.Set("display_name", name)
 		}
+		// Pass sign_in_provider to identify OAuth accounts
+		if firebase, ok := token.Claims["firebase"].(map[string]interface{}); ok {
+			if provider, ok := firebase["sign_in_provider"].(string); ok {
+				c.Set("sign_in_provider", provider)
+			}
+		}
 		c.Next()
 	}
 }
