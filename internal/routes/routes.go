@@ -201,6 +201,7 @@ func Setup(r *gin.Engine) {
 
 		// Universidades/cursos estáticos
 		public.GET("/universities", handlers.ListUniversities)
+		public.GET("/universities/search", handlers.SearchUniversities)
 		public.GET("/universities/courses", handlers.ListCoursesByUniversity)
 
 		// Guest onboarding sessions (anónimo)

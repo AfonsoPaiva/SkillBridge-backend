@@ -21,14 +21,15 @@ var univFile []byte
 // Skills is the predefined list loaded from config/skills.json.
 var Skills []string
 
-// UnivCourse represents a single entry in UniversidadesECursos.json.
-type UnivCourse struct {
-	Estabelecimento string `json:"Estabelecimento"`
-	NomeCurso       string `json:"NomeCurso"`
+// UnivEntry represents a single entry in UniversidadesECursos.json (new format).
+type UnivEntry struct {
+	Estabelecimento string   `json:"Estabelecimento"`
+	TotalCursos     int      `json:"TotalCursos"`
+	Cursos          []string `json:"Cursos"`
 }
 
-// UnivCourses holds every record from the JSON file (including duplicates).
-var UnivCourses []UnivCourse
+// UnivEntries holds every record from the JSON file.
+var UnivEntries []UnivEntry
 
 // UnivList is the deduplicated, alphabetically-sorted slice of establishment names.
 var UnivList []string
@@ -46,31 +47,17 @@ func init() {
 	}
 	Skills = payload.Skills
 
-	// load universities/courses from embedded JSON
-	if err := json.Unmarshal(univFile, &UnivCourses); err != nil {
+	// load universities/courses from embedded JSON (new format)
+	if err := json.Unmarshal(univFile, &UnivEntries); err != nil {
 		log.Fatalf("config: failed to parse UniversidadesECursos.json: %v", err)
 	}
 
 	// build deduplicated lists and maps
 	CoursesByUniv = make(map[string][]string)
-	for _, uc := range UnivCourses {
-		name := uc.Estabelecimento
-		course := uc.NomeCurso
-		// append course if not already present
-		list := CoursesByUniv[name]
-		found := false
-		for _, existing := range list {
-			if existing == course {
-				found = true
-				break
-			}
-		}
-		if !found {
-			CoursesByUniv[name] = append(list, course)
-		}
-	}
-
-	for name := range CoursesByUniv {
+	for _, entry := range UnivEntries {
+		name := entry.Estabelecimento
+		// Store courses (already unique in the new format)
+		CoursesByUniv[name] = entry.Cursos
 		UnivList = append(UnivList, name)
 	}
 	// sort alphabetically for consistent output
