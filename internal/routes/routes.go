@@ -50,10 +50,12 @@ func Setup(r *gin.Engine) {
 	r.Use(func(c *gin.Context) {
 		origin := c.Request.Header.Get("Origin")
 		
-		// List of allowed origins (always explicitly defined)
-		allowedOrigins := []string{
-			config.AppConfig.FrontendURL,
-			"https://skillbridge-frontend-zeta.vercel.app",
+		// Get allowed origins from config (comma-separated in ALLOWED_ORIGINS env var)
+		allowedOrigins := config.AppConfig.AllowedOrigins
+		
+		// Fallback to FrontendURL if ALLOWED_ORIGINS is not set
+		if len(allowedOrigins) == 0 && config.AppConfig.FrontendURL != "" {
+			allowedOrigins = []string{config.AppConfig.FrontendURL}
 		}
 		
 		// In development, add localhost
@@ -62,6 +64,7 @@ func Setup(r *gin.Engine) {
 		}
 		
 		// Check if the origin is allowed (reject if empty or not in list)
+		// Also allow all *.vercel.app subdomains for preview deployments
 		isAllowed := false
 		if origin != "" {
 			for _, allowed := range allowedOrigins {
@@ -69,6 +72,10 @@ func Setup(r *gin.Engine) {
 					isAllowed = true
 					break
 				}
+			}
+			// Allow Vercel preview deployments (*.vercel.app)
+			if !isAllowed && strings.HasSuffix(origin, ".vercel.app") && strings.HasPrefix(origin, "https://skillbridge-frontend") {
+				isAllowed = true
 			}
 		}
 		

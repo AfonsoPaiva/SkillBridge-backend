@@ -94,6 +94,7 @@ type Config struct {
 	StripeWebhookSecret     string
 	StripeDonationURL       string
 	FrontendURL             string // Base URL of frontend application
+	AllowedOrigins          []string // Lista de origens permitidas para CORS (separadas por vírgula)
 	BackendURL              string // Base URL of this backend (for generating absolute image URLs)
 	UploadsDir              string
 	Env                     string
@@ -134,6 +135,7 @@ func Load() {
 		StripeWebhookSecret:     getEnv("STRIPE_WEBHOOK_SECRET", ""),
 		StripeDonationURL:       getEnv("STRIPE_DONATION_URL", "https://donate.stripe.com/test_aFacN44fz2pf5N1fPAenS00"),
 		FrontendURL:             getEnv("FRONTEND_URL", "http://localhost:4200"),
+		AllowedOrigins:          parseList(getEnv("ALLOWED_ORIGINS", "")),
 		BackendURL:              getEnv("BACKEND_URL", ""),
 		UploadsDir:              getEnv("UPLOADS_DIR", "./uploads"),
 		Env:                     getEnv("ENV", "development"),
