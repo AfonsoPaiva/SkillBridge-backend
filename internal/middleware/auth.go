@@ -63,24 +63,6 @@ func AuthRequired() gin.HandlerFunc {
 			return
 		}
 
-		// Check if email is verified for password-based accounts
-		if emailVerified, ok := token.Claims["email_verified"].(bool); ok && !emailVerified {
-			// Check if this is a password provider (not OAuth)
-			if firebaseProvider, ok := token.Claims["firebase"].(map[string]interface{}); ok {
-				if signInProvider, ok := firebaseProvider["sign_in_provider"].(string); ok {
-					// Only require verification for password accounts
-					if signInProvider == "password" {
-						c.JSON(http.StatusForbidden, gin.H{
-							"error": "Email não verificado. Por favor verifica o teu email antes de fazer login.",
-							"code":  "EMAIL_NOT_VERIFIED",
-						})
-						c.Abort()
-						return
-					}
-				}
-			}
-		}
-
 		c.Set("firebase_uid", token.UID)
 		c.Set("email", token.Claims["email"])
 		if name, ok := token.Claims["name"]; ok {
