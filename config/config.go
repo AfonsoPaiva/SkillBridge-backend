@@ -18,8 +18,16 @@ var skillsFile []byte
 //go:embed UniversidadesECursos.json
 var univFile []byte
 
+type SkillSection struct {
+	ID     string   `json:"id"`
+	Label  string   `json:"label"`
+	Skills []string `json:"skills"`
+}
+
 // Skills is the predefined list loaded from config/skills.json.
 var Skills []string
+var SkillSections []SkillSection
+var skillsSet map[string]struct{}
 
 // UnivEntry represents a single entry in UniversidadesECursos.json (new format).
 type UnivEntry struct {
@@ -40,12 +48,24 @@ var CoursesByUniv map[string][]string
 func init() {
 	// load skills from embedded JSON
 	var payload struct {
-		Skills []string `json:"skills"`
+		Skills   []string       `json:"skills"`
+		Sections []SkillSection `json:"sections"`
 	}
 	if err := json.Unmarshal(skillsFile, &payload); err != nil {
 		log.Fatalf("config: failed to parse skills.json: %v", err)
 	}
-	Skills = payload.Skills
+
+	if len(payload.Sections) > 0 {
+		SkillSections = payload.Sections
+		Skills = flattenSkillsFromSections(payload.Sections)
+	} else {
+		Skills = dedupeSkills(payload.Skills)
+	}
+
+	skillsSet = make(map[string]struct{}, len(Skills))
+	for _, s := range Skills {
+		skillsSet[s] = struct{}{}
+	}
 
 	// load universities/courses from embedded JSON (new format)
 	if err := json.Unmarshal(univFile, &UnivEntries); err != nil {
@@ -180,4 +200,37 @@ func IsAdmin(uid string) bool {
 		}
 	}
 	return false
+}
+
+func IsValidSkill(skill string) bool {
+	_, ok := skillsSet[skill]
+	return ok
+}
+
+func flattenSkillsFromSections(sections []SkillSection) []string {
+	out := make([]string, 0)
+	seen := make(map[string]struct{})
+	for _, section := range sections {
+		for _, skill := range section.Skills {
+			if _, exists := seen[skill]; exists {
+				continue
+			}
+			seen[skill] = struct{}{}
+			out = append(out, skill)
+		}
+	}
+	return out
+}
+
+func dedupeSkills(skills []string) []string {
+	out := make([]string, 0, len(skills))
+	seen := make(map[string]struct{}, len(skills))
+	for _, skill := range skills {
+		if _, exists := seen[skill]; exists {
+			continue
+		}
+		seen[skill] = struct{}{}
+		out = append(out, skill)
+	}
+	return out
 }

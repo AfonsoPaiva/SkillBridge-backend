@@ -586,15 +586,7 @@ func CreateProjectRole(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
-	// Validate against predefined skill list
-	valid := false
-	for _, s := range config.Skills {
-		if s == input.SkillName {
-			valid = true
-			break
-		}
-	}
-	if !valid {
+	if !config.IsValidSkill(input.SkillName) {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "Competência não reconhecida."})
 		return
 	}

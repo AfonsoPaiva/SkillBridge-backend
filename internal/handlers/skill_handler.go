@@ -15,10 +15,14 @@ import (
 // @Description  Devolve a lista predefinida de competências que os utilizadores podem selecionar
 // @Tags         skills
 // @Produce      json
-// @Success      200  {array}   string
+// @Success      200  {object}  map[string]interface{}
 // @Router       /skills [get]
 func ListSkills(c *gin.Context) {
-	c.JSON(http.StatusOK, config.Skills)
+	c.JSON(http.StatusOK, gin.H{
+		"count":    len(config.Skills),
+		"sections": config.SkillSections,
+		"skills":   config.Skills,
+	})
 }
 
 // AddUserSkill adds a skill string to the authenticated user's profile.
@@ -49,15 +53,7 @@ func AddUserSkill(c *gin.Context) {
 		return
 	}
 
-	// Validate against predefined list
-	valid := false
-	for _, s := range config.Skills {
-		if s == input.Skill {
-			valid = true
-			break
-		}
-	}
-	if !valid {
+	if !config.IsValidSkill(input.Skill) {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "Competência não reconhecida."})
 		return
 	}
