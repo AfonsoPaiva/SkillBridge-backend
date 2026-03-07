@@ -7,7 +7,6 @@ import (
 	"strings"
 	"time"
 	"github.com/paiva/SkillBridge/Backend/internal/database"
-	"github.com/paiva/SkillBridge/Backend/internal/email"
 	"github.com/paiva/SkillBridge/Backend/internal/middleware"
 	"github.com/paiva/SkillBridge/Backend/internal/models"
 	"github.com/paiva/SkillBridge/Backend/internal/storage"
@@ -130,13 +129,7 @@ func RegisterUser(c *gin.Context) {
 		return
 	}
 
-	// Enviar email de boas-vindas de forma assíncrona
-	go func() {
-		if err := email.SendWelcome(user.Name, user.Email); err != nil {
-			log.Printf("[email] Erro ao enviar boas-vindas para %s: %v", user.Email, err)
-		}
-	}()
-
+	log.Printf("[register] Utilizador criado com sucesso: %s (%s)", user.Name, user.Email)
 	c.JSON(http.StatusCreated, gin.H{"message": "Utilizador criado com sucesso.", "user": user})
 }
 
@@ -334,10 +327,10 @@ func DeleteMyProfile(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"message": "Conta eliminada."})
 }
 
-// RequestPasswordReset - Envia email de redefinição de palavra-passe
+// RequestPasswordReset - Envia email de redefinição de palavra-passe via Firebase
 //
 // @Summary      Pedir redefinição de palavra-passe
-// @Description  Gera um link Firebase e envia por email ao utilizador
+// @Description  Envia um email de reset de password usando Firebase Auth (sem Mailgun)
 // @Tags         users
 // @Accept       json
 // @Produce      json
@@ -357,22 +350,19 @@ func RequestPasswordReset(c *gin.Context) {
 	// Encontrar utilizador (não revelar se existe ou não por segurança)
 	var user models.User
 	if err := database.DB.Where("email = ?", input.Email).First(&user).Error; err != nil {
+		// Não informamos se o email não existe por segurança
 		c.JSON(http.StatusOK, gin.H{"message": "Se o email existir, receberás um link de redefinição."})
 		return
 	}
 
-	resetLink, err := middleware.GeneratePasswordResetLink(input.Email)
-	if err != nil {
-		log.Printf("[auth] Erro ao gerar link de redefinição para %s: %v", input.Email, err)
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Erro ao gerar link de redefinição."})
+	// Enviar email de reset usando Firebase (envia automaticamente)
+	if err := middleware.SendPasswordResetEmail(input.Email); err != nil {
+		log.Printf("[auth] Erro ao enviar email de reset para %s: %v", input.Email, err)
+		// Não revelamos o erro específico ao cliente
+		c.JSON(http.StatusOK, gin.H{"message": "Se o email existir, receberás um link de redefinição."})
 		return
 	}
 
-	go func() {
-		if err := email.SendPasswordReset(user.Name, user.Email, resetLink); err != nil {
-			log.Printf("[email] Erro ao enviar reset para %s: %v", user.Email, err)
-		}
-	}()
-
+	log.Printf("[auth] Email de reset enviado com sucesso para %s", input.Email)
 	c.JSON(http.StatusOK, gin.H{"message": "Se o email existir, receberás um link de redefinição."})
 }

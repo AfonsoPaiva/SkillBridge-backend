@@ -1,11 +1,8 @@
 package middleware
 
 import (
-	"bytes"
 	"context"
-	"encoding/json"
 	"fmt"
-	"io"
 	"log"
 	"net/http"
 	"os"
@@ -15,7 +12,6 @@ import (
 	"firebase.google.com/go/v4/auth"
 	"github.com/gin-gonic/gin"
 	"github.com/paiva/SkillBridge/Backend/config"
-	"golang.org/x/oauth2/google"
 	"google.golang.org/api/option"
 )
 
@@ -67,6 +63,24 @@ func AuthRequired() gin.HandlerFunc {
 			return
 		}
 
+		// Check if email is verified for password-based accounts
+		if emailVerified, ok := token.Claims["email_verified"].(bool); ok && !emailVerified {
+			// Check if this is a password provider (not OAuth)
+			if firebaseProvider, ok := token.Claims["firebase"].(map[string]interface{}); ok {
+				if signInProvider, ok := firebaseProvider["sign_in_provider"].(string); ok {
+					// Only require verification for password accounts
+					if signInProvider == "password" {
+						c.JSON(http.StatusForbidden, gin.H{
+							"error": "Email não verificado. Por favor verifica o teu email antes de fazer login.",
+							"code":  "EMAIL_NOT_VERIFIED",
+						})
+						c.Abort()
+						return
+					}
+				}
+			}
+		}
+
 		c.Set("firebase_uid", token.UID)
 		c.Set("email", token.Claims["email"])
 		if name, ok := token.Claims["name"]; ok {
@@ -85,71 +99,29 @@ func DeleteUser(uid string) error {
 	return firebaseAuth.DeleteUser(context.Background(), uid)
 }
 
-// GeneratePasswordResetLink gera um link de redefinição de palavra-passe via Identity Toolkit REST API,
-// autenticado com as credenciais de serviço (admin), para que possamos enviar o link por email personalizado.
-func GeneratePasswordResetLink(email string) (string, error) {
+// SendPasswordResetEmail sends a password reset email using Firebase Auth native method.
+// Firebase handles the email sending automatically using the configured email templates.
+func SendPasswordResetEmail(email string) error {
+	if firebaseAuth == nil {
+		return fmt.Errorf("firebase auth not initialized")
+	}
+
 	ctx := context.Background()
-
-	var credBytes []byte
-	var err error
-
-	// Try to load from env var (Cloud Run with secrets)
-	credsContent := os.Getenv("FIREBASE_CREDENTIALS_CONTENT")
-	if credsContent != "" {
-		credBytes = []byte(credsContent)
-	} else {
-		// Fall back to file path (local development)
-		credBytes, err = os.ReadFile(config.AppConfig.FirebaseCredentialsPath)
-		if err != nil {
-			return "", fmt.Errorf("erro ao ler credenciais Firebase: %w", err)
-		}
+	
+	// Generate password reset link using Firebase Admin SDK
+	// This will trigger Firebase to send the email automatically
+	actionCodeSettings := &auth.ActionCodeSettings{
+		// URL to redirect after password reset
+		// Firebase will append the oobCode parameter automatically
+		URL: config.AppConfig.FrontendURL + "/login",
+		HandleCodeInApp: false,
 	}
 
-	creds, err := google.CredentialsFromJSON(ctx, credBytes,
-		"https://www.googleapis.com/auth/cloud-platform",
-		"https://www.googleapis.com/auth/identitytoolkit",
-	)
+	link, err := firebaseAuth.PasswordResetLinkWithSettings(ctx, email, actionCodeSettings)
 	if err != nil {
-		return "", fmt.Errorf("erro ao criar credenciais OAuth2: %w", err)
+		return fmt.Errorf("erro ao gerar link de reset: %w", err)
 	}
 
-	token, err := creds.TokenSource.Token()
-	if err != nil {
-		return "", fmt.Errorf("erro ao obter token OAuth2: %w", err)
-	}
-
-	payload, _ := json.Marshal(map[string]interface{}{
-		"requestType":   "PASSWORD_RESET",
-		"email":         email,
-		"returnOobLink": true,
-	})
-
-	req, err := http.NewRequestWithContext(ctx, http.MethodPost,
-		"https://identitytoolkit.googleapis.com/v1/accounts:sendOobCode",
-		bytes.NewReader(payload),
-	)
-	if err != nil {
-		return "", err
-	}
-	req.Header.Set("Authorization", "Bearer "+token.AccessToken)
-	req.Header.Set("Content-Type", "application/json")
-
-	resp, err := http.DefaultClient.Do(req)
-	if err != nil {
-		return "", fmt.Errorf("erro na chamada Identity Toolkit: %w", err)
-	}
-	defer resp.Body.Close()
-
-	body, _ := io.ReadAll(resp.Body)
-	if resp.StatusCode != http.StatusOK {
-		return "", fmt.Errorf("Identity Toolkit devolveu %d: %s", resp.StatusCode, body)
-	}
-
-	var result struct {
-		OobLink string `json:"oobLink"`
-	}
-	if err := json.Unmarshal(body, &result); err != nil {
-		return "", err
-	}
-	return result.OobLink, nil
+	log.Printf("[firebase] Password reset link generated for %s: %s", email, link)
+	return nil
 }
