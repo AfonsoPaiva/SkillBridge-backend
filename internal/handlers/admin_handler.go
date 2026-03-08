@@ -121,7 +121,7 @@ func isIPInWhitelist(ip string, whitelist []string) bool {
 // @Router       /admin/users [get]
 func AdminListUsers(c *gin.Context) {
 	var users []models.User
-	database.DB.Preload("Skills.Skill").Order("created_at DESC").Find(&users)
+	database.DB.Order("created_at DESC").Find(&users)
 	c.JSON(http.StatusOK, users)
 }
 
@@ -138,7 +138,7 @@ func AdminListUsers(c *gin.Context) {
 // @Router       /admin/users/{id} [get]
 func AdminGetUser(c *gin.Context) {
 	var user models.User
-	if err := database.DB.Preload("Skills.Skill").Preload("OwnedProjects").
+	if err := database.DB.Preload("OwnedProjects").
 		First(&user, c.Param("id")).Error; err != nil {
 		c.JSON(http.StatusNotFound, gin.H{"error": "Utilizador não encontrado."})
 		return
@@ -240,7 +240,7 @@ func AdminDeleteUser(c *gin.Context) {
 // @Router       /admin/projects [get]
 func AdminListProjects(c *gin.Context) {
 	var projects []models.Project
-	database.DB.Preload("Owner").Preload("Members").Order("created_at DESC").Find(&projects)
+	database.DB.Preload("Owner").Preload("Roles").Preload("Members.User").Order("created_at DESC").Find(&projects)
 	c.JSON(http.StatusOK, projects)
 }
 

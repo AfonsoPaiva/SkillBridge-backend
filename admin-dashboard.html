@@ -214,8 +214,8 @@
       </div>
       <div class="card">
         <table>
-          <thead><tr><th>ID</th><th>Name</th><th>Email</th><th>University</th><th>Skills</th><th>Joined</th><th></th></tr></thead>
-          <tbody id="users-body"><tr><td colspan="7" class="loading">Loading...</td></tr></tbody>
+          <thead><tr><th>ID</th><th>Name</th><th>Email</th><th>Username</th><th>University</th><th>Course</th><th>Role</th><th>Joined</th><th></th></tr></thead>
+          <tbody id="users-body"><tr><td colspan="9" class="loading">Loading...</td></tr></tbody>
         </table>
       </div>
     </div>
@@ -229,8 +229,8 @@
       </div>
       <div class="card">
         <table>
-          <thead><tr><th>ID</th><th>Title</th><th>Status</th><th>Owner ID</th><th>Created</th><th></th></tr></thead>
-          <tbody id="projects-body"><tr><td colspan="6" class="loading">Loading...</td></tr></tbody>
+          <thead><tr><th>ID</th><th>Title</th><th>Slug</th><th>Status</th><th>Owner</th><th>Roles</th><th>Members</th><th>Created</th><th></th></tr></thead>
+          <tbody id="projects-body"><tr><td colspan="9" class="loading">Loading...</td></tr></tbody>
         </table>
       </div>
     </div>
@@ -533,14 +533,17 @@
     }).join("");
   }
   function renderUsers(list) {
-    if (!list.length) { document.getElementById("users-body").innerHTML = '<tr><td colspan="7" class="empty">No users found</td></tr>'; return; }
+    if (!list.length) { document.getElementById("users-body").innerHTML = '<tr><td colspan="9" class="empty">No users found</td></tr>'; return; }
     document.getElementById("users-body").innerHTML = list.map(function(u) {
+      var roleDisplay = u.role === 'needs_help' ? 'Needs Help' : u.role === 'helper' ? 'Helper' : (u.role || '\u2014');
       return '<tr class="clickable" onclick="showUser(' + u.id + ')">' +
         '<td>' + u.id + '</td>' +
         '<td>' + (u.name || '\u2014') + '</td>' +
-        '<td>' + (u.email || '\u2014') + '</td>' +
+        '<td style="max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">' + (u.email || '\u2014') + '</td>' +
+        '<td>' + (u.slug || '\u2014') + '</td>' +
         '<td>' + (u.university || '\u2014') + '</td>' +
-        '<td style="max-width:220px">' + skillTags(u.skills) + '</td>' +
+        '<td style="max-width:150px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">' + (u.course || '\u2014') + '</td>' +
+        '<td>' + roleDisplay + '</td>' +
         '<td>' + fmt(u.created_at) + '</td>' +
         '<td><button class="btn btn-danger" onclick="event.stopPropagation();deleteUser(' + u.id + ')">Delete</button></td>' +
         '</tr>';
@@ -549,6 +552,8 @@
   function showUser(id) {
     var u = _users.find(function(x) { return x.id === id; });
     if (!u) return;
+    var roleDisplay = u.role === 'needs_help' ? 'Needs Help' : u.role === 'helper' ? 'Helper' : (u.role || null);
+    var contactLinks = u.contact_links || {};
     openDetail(
       u.name || "User #" + u.id,
       "User profile",
@@ -558,27 +563,35 @@
           { label: "Firebase UID", value: u.firebase_uid },
           { label: "Name",         value: u.name },
           { label: "Email",        value: u.email },
+          { label: "Email Verified", value: u.email_verified },
+          { label: "Slug",         value: u.slug },
         ]},
         { heading: "Profile", rows: [
-          { label: "Username",     value: u.username },
           { label: "University",   value: u.university },
           { label: "Course",       value: u.course },
           { label: "Year",         value: u.year },
+          { label: "Role",         value: roleDisplay },
           { label: "Bio",          value: u.bio },
-          { label: "Location",     value: u.location },
-          { label: "Website",      value: u.website, link: true },
-          { label: "LinkedIn",     value: u.linkedin, link: true },
-          { label: "GitHub",       value: u.github, link: true },
+        ]},
+        { heading: "Contact Links", rows: [
+          { label: "Website",      value: contactLinks.website, link: true },
+          { label: "LinkedIn",     value: contactLinks.linkedin, link: true },
+          { label: "GitHub",       value: contactLinks.github, link: true },
+          { label: "Twitter",      value: contactLinks.twitter, link: true },
+          { label: "Instagram",    value: contactLinks.instagram, link: true },
         ]},
         { heading: "Skills", rows: [
-          { label: "Skills",       value: u.skills },
+          { label: "Skills",       value: Array.isArray(u.skills) ? u.skills : [] },
         ]},
-        { heading: "Avatar", rows: [
+        { heading: "Security", rows: [
+          { label: "TOTP Enabled", value: u.totp_enabled },
+          { label: "TOTP Verified", value: u.totp_verified_at ? new Date(u.totp_verified_at).toLocaleString() : null },
+        ]},
+        { heading: "Media", rows: [
           { label: "Avatar URL",   value: u.avatar_url, link: true },
         ]},
         { heading: "Timestamps", rows: [
           { label: "Joined",       value: u.created_at ? new Date(u.created_at).toLocaleString() : null },
-          { label: "Updated",      value: u.updated_at ? new Date(u.updated_at).toLocaleString() : null },
         ]},
       ]
     );
@@ -607,13 +620,22 @@
     }));
   }
   function renderProjects(list) {
-    if (!list.length) { document.getElementById("projects-body").innerHTML = '<tr><td colspan="6" class="empty">No projects found</td></tr>'; return; }
+    if (!list.length) { document.getElementById("projects-body").innerHTML = '<tr><td colspan="9" class="empty">No projects found</td></tr>'; return; }
     document.getElementById("projects-body").innerHTML = list.map(function(p) {
+      var statusBadge = '<span class="badge badge-' + 
+        (p.status === 'completed' ? 'approved' : p.status === 'in_progress' ? 'pending' : 'pending') + 
+        '">' + p.status + '</span>';
+      var ownerName = p.owner && p.owner.name ? p.owner.name : 'ID: ' + (p.owner_id || '\u2014');
+      var rolesCount = p.roles ? p.roles.length : 0;
+      var membersCount = p.members ? p.members.length : 0;
       return '<tr class="clickable" onclick="showProject(' + p.id + ')">' +
         '<td>' + p.id + '</td>' +
-        '<td>' + (p.title || '\u2014') + '</td>' +
-        '<td>' + (p.status || '\u2014') + '</td>' +
-        '<td>' + (p.owner_id || '\u2014') + '</td>' +
+        '<td style="max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">' + (p.title || '\u2014') + '</td>' +
+        '<td>' + (p.slug || '\u2014') + '</td>' +
+        '<td>' + statusBadge + '</td>' +
+        '<td>' + ownerName + '</td>' +
+        '<td>' + rolesCount + '</td>' +
+        '<td>' + membersCount + '</td>' +
         '<td>' + fmt(p.created_at) + '</td>' +
         '<td><button class="btn btn-danger" onclick="event.stopPropagation();deleteProject(' + p.id + ')">Delete</button></td>' +
         '</tr>';
@@ -622,6 +644,13 @@
   function showProject(id) {
     var p = _projects.find(function(x) { return x.id === id; });
     if (!p) return;
+    var ownerName = p.owner ? (p.owner.name + ' (ID: ' + p.owner_id + ')') : ('ID: ' + p.owner_id);
+    var rolesFormatted = p.roles && p.roles.length ? p.roles.map(function(r) {
+      return r.title + ' (' + r.skill_name + ') - ' + r.spots + ' spot(s)';
+    }) : [];
+    var membersFormatted = p.members && p.members.length ? p.members.map(function(m) {
+      return (m.user ? m.user.name : 'User ID: ' + m.user_id) + ' - ' + m.role;
+    }) : [];
     openDetail(
       p.title || "Project #" + p.id,
       "Project details",
@@ -629,29 +658,24 @@
         { heading: "Overview", rows: [
           { label: "ID",          value: p.id },
           { label: "Title",       value: p.title },
+          { label: "Slug",        value: p.slug },
           { label: "Status",      value: p.status },
-          { label: "Owner ID",    value: p.owner_id },
-          { label: "Category",    value: p.category },
-          { label: "Tags",        value: Array.isArray(p.tags) ? p.tags : p.tags ? [p.tags] : [] },
+          { label: "Owner",       value: ownerName },
         ]},
         { heading: "Description", rows: [
-          { label: "Short desc.", value: p.short_description || p.description },
-          { label: "Long desc.",  value: p.long_description },
+          { label: "Description", value: p.description },
         ]},
         { heading: "Media", rows: [
-          { label: "Cover URL",   value: p.cover_url, link: true },
-          { label: "Repo URL",    value: p.repo_url, link: true },
-          { label: "Demo URL",    value: p.demo_url, link: true },
+          { label: "Image URL",   value: p.image_url, link: true },
         ]},
-        { heading: "Roles needed", rows: [
-          { label: "Roles",       value: p.roles },
+        { heading: "Roles Needed", rows: [
+          { label: "Roles",       value: rolesFormatted.length ? rolesFormatted : null },
         ]},
         { heading: "Members", rows: [
-          { label: "Members",     value: p.members },
+          { label: "Members",     value: membersFormatted.length ? membersFormatted : null },
         ]},
         { heading: "Timestamps", rows: [
           { label: "Created",     value: p.created_at ? new Date(p.created_at).toLocaleString() : null },
-          { label: "Updated",     value: p.updated_at ? new Date(p.updated_at).toLocaleString() : null },
         ]},
       ]
     );
