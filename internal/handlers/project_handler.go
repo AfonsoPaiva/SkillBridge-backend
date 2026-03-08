@@ -419,7 +419,7 @@ func UpdateProject(c *gin.Context) {
 	var input struct {
 		Title       string `json:"title"`
 		Description string `json:"description"`
-		ImageURL    string `json:"image_url"`
+		ImageURL    *string `json:"image_url"` // Pointer to distinguish between not provided and empty
 		Status      string `json:"status"`
 		Roles       []struct {
 			Title       string `json:"title"`
@@ -441,9 +441,15 @@ func UpdateProject(c *gin.Context) {
 	if input.Description != "" {
 		project.Description = input.Description
 	}
-	if input.ImageURL != "" {
-		// Delete old image from GCS if it's being replaced
-		if project.ImageURL != "" && input.ImageURL != project.ImageURL {
+	
+	// Handle image URL update or removal
+	// Only process if image_url field was explicitly provided in the request
+	if input.ImageURL != nil {
+		newImageURL := *input.ImageURL
+		
+		// Only delete from GCS if replacing with a DIFFERENT non-empty URL
+		// If removing (empty string) or keeping same URL, don't delete
+		if project.ImageURL != "" && newImageURL != "" && newImageURL != project.ImageURL {
 			oldObjectName := extractGCSObjectName(project.ImageURL)
 			if oldObjectName != "" {
 				if err := storage.DeleteFile(oldObjectName); err != nil {
@@ -451,8 +457,10 @@ func UpdateProject(c *gin.Context) {
 				}
 			}
 		}
-		project.ImageURL = input.ImageURL
+		// Update the image URL (can be empty to remove the reference without deleting file)
+		project.ImageURL = newImageURL
 	}
+	
 	if input.Status != "" {
 		project.Status = input.Status
 	}
