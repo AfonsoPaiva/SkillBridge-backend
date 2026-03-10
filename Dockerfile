@@ -25,8 +25,7 @@ WORKDIR /app
 COPY --from=builder /app/server .
 COPY --from=builder /app/config ./config
 COPY --from=builder /app/admin-dashboard.html .
-COPY --from=builder /app/favicon-32.png .
-COPY --from=builder /app/favicon-16.png .
+
 
 EXPOSE 8080
 
