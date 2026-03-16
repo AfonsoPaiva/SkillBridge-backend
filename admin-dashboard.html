@@ -191,7 +191,6 @@
     <a onclick="showPage('users')"    data-page="users">Users</a>
     <a onclick="showPage('projects')" data-page="projects">Projects</a>
     <a onclick="showPage('reviews')"  data-page="reviews">Reviews</a>
-    <a onclick="showPage('donations')"data-page="donations">Donations</a>
     <a onclick="showPage('security')" data-page="security">Security (TOTP)</a>
     <a onclick="signOut()" style="margin-top:auto;color:#ef4444">Sign out</a>
   </nav>
@@ -204,7 +203,6 @@
         <div class="stat-card"><div class="num" id="stat-users">—</div><div class="lbl">Users</div></div>
         <div class="stat-card"><div class="num" id="stat-projects">—</div><div class="lbl">Projects</div></div>
         <div class="stat-card"><div class="num" id="stat-reviews">—</div><div class="lbl">Pending Reviews</div></div>
-        <div class="stat-card"><div class="num" id="stat-donations">—</div><div class="lbl">Total Donations (€)</div></div>
       </div>
     </div>
 
@@ -254,21 +252,6 @@
         <table>
           <thead><tr><th>ID</th><th>Reviewer</th><th>Reviewed</th><th>Rating</th><th>Comment</th><th>Status</th><th></th></tr></thead>
           <tbody id="reviews-body"><tr><td colspan="7" class="loading">Loading...</td></tr></tbody>
-        </table>
-      </div>
-    </div>
-
-    <!-- DONATIONS -->
-    <div id="page-donations" class="page">
-      <h2 class="page-title">Donations</h2>
-      <div class="toolbar">
-        <span id="donations-total" style="font-size:14px;color:#64748b"></span>
-        <button class="btn btn-ghost" onclick="loadDonations()">Refresh</button>
-      </div>
-      <div class="card">
-        <table>
-          <thead><tr><th>ID</th><th>Email</th><th>Amount</th><th>Status</th><th>Date</th></tr></thead>
-          <tbody id="donations-body"><tr><td colspan="5" class="loading">Loading...</td></tr></tbody>
         </table>
       </div>
     </div>
@@ -485,7 +468,6 @@
     if (name === "users")     loadUsers();
     if (name === "projects")  loadProjects();
     if (name === "reviews")   loadReviews();
-    if (name === "donations") loadDonations();
     if (name === "overview")  loadOverview();
     if (name === "security")  loadSecurityPage();
   }
@@ -498,19 +480,14 @@
   // ── OVERVIEW ────────────────────────────────────────────────
   async function loadOverview() {
     try {
-      const [users, projects, reviews, donations] = await Promise.all([
+      const [users, projects, reviews] = await Promise.all([
         api("GET", "/admin/users"),
         api("GET", "/admin/projects"),
         api("GET", "/admin/reviews?status=pending"),
-        api("GET", "/admin/donations")
       ]);
       document.getElementById("stat-users").textContent    = users.length;
       document.getElementById("stat-projects").textContent = projects.length;
       document.getElementById("stat-reviews").textContent  = reviews.length;
-      const total = donations
-        .filter(function(d) { return d.status === "succeeded"; })
-        .reduce(function(s, d) { return s + d.amount; }, 0);
-      document.getElementById("stat-donations").textContent = (total / 100).toFixed(2);
     } catch(e) { toast(e.message, true); }
   }
 
@@ -723,27 +700,6 @@
     if (!confirm("Delete this review? This cannot be undone.")) return;
     try { await api("DELETE", "/admin/reviews/" + id); toast("Review deleted"); loadReviews(); }
     catch(e) { toast(e.message, true); }
-  }
-
-  // ── DONATIONS ───────────────────────────────────────────────
-  async function loadDonations() {
-    document.getElementById("donations-body").innerHTML = '<tr><td colspan="5" class="loading">Loading...</td></tr>';
-    try {
-      const list = await api("GET", "/admin/donations");
-      const total = list.filter(function(d) { return d.status === "succeeded"; })
-                        .reduce(function(s, d) { return s + d.amount; }, 0);
-      document.getElementById("donations-total").textContent = "Total confirmed: €" + (total/100).toFixed(2);
-      if (!list.length) { document.getElementById("donations-body").innerHTML = '<tr><td colspan="5" class="empty">No donations</td></tr>'; return; }
-      document.getElementById("donations-body").innerHTML = list.map(function(d) {
-        return '<tr>' +
-          '<td>' + d.id + '</td>' +
-          '<td>' + (d.donor_email || "—") + '</td>' +
-          '<td>€' + (d.amount/100).toFixed(2) + '</td>' +
-          '<td><span class="badge badge-' + (d.status==="succeeded"?"approved":d.status==="failed"?"rejected":"pending") + '">' + d.status + '</span></td>' +
-          '<td>' + fmt(d.created_at) + '</td>' +
-          '</tr>';
-      }).join("");
-    } catch(e) { toast(e.message, true); }
   }
 
   // ── TOTP / SECURITY ─────────────────────────────────────────
