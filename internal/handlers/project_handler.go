@@ -447,9 +447,8 @@ func UpdateProject(c *gin.Context) {
 	if input.ImageURL != nil {
 		newImageURL := *input.ImageURL
 		
-		// Only delete from GCS if replacing with a DIFFERENT non-empty URL
-		// If removing (empty string) or keeping same URL, don't delete
-		if project.ImageURL != "" && newImageURL != "" && newImageURL != project.ImageURL {
+		// Delete old image when the URL changes (including removal with empty string)
+		if project.ImageURL != "" && newImageURL != project.ImageURL {
 			oldObjectName := extractGCSObjectName(project.ImageURL)
 			if oldObjectName != "" {
 				if err := storage.DeleteFile(oldObjectName); err != nil {
@@ -457,7 +456,7 @@ func UpdateProject(c *gin.Context) {
 				}
 			}
 		}
-		// Update the image URL (can be empty to remove the reference without deleting file)
+		// Update the image URL (can be empty to remove the image from the project)
 		project.ImageURL = newImageURL
 	}
 	
