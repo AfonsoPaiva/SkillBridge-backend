@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"log"
 	"os"
+	"strings"
 	"time"
 
 	firebase "firebase.google.com/go/v4"
@@ -55,6 +56,14 @@ func SendMessagePush(tokens []string, title string, body string, data map[string
 	ctx, cancel := context.WithTimeout(context.Background(), 8*time.Second)
 	defer cancel()
 
+	frontendURL := strings.TrimSpace(config.AppConfig.FrontendURL)
+	frontendURL = strings.TrimRight(frontendURL, "/")
+	if frontendURL == "" {
+		frontendURL = "https://skillbridge.pt"
+	}
+
+	messageLink := frontendURL + "/messages"
+
 	msg := &messaging.MulticastMessage{
 		Tokens: tokens,
 		Notification: &messaging.Notification{
@@ -70,7 +79,7 @@ func SendMessagePush(tokens []string, title string, body string, data map[string
 				Badge: "/assets/favicon-192.png",
 			},
 			FCMOptions: &messaging.WebpushFCMOptions{
-				Link: "/messages",
+				Link: messageLink,
 			},
 		},
 	}
