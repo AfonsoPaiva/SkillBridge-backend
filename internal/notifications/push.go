@@ -64,13 +64,24 @@ func SendMessagePush(tokens []string, title string, body string, data map[string
 
 	messageLink := frontendURL + "/messages"
 
+	payloadData := make(map[string]string, len(data)+1)
+	for k, v := range data {
+		payloadData[k] = v
+	}
+
+	if conversationID := strings.TrimSpace(payloadData["conversation_id"]); conversationID != "" {
+		messageLink = frontendURL + "/messages/" + conversationID
+	}
+
+	payloadData["url"] = messageLink
+
 	msg := &messaging.MulticastMessage{
 		Tokens: tokens,
 		Notification: &messaging.Notification{
 			Title: title,
 			Body:  body,
 		},
-		Data: data,
+		Data: payloadData,
 		Webpush: &messaging.WebpushConfig{
 			Notification: &messaging.WebpushNotification{
 				Title: title,
