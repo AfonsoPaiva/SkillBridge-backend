@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"strings"
 	"time"
+
 	"github.com/paiva/SkillBridge/Backend/internal/database"
 	"github.com/paiva/SkillBridge/Backend/internal/middleware"
 	"github.com/paiva/SkillBridge/Backend/internal/models"
@@ -18,18 +19,18 @@ import (
 // Returns the user and true if found, or nil and false if not found.
 func getUserByIDOrSlug(idOrSlug string) (*models.User, bool) {
 	var user models.User
-	
+
 	// Try to find by slug first
 	err := database.DB.Where("slug = ?", idOrSlug).First(&user).Error
 	if err == nil {
 		return &user, true
 	}
-	
+
 	// If not found by slug, try by numeric ID
 	if err := database.DB.First(&user, idOrSlug).Error; err != nil {
 		return nil, false
 	}
-	
+
 	return &user, true
 }
 
@@ -68,16 +69,16 @@ func RegisterUser(c *gin.Context) {
 	emailStr := fmt.Sprintf("%v", firebaseEmail)
 
 	var input struct {
-		Name             string              `json:"name" binding:"required"`
-		ContactLinks     models.ContactLinks `json:"contact_links"`
-		University       string              `json:"university"`
-		Course           string              `json:"course"`
-		Year             string              `json:"year"`
-		Bio              string              `json:"bio"`
-		Role             string              `json:"role"`
+		Name         string              `json:"name" binding:"required"`
+		ContactLinks models.ContactLinks `json:"contact_links"`
+		University   string              `json:"university"`
+		Course       string              `json:"course"`
+		Year         string              `json:"year"`
+		Bio          string              `json:"bio"`
+		Role         string              `json:"role"`
 		// If the user filled the guest onboarding form, pass the token here
 		// to have role automatically applied to the new profile.
-		GuestSessionToken string             `json:"guest_session_token"`
+		GuestSessionToken string `json:"guest_session_token"`
 	}
 
 	if err := c.ShouldBindJSON(&input); err != nil {
@@ -109,17 +110,17 @@ func RegisterUser(c *gin.Context) {
 	}
 
 	user := models.User{
-		FirebaseUID:  firebaseUID,
-		Name:         input.Name,
-		Slug:         slug,
-		Email:        emailStr,
+		FirebaseUID:   firebaseUID,
+		Name:          input.Name,
+		Slug:          slug,
+		Email:         emailStr,
 		EmailVerified: emailVerified,
-		University:   input.University,
-		Course:       input.Course,
-		Year:         input.Year,
-		Bio:          input.Bio,
-		Role:         input.Role,
-		ContactLinks: input.ContactLinks,
+		University:    input.University,
+		Course:        input.Course,
+		Year:          input.Year,
+		Bio:           input.Bio,
+		Role:          input.Role,
+		ContactLinks:  input.ContactLinks,
 	}
 
 	// Apply guest onboarding preferences if a session token was provided
@@ -160,7 +161,7 @@ func GetMyProfile(c *gin.Context) {
 	firebaseUID := c.GetString("firebase_uid")
 
 	var user models.User
-	if err := database.DB.Preload("Skills.Skill").Where("firebase_uid = ?", firebaseUID).First(&user).Error; err != nil {
+	if err := database.DB.Where("firebase_uid = ?", firebaseUID).First(&user).Error; err != nil {
 		firebaseEmail, _ := c.Get("email")
 		emailStr := fmt.Sprintf("%v", firebaseEmail)
 
@@ -200,12 +201,11 @@ func GetUserByID(c *gin.Context) {
 		c.JSON(http.StatusNotFound, gin.H{"error": "Utilizador não encontrado."})
 		return
 	}
-	
+
 	// Omitir email do perfil público
 	user.Email = ""
 	c.JSON(http.StatusOK, user)
 }
-
 
 // UpdateProfile - Atualiza o perfil do utilizador autenticado
 //
@@ -304,7 +304,7 @@ func DeleteMyProfile(c *gin.Context) {
 		database.DB.Where("project_id = ?", proj.ID).Delete(&models.ProjectOwner{})
 		database.DB.Delete(&proj)
 	}
-	
+
 	database.DB.Where("user_id = ?", user.ID).Delete(&models.ProjectOwner{})
 	database.DB.Where("user_id = ?", user.ID).Delete(&models.ProjectMember{})
 	database.DB.Where("reviewer_id = ? OR reviewed_id = ?", user.ID, user.ID).Delete(&models.Review{})
@@ -313,13 +313,15 @@ func DeleteMyProfile(c *gin.Context) {
 	database.DB.Where("user_a_id = ? OR user_b_id = ?", user.ID, user.ID).Find(&convs)
 	if len(convs) > 0 {
 		ids := make([]uint, len(convs))
-		for i, c2 := range convs { ids[i] = c2.ID }
+		for i, c2 := range convs {
+			ids[i] = c2.ID
+		}
 		database.DB.Where("conversation_id IN ?", ids).Delete(&models.Message{})
 		database.DB.Where("id IN ?", ids).Delete(&models.Conversation{})
 	}
 	database.DB.Where("user_id = ?", user.ID).Delete(&models.UserPublicKey{})
 	database.DB.Where("user_id = ?", user.ID).Delete(&models.GuestSession{})
-	
+
 	// Delete user avatar from GCS
 	if user.AvatarURL != "" {
 		objectName := extractGCSObjectName(user.AvatarURL)
@@ -329,7 +331,7 @@ func DeleteMyProfile(c *gin.Context) {
 			}
 		}
 	}
-	
+
 	if err := middleware.DeleteUser(firebaseUID); err != nil {
 		log.Printf("erro a eliminar utilizador firebase uid=%s: %v", firebaseUID, err)
 	}
@@ -409,7 +411,7 @@ func UpdateEmailVerification(c *gin.Context) {
 
 	log.Printf("[verify-email] Email verificado para UID=%s", firebaseUID)
 	c.JSON(http.StatusOK, gin.H{
-		"message": "Email verificado com sucesso.",
+		"message":        "Email verificado com sucesso.",
 		"email_verified": true,
 	})
 }
