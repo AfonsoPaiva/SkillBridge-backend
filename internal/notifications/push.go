@@ -2,6 +2,7 @@ package notifications
 
 import (
 	"context"
+	"fmt"
 	"log"
 	"os"
 	"time"
@@ -70,6 +71,26 @@ func SendMessagePush(tokens []string, title string, body string, data map[string
 		},
 	}
 
-	_, err := messagingClient.SendEachForMulticast(ctx, msg)
-	return err
+	resp, err := messagingClient.SendEachForMulticast(ctx, msg)
+	if err != nil {
+		return err
+	}
+
+	if resp == nil {
+		return fmt.Errorf("fcm returned empty response")
+	}
+
+	if resp.FailureCount > 0 {
+		for i, r := range resp.Responses {
+			if r != nil && r.Error != nil {
+				log.Printf("[push] token[%d] failed: %v", i, r.Error)
+			}
+		}
+	}
+
+	if resp.SuccessCount == 0 {
+		return fmt.Errorf("push delivery failed for all tokens (%d failures)", resp.FailureCount)
+	}
+
+	return nil
 }
