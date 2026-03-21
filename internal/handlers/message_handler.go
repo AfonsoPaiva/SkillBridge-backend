@@ -396,6 +396,8 @@ func SendMessage(c *gin.Context) {
 			}
 		}
 
+		log.Printf("[push] conversation=%d recipient=%d tokens_found=%d", conv.ID, recipientID, len(tokens))
+
 		if len(tokens) > 0 {
 			notificationBody := "Recebeu uma nova mensagem no SkillBridge."
 			if me.Name != "" {
@@ -409,7 +411,11 @@ func SendMessage(c *gin.Context) {
 			}); err != nil {
 				log.Printf("[push] failed to send message notification (conv=%d recipient=%d): %v", conv.ID, recipientID, err)
 			}
+		} else {
+			log.Printf("[push] skipped send (conv=%d recipient=%d): no tokens", conv.ID, recipientID)
 		}
+	} else {
+		log.Printf("[push] failed to query recipient tokens (conv=%d recipient=%d): %v", conv.ID, recipientID, err)
 	}
 
 	// Return sender info (no email)
@@ -590,6 +596,7 @@ func RegisterPushToken(c *gin.Context) {
 		record.UserAgent = userAgent
 		record.LastSeenAt = now
 		database.DB.Save(&record)
+		log.Printf("[push] token updated user=%d platform=%s", me.ID, platform)
 		c.JSON(http.StatusOK, gin.H{"message": "Token atualizado com sucesso."})
 		return
 	}
@@ -602,6 +609,7 @@ func RegisterPushToken(c *gin.Context) {
 		LastSeenAt: now,
 	}
 	database.DB.Create(&record)
+	log.Printf("[push] token registered user=%d platform=%s", me.ID, platform)
 
 	c.JSON(http.StatusCreated, gin.H{"message": "Token registado com sucesso."})
 }

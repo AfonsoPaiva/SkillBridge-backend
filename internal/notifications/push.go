@@ -44,8 +44,12 @@ func InitFirebaseMessaging() error {
 
 // SendMessagePush sends a push notification to one or more device tokens.
 func SendMessagePush(tokens []string, title string, body string, data map[string]string) error {
-	if messagingClient == nil || len(tokens) == 0 {
-		return nil
+	if messagingClient == nil {
+		return fmt.Errorf("fcm messaging client not initialized")
+	}
+
+	if len(tokens) == 0 {
+		return fmt.Errorf("no push tokens provided")
 	}
 
 	ctx, cancel := context.WithTimeout(context.Background(), 8*time.Second)
@@ -91,6 +95,8 @@ func SendMessagePush(tokens []string, title string, body string, data map[string
 	if resp.SuccessCount == 0 {
 		return fmt.Errorf("push delivery failed for all tokens (%d failures)", resp.FailureCount)
 	}
+
+	log.Printf("[push] delivery ok: success=%d failure=%d", resp.SuccessCount, resp.FailureCount)
 
 	return nil
 }
