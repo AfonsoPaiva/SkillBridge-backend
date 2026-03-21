@@ -15,31 +15,31 @@ func Setup(r *gin.Engine) {
 
 	// Health check endpoint (no authentication required)
 	r.GET("/health", handlers.HealthCheck)
-	
+
 	// Cache headers middleware for static and public resources
 	r.Use(func(c *gin.Context) {
 		path := c.Request.URL.Path
-		
+
 		// Long cache for static assets (images, fonts, etc.)
-		if strings.HasPrefix(path, "/api/upload/") || 
-		   strings.HasPrefix(path, "/assets/") ||
-		   strings.HasSuffix(path, ".js") || 
-		   strings.HasSuffix(path, ".css") ||
-		   strings.HasSuffix(path, ".woff") ||
-		   strings.HasSuffix(path, ".woff2") ||
-		   strings.HasSuffix(path, ".ttf") ||
-		   strings.HasSuffix(path, ".svg") ||
-		   strings.HasSuffix(path, ".png") ||
-		   strings.HasSuffix(path, ".jpg") ||
-		   strings.HasSuffix(path, ".jpeg") ||
-		   strings.HasSuffix(path, ".webp") {
+		if strings.HasPrefix(path, "/api/upload/") ||
+			strings.HasPrefix(path, "/assets/") ||
+			strings.HasSuffix(path, ".js") ||
+			strings.HasSuffix(path, ".css") ||
+			strings.HasSuffix(path, ".woff") ||
+			strings.HasSuffix(path, ".woff2") ||
+			strings.HasSuffix(path, ".ttf") ||
+			strings.HasSuffix(path, ".svg") ||
+			strings.HasSuffix(path, ".png") ||
+			strings.HasSuffix(path, ".jpg") ||
+			strings.HasSuffix(path, ".jpeg") ||
+			strings.HasSuffix(path, ".webp") {
 			// 1 year cache for immutable assets
 			c.Header("Cache-Control", "public, max-age=31536000, immutable")
 		} else if strings.HasPrefix(path, "/api/") {
 			// Short cache for API responses
 			c.Header("Cache-Control", "no-cache, must-revalidate")
 		}
-		
+
 		c.Next()
 	})
 
@@ -49,20 +49,20 @@ func Setup(r *gin.Engine) {
 	// CORS - permite pedidos do frontend Angular (production-safe)
 	r.Use(func(c *gin.Context) {
 		origin := c.Request.Header.Get("Origin")
-		
+
 		// Get allowed origins from config (comma-separated in ALLOWED_ORIGINS env var)
 		allowedOrigins := config.AppConfig.AllowedOrigins
-		
+
 		// Fallback to FrontendURL if ALLOWED_ORIGINS is not set
 		if len(allowedOrigins) == 0 && config.AppConfig.FrontendURL != "" {
 			allowedOrigins = []string{config.AppConfig.FrontendURL}
 		}
-		
+
 		// In development, add localhost
 		if config.AppConfig.Env == "development" {
 			allowedOrigins = append(allowedOrigins, "http://localhost:4200")
 		}
-		
+
 		// Check if the origin is allowed (reject if empty or not in list)
 		// Also allow all *.vercel.app subdomains for preview deployments
 		isAllowed := false
@@ -78,13 +78,13 @@ func Setup(r *gin.Engine) {
 				isAllowed = true
 			}
 		}
-		
+
 		// Log rejected CORS requests for security monitoring
 		if !isAllowed && origin != "" && config.AppConfig.Env != "development" {
-			log.Printf("[CORS] Rejected request from unauthorized origin: %s (method: %s, path: %s)", 
+			log.Printf("[CORS] Rejected request from unauthorized origin: %s (method: %s, path: %s)",
 				origin, c.Request.Method, c.Request.URL.Path)
 		}
-		
+
 		// Only set CORS headers if origin is explicitly allowed
 		if isAllowed {
 			c.Header("Access-Control-Allow-Origin", origin)
@@ -93,11 +93,11 @@ func Setup(r *gin.Engine) {
 			c.Header("Access-Control-Allow-Headers", "Content-Type, Authorization, Origin, Accept")
 			c.Header("Access-Control-Max-Age", "86400") // Cache preflight for 24 hours
 		}
-		
+
 		// Required for Firebase signInWithPopup to work across same origin
 		c.Header("Cross-Origin-Opener-Policy", "same-origin-allow-popups")
 		c.Header("Cross-Origin-Embedder-Policy", "unsafe-none")
-		
+
 		// Handle preflight OPTIONS request
 		if c.Request.Method == "OPTIONS" {
 			// Return 204 if allowed, 403 if not
@@ -108,7 +108,7 @@ func Setup(r *gin.Engine) {
 			}
 			return
 		}
-		
+
 		c.Next()
 	})
 
@@ -168,6 +168,8 @@ func Setup(r *gin.Engine) {
 		protected.PUT("/messages/keys", handlers.RegisterPublicKey)
 		protected.GET("/messages/keys/:user_id", handlers.GetPublicKey)
 		protected.GET("/messages/unread-count", handlers.GetUnreadCount)
+		protected.POST("/notifications/tokens", handlers.RegisterPushToken)
+		protected.DELETE("/notifications/tokens", handlers.DeletePushToken)
 		protected.POST("/conversations", handlers.StartOrGetConversation)
 		protected.GET("/conversations", handlers.ListConversations)
 		protected.POST("/conversations/:id/messages", handlers.SendMessage)

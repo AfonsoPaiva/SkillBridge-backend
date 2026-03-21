@@ -68,26 +68,26 @@ func (s *StringList) Scan(value interface{}) error {
 // A password é gerida pelo Firebase (não é armazenada aqui)
 // --------------------------------------------------
 type User struct {
-	ID           uint         `gorm:"primaryKey;autoIncrement" json:"id"`
-	FirebaseUID  string       `gorm:"uniqueIndex:idx_users_firebase_uid;not null" json:"firebase_uid"`
-	Name         string       `gorm:"not null" json:"name"`
-	Slug         string       `gorm:"uniqueIndex:idx_users_slug;not null" json:"slug"`
-	Email        string       `gorm:"uniqueIndex:idx_users_email;not null" json:"email"`
-	EmailVerified bool        `gorm:"default:false" json:"email_verified"`
-	ContactLinks ContactLinks `gorm:"type:jsonb" json:"contact_links"`
-	University   string       `json:"university"`
-	Course       string       `json:"course"`
-	Year         string       `gorm:"type:varchar(50)" json:"year"`
-	Bio          string       `json:"bio"`
-	AvatarURL    string       `json:"avatar_url"`
-	Skills       StringList   `gorm:"type:jsonb;default:'[]'" json:"skills"`
+	ID            uint         `gorm:"primaryKey;autoIncrement" json:"id"`
+	FirebaseUID   string       `gorm:"uniqueIndex:idx_users_firebase_uid;not null" json:"firebase_uid"`
+	Name          string       `gorm:"not null" json:"name"`
+	Slug          string       `gorm:"uniqueIndex:idx_users_slug;not null" json:"slug"`
+	Email         string       `gorm:"uniqueIndex:idx_users_email;not null" json:"email"`
+	EmailVerified bool         `gorm:"default:false" json:"email_verified"`
+	ContactLinks  ContactLinks `gorm:"type:jsonb" json:"contact_links"`
+	University    string       `json:"university"`
+	Course        string       `json:"course"`
+	Year          string       `gorm:"type:varchar(50)" json:"year"`
+	Bio           string       `json:"bio"`
+	AvatarURL     string       `json:"avatar_url"`
+	Skills        StringList   `gorm:"type:jsonb;default:'[]'" json:"skills"`
 	// Onboarding preferences — collected on first visit (guest or registered)
-	Role         string       `gorm:"type:varchar(20);default:''" json:"role"` // needs_help | helper
+	Role string `gorm:"type:varchar(20);default:''" json:"role"` // needs_help | helper
 	// TOTP two-factor authentication
-	TOTPSecret   string       `gorm:"type:varchar(255);default:''" json:"-"` // TOTP secret (never sent to client)
-	TOTPEnabled  bool         `gorm:"default:false" json:"totp_enabled"`
+	TOTPSecret     string     `gorm:"type:varchar(255);default:''" json:"-"` // TOTP secret (never sent to client)
+	TOTPEnabled    bool       `gorm:"default:false" json:"totp_enabled"`
 	TOTPVerifiedAt *time.Time `json:"totp_verified_at,omitempty"` // Last successful TOTP verification (persists across restarts)
-	CreatedAt    time.Time    `json:"created_at"`
+	CreatedAt      time.Time  `json:"created_at"`
 
 	// Relações
 	OwnedProjects  []Project       `gorm:"foreignKey:OwnerID" json:"owned_projects,omitempty"`
@@ -103,7 +103,7 @@ type GuestSession struct {
 	ID        uint      `gorm:"primaryKey;autoIncrement" json:"id"`
 	Token     string    `gorm:"uniqueIndex:idx_guest_token;not null" json:"token"`
 	Role      string    `gorm:"type:varchar(20)" json:"role"` // needs_help | helper
-	ExpiresAt time.Time `json:"expires_at"` // 90 days from creation
+	ExpiresAt time.Time `json:"expires_at"`                   // 90 days from creation
 	CreatedAt time.Time `json:"created_at"`
 }
 
@@ -120,9 +120,9 @@ type Project struct {
 	ImageURL    string    `gorm:"type:text" json:"image_url"`
 	CreatedAt   time.Time `json:"created_at"`
 
-	Owner   User           `gorm:"foreignKey:OwnerID" json:"owner,omitempty"`
-	Owners  []ProjectOwner `gorm:"foreignKey:ProjectID" json:"owners,omitempty"`
-	Roles   []ProjectRole  `gorm:"foreignKey:ProjectID" json:"roles,omitempty"`
+	Owner   User            `gorm:"foreignKey:OwnerID" json:"owner,omitempty"`
+	Owners  []ProjectOwner  `gorm:"foreignKey:ProjectID" json:"owners,omitempty"`
+	Roles   []ProjectRole   `gorm:"foreignKey:ProjectID" json:"roles,omitempty"`
 	Members []ProjectMember `gorm:"foreignKey:ProjectID" json:"members,omitempty"`
 }
 
@@ -173,7 +173,7 @@ type Review struct {
 	ID         uint      `gorm:"primaryKey;autoIncrement" json:"id"`
 	ReviewerID uint      `gorm:"not null;index" json:"reviewer_id"`
 	ReviewedID uint      `gorm:"not null;index" json:"reviewed_id"`
-	ProjectID  *uint     `json:"project_id,omitempty"` // opcional - contexto do projeto
+	ProjectID  *uint     `json:"project_id,omitempty"`   // opcional - contexto do projeto
 	Rating     int       `gorm:"not null" json:"rating"` // 1 a 5
 	Comment    string    `json:"comment"`
 	Status     string    `gorm:"type:varchar(20);default:'pending'" json:"status"` // pending | approved | rejected
@@ -186,13 +186,13 @@ type Review struct {
 // DONATION - Registo de donativos via Stripe
 // --------------------------------------------------
 type Donation struct {
-	ID               uint      `gorm:"primaryKey;autoIncrement" json:"id"`
-	DonorEmail       string    `json:"donor_email"`       // Email do doador (pode ser anónimo)
-	Amount           int64     `gorm:"not null" json:"amount"` // Em cêntimos (ex: 500 = 5,00€)
-	Currency         string    `gorm:"default:'eur'" json:"currency"`
-	StripePaymentID  string    `gorm:"uniqueIndex" json:"stripe_payment_id"` // ID do PaymentIntent Stripe
-	Status           string    `gorm:"default:'pending'" json:"status"` // pending / succeeded / failed
-	CreatedAt        time.Time `json:"created_at"`
+	ID              uint      `gorm:"primaryKey;autoIncrement" json:"id"`
+	DonorEmail      string    `json:"donor_email"`            // Email do doador (pode ser anónimo)
+	Amount          int64     `gorm:"not null" json:"amount"` // Em cêntimos (ex: 500 = 5,00€)
+	Currency        string    `gorm:"default:'eur'" json:"currency"`
+	StripePaymentID string    `gorm:"uniqueIndex" json:"stripe_payment_id"` // ID do PaymentIntent Stripe
+	Status          string    `gorm:"default:'pending'" json:"status"`      // pending / succeeded / failed
+	CreatedAt       time.Time `json:"created_at"`
 }
 
 // --------------------------------------------------
@@ -210,10 +210,10 @@ type Donation struct {
 // UserPublicKey holds a user's X25519 public key (base64-encoded).
 // One row per user; updated via PUT /messages/keys.
 type UserPublicKey struct {
-	ID        uint      `gorm:"primaryKey;autoIncrement" json:"id"`
-	UserID    uint      `gorm:"uniqueIndex:idx_user_pubkey;not null" json:"user_id"`
+	ID     uint `gorm:"primaryKey;autoIncrement" json:"id"`
+	UserID uint `gorm:"uniqueIndex:idx_user_pubkey;not null" json:"user_id"`
 	// Base64-encoded raw public key bytes (32 bytes → 44 chars in base64)
-	PublicKey string    `gorm:"type:text;not null" json:"public_key"`
+	PublicKey string `gorm:"type:text;not null" json:"public_key"`
 	// Algorithm used — currently only "X25519"
 	Algorithm string    `gorm:"type:varchar(20);default:'X25519'" json:"algorithm"`
 	UpdatedAt time.Time `json:"updated_at"`
@@ -258,25 +258,39 @@ type Follow struct {
 // The recipient fetches the message, performs ECDH with their private key and the
 // stored EphemeralKey to recover the shared secret, then decrypts EncryptedContent.
 type Message struct {
-	ID             uint       `gorm:"primaryKey;autoIncrement" json:"id"`
-	ConversationID uint       `gorm:"not null;index" json:"conversation_id"`
-	SenderID       uint       `gorm:"not null;index" json:"sender_id"`
+	ID             uint `gorm:"primaryKey;autoIncrement" json:"id"`
+	ConversationID uint `gorm:"not null;index" json:"conversation_id"`
+	SenderID       uint `gorm:"not null;index" json:"sender_id"`
 	// Base64-encoded ciphertext — the server cannot read this.
-	EncryptedContent string   `gorm:"type:text;not null" json:"encrypted_content"`
+	EncryptedContent string `gorm:"type:text;not null" json:"encrypted_content"`
 	// Base64-encoded ephemeral X25519 public key used for this message's ECDH.
-	EphemeralKey   string     `gorm:"type:text;not null" json:"ephemeral_key"`
+	EphemeralKey string `gorm:"type:text;not null" json:"ephemeral_key"`
 	// Timestamp the recipient acknowledged the message (nil = unread).
-	ReadAt         *time.Time `json:"read_at"`
-	CreatedAt      time.Time  `json:"created_at"`
+	ReadAt    *time.Time `json:"read_at"`
+	CreatedAt time.Time  `json:"created_at"`
 
 	// System-generated messages (e.g., join application notification)
-	IsSystem     bool   `gorm:"default:false" json:"is_system"`
-	MessageType  string `gorm:"type:varchar(50);default:''" json:"message_type,omitempty"` // 'application'
-	MetaProjectID *uint `json:"meta_project_id,omitempty"`
-	MetaMemberID  *uint `json:"meta_member_id,omitempty"`
+	IsSystem      bool   `gorm:"default:false" json:"is_system"`
+	MessageType   string `gorm:"type:varchar(50);default:''" json:"message_type,omitempty"` // 'application'
+	MetaProjectID *uint  `json:"meta_project_id,omitempty"`
+	MetaMemberID  *uint  `json:"meta_member_id,omitempty"`
 	MetaStatus    string `gorm:"type:varchar(20);default:''" json:"meta_status,omitempty"` // 'pending', 'accepted', 'rejected'
 
 	Sender User `gorm:"foreignKey:SenderID" json:"sender,omitempty"`
+}
+
+// PushDeviceToken stores device/browser push tokens for Web Push notifications.
+// One token can move between users (shared device logout/login), so token must be unique.
+type PushDeviceToken struct {
+	ID         uint      `gorm:"primaryKey;autoIncrement" json:"id"`
+	UserID     uint      `gorm:"not null;index" json:"user_id"`
+	Token      string    `gorm:"type:text;uniqueIndex:idx_push_token;not null" json:"token"`
+	Platform   string    `gorm:"type:varchar(20);default:'web'" json:"platform"` // web | android | ios
+	UserAgent  string    `gorm:"type:text" json:"user_agent"`
+	LastSeenAt time.Time `gorm:"index" json:"last_seen_at"`
+	CreatedAt  time.Time `json:"created_at"`
+
+	User User `gorm:"foreignKey:UserID" json:"user,omitempty"`
 }
 
 // --------------------------------------------------
@@ -284,22 +298,22 @@ type Message struct {
 // --------------------------------------------------
 
 // GenerateSlug creates a URL-friendly slug from a project title.
-// It normalizes accented characters, converts to lowercase, 
+// It normalizes accented characters, converts to lowercase,
 // replaces spaces/special chars with hyphens, and removes any duplicate hyphens.
 func GenerateSlug(title string) string {
 	// Normalize accented characters
 	slug := normalizeAccents(title)
-	
+
 	// Convert to lowercase
 	slug = strings.ToLower(slug)
-	
+
 	// Replace spaces and non-alphanumeric characters with hyphens
 	reg := regexp.MustCompile(`[^a-z0-9]+`)
 	slug = reg.ReplaceAllString(slug, "-")
-	
+
 	// Remove leading/trailing hyphens
 	slug = strings.Trim(slug, "-")
-	
+
 	return slug
 }
 
@@ -324,7 +338,7 @@ func normalizeAccents(s string) string {
 		'æ': "ae", 'Æ': "AE",
 		'œ': "oe", 'Œ': "OE",
 	}
-	
+
 	var result strings.Builder
 	for _, char := range s {
 		if replacement, found := replacements[char]; found {
@@ -333,7 +347,7 @@ func normalizeAccents(s string) string {
 			result.WriteRune(char)
 		}
 	}
-	
+
 	return result.String()
 }
 
@@ -349,4 +363,3 @@ type AuditLog struct {
 	UserAgent   string    `json:"user_agent"`
 	Timestamp   time.Time `gorm:"index;not null" json:"timestamp"`
 }
-

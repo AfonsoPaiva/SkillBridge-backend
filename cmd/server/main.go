@@ -4,10 +4,12 @@ package main
 import (
 	"log"
 	"os"
+
 	"github.com/paiva/SkillBridge/Backend/config"
 	"github.com/paiva/SkillBridge/Backend/internal/database"
 	"github.com/paiva/SkillBridge/Backend/internal/handlers"
 	"github.com/paiva/SkillBridge/Backend/internal/middleware"
+	"github.com/paiva/SkillBridge/Backend/internal/notifications"
 	"github.com/paiva/SkillBridge/Backend/internal/routes"
 	"github.com/paiva/SkillBridge/Backend/internal/storage"
 
@@ -37,6 +39,12 @@ func main() {
 		log.Println("  Image uploads will not work. Set GCS_BUCKET_NAME and GCS_PROJECT_ID env vars.")
 	}
 	defer storage.CloseGCS()
+
+	// 4.1 Inicializar Firebase Cloud Messaging (não fatal)
+	if err := notifications.InitFirebaseMessaging(); err != nil {
+		log.Printf("⚠ Warning: Firebase Cloud Messaging initialization failed: %v", err)
+		log.Println("  Push notifications will be disabled until FCM is configured.")
+	}
 
 	// 5. Conectar ao CockroachDB e aplicar migrações
 	database.Connect()

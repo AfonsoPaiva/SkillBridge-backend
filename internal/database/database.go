@@ -3,6 +3,7 @@ package database
 import (
 	"fmt"
 	"log"
+
 	"github.com/paiva/SkillBridge/Backend/config"
 	"github.com/paiva/SkillBridge/Backend/internal/models"
 
@@ -165,6 +166,7 @@ func migrate() error {
 		&models.UserPublicKey{},
 		&models.Conversation{},
 		&models.Message{},
+		&models.PushDeviceToken{},
 		// Guest onboarding sessions
 		&models.GuestSession{},
 		// Follow relationships
@@ -179,7 +181,7 @@ func migrate() error {
 			}
 		}
 	}
-	
+
 	// Add slug column to projects if it doesn't exist
 	if !DB.Migrator().HasColumn(&models.Project{}, "slug") {
 		log.Println("[migrate] Adding slug column to projects table...")
@@ -187,45 +189,45 @@ func migrate() error {
 		if err := DB.Exec("ALTER TABLE projects ADD COLUMN slug TEXT").Error; err != nil {
 			return fmt.Errorf("failed to add slug column: %w", err)
 		}
-		
+
 		// Populate slugs for existing projects
 		log.Println("[migrate] Populating slugs for existing projects...")
 		var projects []models.Project
 		if err := DB.Find(&projects).Error; err != nil {
 			return fmt.Errorf("failed to fetch projects: %w", err)
 		}
-		
+
 		slugCounts := make(map[string]int)
 		for _, project := range projects {
 			baseSlug := models.GenerateSlug(project.Title)
 			slug := baseSlug
-			
+
 			// Ensure uniqueness by appending counter if needed
 			if slugCounts[baseSlug] > 0 {
 				slug = fmt.Sprintf("%s-%d", baseSlug, slugCounts[baseSlug])
 			}
 			slugCounts[baseSlug]++
-			
+
 			if err := DB.Model(&models.Project{}).Where("id = ?", project.ID).Update("slug", slug).Error; err != nil {
 				log.Printf("[migrate] Warning: failed to set slug for project %d: %v", project.ID, err)
 			} else {
 				log.Printf("[migrate] Set slug '%s' for project %d", slug, project.ID)
 			}
 		}
-		
+
 		// Now make it non-null and add unique index
 		log.Println("[migrate] Setting slug column as NOT NULL...")
 		if err := DB.Exec("ALTER TABLE projects ALTER COLUMN slug SET NOT NULL").Error; err != nil {
 			return fmt.Errorf("failed to set slug NOT NULL: %w", err)
 		}
-		
+
 		log.Println("[migrate] Creating unique index on slug...")
 		if err := DB.Exec("CREATE UNIQUE INDEX IF NOT EXISTS idx_projects_slug ON projects(slug)").Error; err != nil {
 			log.Printf("[migrate] Warning: failed to create slug index: %v", err)
 		}
-		
+
 		log.Println("[migrate] Slug column migration completed successfully")
 	}
-	
+
 	return nil
 }

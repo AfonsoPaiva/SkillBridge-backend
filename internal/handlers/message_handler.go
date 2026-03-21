@@ -32,6 +32,7 @@ package handlers
 import (
 	"encoding/base64"
 	"fmt"
+	"log"
 	"net/http"
 	"sync"
 	"time"
@@ -39,6 +40,7 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/paiva/SkillBridge/Backend/internal/database"
 	"github.com/paiva/SkillBridge/Backend/internal/models"
+	"github.com/paiva/SkillBridge/Backend/internal/notifications"
 )
 
 // ─────────────────────────────────────────────────────────────
@@ -162,9 +164,9 @@ func GetPublicKey(c *gin.Context) {
 	}
 	// Omit the internal user relation — only expose the key itself
 	c.JSON(http.StatusOK, gin.H{
-		"user_id":   record.UserID,
+		"user_id":    record.UserID,
 		"public_key": record.PublicKey,
-		"algorithm": record.Algorithm,
+		"algorithm":  record.Algorithm,
 		"updated_at": record.UpdatedAt,
 	})
 }
@@ -268,22 +270,22 @@ func ListConversations(c *gin.Context) {
 		models.Conversation
 		UnreadCount int `json:"unread_count"`
 	}
-	
+
 	result := make([]ConversationWithUnread, len(convs))
 	for i := range convs {
 		// Strip emails from public profiles
 		convs[i].UserA.Email = ""
 		convs[i].UserB.Email = ""
-		
+
 		// Count unread messages (messages sent by the other user that haven't been read)
 		var unreadCount int64
 		database.DB.Model(&models.Message{}).
 			Where("conversation_id = ? AND sender_id != ? AND read_at IS NULL", convs[i].ID, me.ID).
 			Count(&unreadCount)
-		
+
 		result[i] = ConversationWithUnread{
 			Conversation: convs[i],
-			UnreadCount: int(unreadCount),
+			UnreadCount:  int(unreadCount),
 		}
 	}
 
@@ -378,6 +380,37 @@ func SendMessage(c *gin.Context) {
 		EphemeralKey:     input.EphemeralKey,
 	}
 	database.DB.Create(&msg)
+
+	// Push notification to the other conversation participant (best-effort)
+	recipientID := conv.UserAID
+	if recipientID == me.ID {
+		recipientID = conv.UserBID
+	}
+
+	var recipientTokens []models.PushDeviceToken
+	if err := database.DB.Where("user_id = ?", recipientID).Find(&recipientTokens).Error; err == nil {
+		tokens := make([]string, 0, len(recipientTokens))
+		for _, t := range recipientTokens {
+			if t.Token != "" {
+				tokens = append(tokens, t.Token)
+			}
+		}
+
+		if len(tokens) > 0 {
+			notificationBody := "Recebeu uma nova mensagem no SkillBridge."
+			if me.Name != "" {
+				notificationBody = fmt.Sprintf("%s enviou-lhe uma nova mensagem.", me.Name)
+			}
+
+			if err := notifications.SendMessagePush(tokens, "Nova mensagem", notificationBody, map[string]string{
+				"type":            "new_message",
+				"conversation_id": fmt.Sprintf("%d", conv.ID),
+				"sender_id":       fmt.Sprintf("%d", me.ID),
+			}); err != nil {
+				log.Printf("[push] failed to send message notification (conv=%d recipient=%d): %v", conv.ID, recipientID, err)
+			}
+		}
+	}
 
 	// Return sender info (no email)
 	database.DB.Preload("Sender").First(&msg, msg.ID)
@@ -520,4 +553,77 @@ func GetUnreadCount(c *gin.Context) {
 		Count(&unreadCount)
 
 	c.JSON(http.StatusOK, gin.H{"unread_count": unreadCount})
+}
+
+// RegisterPushToken stores or updates a push token for the authenticated user.
+func RegisterPushToken(c *gin.Context) {
+	firebaseUID := c.GetString("firebase_uid")
+
+	var me models.User
+	if err := database.DB.Where("firebase_uid = ?", firebaseUID).First(&me).Error; err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "Utilizador não encontrado."})
+		return
+	}
+
+	var input struct {
+		Token    string `json:"token" binding:"required"`
+		Platform string `json:"platform"`
+	}
+	if err := c.ShouldBindJSON(&input); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	platform := input.Platform
+	if platform != "android" && platform != "ios" {
+		platform = "web"
+	}
+
+	now := time.Now()
+	userAgent := c.GetHeader("User-Agent")
+
+	var record models.PushDeviceToken
+	err := database.DB.Where("token = ?", input.Token).First(&record).Error
+	if err == nil {
+		record.UserID = me.ID
+		record.Platform = platform
+		record.UserAgent = userAgent
+		record.LastSeenAt = now
+		database.DB.Save(&record)
+		c.JSON(http.StatusOK, gin.H{"message": "Token atualizado com sucesso."})
+		return
+	}
+
+	record = models.PushDeviceToken{
+		UserID:     me.ID,
+		Token:      input.Token,
+		Platform:   platform,
+		UserAgent:  userAgent,
+		LastSeenAt: now,
+	}
+	database.DB.Create(&record)
+
+	c.JSON(http.StatusCreated, gin.H{"message": "Token registado com sucesso."})
+}
+
+// DeletePushToken removes a push token from the authenticated user.
+func DeletePushToken(c *gin.Context) {
+	firebaseUID := c.GetString("firebase_uid")
+
+	var me models.User
+	if err := database.DB.Where("firebase_uid = ?", firebaseUID).First(&me).Error; err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "Utilizador não encontrado."})
+		return
+	}
+
+	var input struct {
+		Token string `json:"token" binding:"required"`
+	}
+	if err := c.ShouldBindJSON(&input); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	database.DB.Where("user_id = ? AND token = ?", me.ID, input.Token).Delete(&models.PushDeviceToken{})
+	c.JSON(http.StatusOK, gin.H{"message": "Token removido com sucesso."})
 }
