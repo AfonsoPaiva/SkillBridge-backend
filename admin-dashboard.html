@@ -141,6 +141,109 @@
     .kv .v a:hover { text-decoration: underline; }
     tr.clickable { cursor: pointer; }
     tr.clickable:hover td { background: #eef2ff !important; }
+
+    /* Mobile / tablet improvements */
+    @media (max-width: 960px) {
+      .layout { flex-direction: column; }
+
+      nav {
+        width: 100%;
+        flex-direction: row;
+        align-items: center;
+        gap: 8px;
+        overflow-x: auto;
+        padding: 10px;
+        position: sticky;
+        top: 0;
+        z-index: 40;
+      }
+
+      nav h1 {
+        display: none;
+      }
+
+      nav a {
+        flex: 0 0 auto;
+        border-radius: 8px;
+        padding: 10px 12px;
+      }
+
+      nav a[onclick="signOut()"] {
+        margin-top: 0 !important;
+        margin-left: auto;
+      }
+
+      main {
+        padding: 16px;
+      }
+
+      .stats {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+      }
+
+      .stat-card {
+        min-width: 0;
+        padding: 16px;
+      }
+
+      .toolbar {
+        align-items: stretch;
+      }
+
+      .toolbar input,
+      .toolbar select,
+      .toolbar button {
+        width: 100% !important;
+      }
+
+      .card {
+        overflow-x: auto;
+      }
+
+      table {
+        min-width: 760px;
+      }
+
+      #detail-panel {
+        width: 100%;
+        max-width: 100%;
+        padding: 20px 16px 24px;
+      }
+    }
+
+    @media (max-width: 560px) {
+      .login-box {
+        width: calc(100% - 24px);
+        padding: 24px 16px;
+      }
+
+      h2.page-title {
+        font-size: 20px;
+      }
+
+      .stats {
+        grid-template-columns: 1fr;
+      }
+
+      .stat-card .num {
+        font-size: 28px;
+      }
+
+      th,
+      td {
+        padding: 10px 12px;
+      }
+
+      .kv {
+        flex-direction: column;
+        gap: 4px;
+      }
+
+      .kv .k {
+        width: auto;
+      }
+    }
   </style>
 </head>
 <body>
