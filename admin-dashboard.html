@@ -687,8 +687,24 @@
     var u = _users.find(function(x) { return x.id === id; });
     var name = u ? (u.name || "this user") : "this user";
     if (!confirm("Delete user \"" + name + "\"? This cannot be undone.")) return;
-    try { await api("DELETE", "/admin/users/" + id); toast("User deleted"); loadUsers(); }
-    catch(e) { toast(e.message, true); }
+    try {
+      const res = await fetch(CONFIG.BASE_URL + "/admin/users/" + id, {
+        method: "DELETE",
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": "Bearer " + await getToken()
+        }
+      });
+      let text = await res.text();
+      if (!res.ok) {
+        toast("DELETE failed: " + res.status + " " + text, true);
+      } else {
+        toast("User deleted: " + text);
+        loadUsers();
+      }
+    } catch(e) {
+      toast("JS error: " + (e && e.message ? e.message : e), true);
+    }
   }
 
   // ── PROJECTS ────────────────────────────────────────────────
