@@ -10,8 +10,8 @@ import (
 	"github.com/paiva/SkillBridge/Backend/config"
 	"github.com/paiva/SkillBridge/Backend/internal/audit"
 	"github.com/paiva/SkillBridge/Backend/internal/database"
-	"github.com/paiva/SkillBridge/Backend/internal/models"
 	"github.com/paiva/SkillBridge/Backend/internal/middleware"
+	"github.com/paiva/SkillBridge/Backend/internal/models"
 	"github.com/paiva/SkillBridge/Backend/internal/storage"
 )
 
@@ -28,7 +28,7 @@ import (
 // @Router       /admin/check-access [get]
 func AdminCheckAccess(c *gin.Context) {
 	uid := c.GetString("firebase_uid")
-	
+
 	// Check UID - is this user in the admin list?
 	if !config.IsAdmin(uid) {
 		audit.LogAction(c, audit.ActionUnauthorized, "UID %s not in admin list", uid)
@@ -51,12 +51,12 @@ func AdminCheckAccess(c *gin.Context) {
 			log.Printf("[Admin Check] UID=%s is admin but IP=%s not in whitelist %v", uid, clientIP, config.AppConfig.AdminAllowedIPs)
 			audit.LogAction(c, audit.ActionUnauthorized, "Admin UID=%s with non-whitelisted IP=%s", uid, clientIP)
 			c.JSON(http.StatusForbidden, gin.H{
-				"error":                 "Your IP address is not authorized for admin access.",
-				"is_admin":              true,
-				"uid":                   uid,
-				"ip_whitelist_enabled":  true,
-				"your_ip":               clientIP,
-				"allowed_ips":           config.AppConfig.AdminAllowedIPs,
+				"error":                "Your IP address is not authorized for admin access.",
+				"is_admin":             true,
+				"uid":                  uid,
+				"ip_whitelist_enabled": true,
+				"your_ip":              clientIP,
+				"allowed_ips":          config.AppConfig.AdminAllowedIPs,
 			})
 			return
 		}
@@ -67,11 +67,11 @@ func AdminCheckAccess(c *gin.Context) {
 
 	// All checks passed
 	c.JSON(http.StatusOK, gin.H{
-		"is_admin":              true,
-		"uid":                   uid,
-		"ip_whitelist_enabled":  ipWhitelistEnabled,
-		"your_ip":               clientIP,
-		"ip_allowed":            ipAllowed,
+		"is_admin":             true,
+		"uid":                  uid,
+		"ip_whitelist_enabled": ipWhitelistEnabled,
+		"your_ip":              clientIP,
+		"ip_allowed":           ipAllowed,
 	})
 }
 
@@ -101,7 +101,7 @@ func isIPInWhitelist(ip string, whitelist []string) bool {
 	if len(whitelist) == 0 {
 		return true // No whitelist = all IPs allowed
 	}
-	
+
 	for _, allowedIP := range whitelist {
 		if allowedIP == ip {
 			return true
@@ -164,11 +164,11 @@ func AdminDeleteUser(c *gin.Context) {
 		c.JSON(http.StatusNotFound, gin.H{"error": "Utilizador não encontrado."})
 		return
 	}
-	
+
 	userID := user.ID
 	userName := user.Name
 	userEmail := user.Email
-	
+
 	// perform the same cleanup as DeleteMyProfile
 	// Delete owned projects and their images from GCS
 	var ownedProjects []models.Project
@@ -188,7 +188,7 @@ func AdminDeleteUser(c *gin.Context) {
 		database.DB.Where("project_id = ?", proj.ID).Delete(&models.ProjectOwner{})
 		database.DB.Delete(&proj)
 	}
-	
+
 	database.DB.Where("user_id = ?", user.ID).Delete(&models.ProjectOwner{})
 	database.DB.Where("user_id = ?", user.ID).Delete(&models.ProjectMember{})
 	database.DB.Where("reviewer_id = ? OR reviewed_id = ?", user.ID, user.ID).Delete(&models.Review{})
@@ -197,13 +197,16 @@ func AdminDeleteUser(c *gin.Context) {
 	database.DB.Where("user_a_id = ? OR user_b_id = ?", user.ID, user.ID).Find(&convs)
 	if len(convs) > 0 {
 		ids := make([]uint, len(convs))
-		for i, c2 := range convs { ids[i] = c2.ID }
+		for i, c2 := range convs {
+			ids[i] = c2.ID
+		}
 		database.DB.Where("conversation_id IN ?", ids).Delete(&models.Message{})
 		database.DB.Where("id IN ?", ids).Delete(&models.Conversation{})
 	}
 	database.DB.Where("user_id = ?", user.ID).Delete(&models.UserPublicKey{})
+	database.DB.Where("user_id = ?", user.ID).Delete(&models.PushDeviceToken{})
 	database.DB.Where("user_id = ?", user.ID).Delete(&models.GuestSession{})
-	
+
 	// Delete user avatar from GCS
 	if user.AvatarURL != "" {
 		objectName := extractGCSObjectName(user.AvatarURL)
@@ -213,19 +216,19 @@ func AdminDeleteUser(c *gin.Context) {
 			}
 		}
 	}
-	
+
 	// delete firebase record if possible
 	firebaseUID := user.FirebaseUID
-  if firebaseUID != "" {
-    if err := middleware.DeleteUser(firebaseUID); err != nil {
-      log.Printf("erro a eliminar utilizador firebase uid=%s: %v", firebaseUID, err)
-    }
-  }
+	if firebaseUID != "" {
+		if err := middleware.DeleteUser(firebaseUID); err != nil {
+			log.Printf("erro a eliminar utilizador firebase uid=%s: %v", firebaseUID, err)
+		}
+	}
 	database.DB.Delete(&user)
-	
-	audit.LogAction(c, audit.ActionUserDelete, 
+
+	audit.LogAction(c, audit.ActionUserDelete,
 		"Deleted user ID=%d Name=%s Email=%s", userID, userName, userEmail)
-	
+
 	c.JSON(http.StatusOK, gin.H{"message": "Utilizador eliminado com sucesso."})
 }
 
@@ -262,10 +265,10 @@ func AdminDeleteProject(c *gin.Context) {
 		c.JSON(http.StatusNotFound, gin.H{"error": "Projeto não encontrado."})
 		return
 	}
-	
+
 	projectID := project.ID
 	projectTitle := project.Title
-	
+
 	// Delete child records first to avoid FK constraint violations
 	database.DB.Where("project_id = ?", project.ID).Delete(&models.ProjectOwner{})
 	database.DB.Where("project_id = ?", project.ID).Delete(&models.ProjectRole{})
@@ -276,10 +279,10 @@ func AdminDeleteProject(c *gin.Context) {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Erro ao eliminar projeto."})
 		return
 	}
-	
-	audit.LogAction(c, audit.ActionProjectDelete, 
+
+	audit.LogAction(c, audit.ActionProjectDelete,
 		"Deleted project ID=%d Title=%s", projectID, projectTitle)
-	
+
 	c.JSON(http.StatusOK, gin.H{"message": "Projeto eliminado."})
 }
 
@@ -356,13 +359,13 @@ func AdminDecideReview(c *gin.Context) {
 	}
 
 	database.DB.Model(&review).Update("status", input.Status)
-	
+
 	if input.Status == "approved" {
 		audit.LogAction(c, audit.ActionReviewApprove, "Approved review ID=%d", review.ID)
 	} else {
 		audit.LogAction(c, audit.ActionReviewReject, "Rejected review ID=%d", review.ID)
 	}
-	
+
 	c.JSON(http.StatusOK, gin.H{"message": "Avaliação " + input.Status + ".", "review_id": review.ID})
 }
 
@@ -384,13 +387,13 @@ func AdminDeleteReview(c *gin.Context) {
 		c.JSON(http.StatusNotFound, gin.H{"error": "Avaliação não encontrada."})
 		return
 	}
-	
+
 	reviewID := review.ID
-	
+
 	database.DB.Delete(&review)
-	
+
 	audit.LogAction(c, audit.ActionReviewDelete, "Deleted review ID=%d", reviewID)
-	
+
 	c.JSON(http.StatusOK, gin.H{"message": "Avaliação eliminada."})
 }
 
