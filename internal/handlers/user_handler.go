@@ -320,7 +320,9 @@ func DeleteMyProfile(c *gin.Context) {
 		database.DB.Where("id IN ?", ids).Delete(&models.Conversation{})
 	}
 	database.DB.Where("user_id = ?", user.ID).Delete(&models.UserPublicKey{})
-	database.DB.Where("user_id = ?", user.ID).Delete(&models.GuestSession{})
+	// Delete push device tokens to avoid FK constraint errors
+	database.DB.Where("user_id = ?", user.ID).Delete(&models.PushDeviceToken{})
+	// Do NOT delete GuestSession by user_id (no such column)
 
 	// Delete user avatar from GCS
 	if user.AvatarURL != "" {
