@@ -632,7 +632,7 @@
         '<td style="max-width:150px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">' + (u.course || '\u2014') + '</td>' +
         '<td>' + roleDisplay + '</td>' +
         '<td>' + fmt(u.created_at) + '</td>' +
-        '<td><button class="btn btn-danger" onclick="event.stopPropagation();deleteUser(' + u.id + ')">Delete</button></td>' +
+        '<td><button class="btn btn-danger" onclick="event.stopPropagation();event.preventDefault();deleteUser(' + u.id + ');return false;">Delete</button></td>' +
         '</tr>';
     }).join("");
   }
