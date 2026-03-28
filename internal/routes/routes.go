@@ -74,7 +74,7 @@ func Setup(r *gin.Engine) {
 				}
 			}
 			// Allow Vercel preview deployments (*.vercel.app)
-			if !isAllowed && strings.HasSuffix(origin, ".vercel.app") && strings.HasPrefix(origin, "https://skillbridge-frontend") {
+			if !isAllowed && strings.HasSuffix(origin, ".vercel.app") && strings.HasPrefix(origin, "https://skillbridge.pt") {
 				isAllowed = true
 			}
 		}
