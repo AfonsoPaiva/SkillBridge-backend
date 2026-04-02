@@ -6,12 +6,12 @@ import (
 	"log"
 	"net/http"
 
-	"gorm.io/gorm"
 	"github.com/gin-gonic/gin"
 	"github.com/paiva/SkillBridge/Backend/config"
 	"github.com/paiva/SkillBridge/Backend/internal/database"
 	"github.com/paiva/SkillBridge/Backend/internal/models"
 	"github.com/paiva/SkillBridge/Backend/internal/storage"
+	"gorm.io/gorm"
 )
 
 // ensureUniqueSlug checks if a slug is unique and appends a counter if needed.
@@ -19,7 +19,7 @@ import (
 func ensureUniqueSlug(baseSlug string, excludeID uint) string {
 	slug := baseSlug
 	counter := 1
-	
+
 	for {
 		var count int64
 		query := database.DB.Model(&models.Project{}).Where("slug = ?", slug)
@@ -27,11 +27,11 @@ func ensureUniqueSlug(baseSlug string, excludeID uint) string {
 			query = query.Where("id != ?", excludeID)
 		}
 		query.Count(&count)
-		
+
 		if count == 0 {
 			return slug
 		}
-		
+
 		slug = fmt.Sprintf("%s-%d", baseSlug, counter)
 		counter++
 	}
@@ -42,7 +42,7 @@ func ensureUniqueSlug(baseSlug string, excludeID uint) string {
 func ensureUniqueUserSlug(baseSlug string, excludeID uint) string {
 	slug := baseSlug
 	counter := 1
-	
+
 	for {
 		var count int64
 		query := database.DB.Model(&models.User{}).Where("slug = ?", slug)
@@ -50,11 +50,11 @@ func ensureUniqueUserSlug(baseSlug string, excludeID uint) string {
 			query = query.Where("id != ?", excludeID)
 		}
 		query.Count(&count)
-		
+
 		if count == 0 {
 			return slug
 		}
-		
+
 		slug = fmt.Sprintf("%s-%d", baseSlug, counter)
 		counter++
 	}
@@ -191,7 +191,7 @@ func GetProjects(c *gin.Context) {
 func GetProjectByID(c *gin.Context) {
 	var project models.Project
 	param := c.Param("id")
-	
+
 	// Try to find by slug first, fallback to ID
 	err := database.DB.Preload("Owner").Preload("Roles").Preload("Members.User").Where("slug = ?", param).First(&project).Error
 	if err != nil {
@@ -218,7 +218,7 @@ func GetProjectByID(c *gin.Context) {
 func GetProjectMembers(c *gin.Context) {
 	var project models.Project
 	param := c.Param("id")
-	
+
 	// Try to find by slug first, fallback to ID
 	err := database.DB.Where("slug = ?", param).First(&project).Error
 	if err != nil {
@@ -263,7 +263,7 @@ func JoinProject(c *gin.Context) {
 
 	var project models.Project
 	param := c.Param("id")
-	
+
 	// Try to find by slug first, fallback to ID
 	err := database.DB.Preload("Owners").Where("slug = ?", param).First(&project).Error
 	if err != nil {
@@ -287,17 +287,25 @@ func JoinProject(c *gin.Context) {
 		}
 	}
 
-	// Verificar candidatura duplicada
-	var existing models.ProjectMember
-	if database.DB.Where("project_id = ? AND user_id = ?", project.ID, user.ID).First(&existing).Error == nil {
-		c.JSON(http.StatusConflict, gin.H{"error": "Já tens uma candidatura neste projeto.", "status": existing.Status})
-		return
-	}
-
 	var input struct {
 		RoleID uint `json:"role_id"`
 	}
 	c.ShouldBindJSON(&input)
+
+	// Verificar candidatura duplicada por vaga (permite candidatar a múltiplas vagas do mesmo projeto)
+	var existing models.ProjectMember
+	dupQuery := database.DB.Where("project_id = ? AND user_id = ?", project.ID, user.ID)
+	if input.RoleID != 0 {
+		dupQuery = dupQuery.Where("role_id = ?", input.RoleID)
+	}
+	if dupQuery.First(&existing).Error == nil {
+		msg := "Já tens uma candidatura neste projeto."
+		if input.RoleID != 0 {
+			msg = "Já tens uma candidatura para esta vaga."
+		}
+		c.JSON(http.StatusConflict, gin.H{"error": msg, "status": existing.Status})
+		return
+	}
 
 	member := models.ProjectMember{
 		ProjectID: project.ID,
@@ -417,10 +425,10 @@ func UpdateProject(c *gin.Context) {
 		return
 	}
 	var input struct {
-		Title       string `json:"title"`
-		Description string `json:"description"`
+		Title       string  `json:"title"`
+		Description string  `json:"description"`
 		ImageURL    *string `json:"image_url"` // Pointer to distinguish between not provided and empty
-		Status      string `json:"status"`
+		Status      string  `json:"status"`
 		Roles       []struct {
 			Title       string `json:"title"`
 			SkillName   string `json:"skill_name"`
@@ -441,12 +449,12 @@ func UpdateProject(c *gin.Context) {
 	if input.Description != "" {
 		project.Description = input.Description
 	}
-	
+
 	// Handle image URL update or removal
 	// Only process if image_url field was explicitly provided in the request
 	if input.ImageURL != nil {
 		newImageURL := *input.ImageURL
-		
+
 		// Delete old image when the URL changes (including removal with empty string)
 		if project.ImageURL != "" && newImageURL != project.ImageURL {
 			oldObjectName := extractGCSObjectName(project.ImageURL)
@@ -459,14 +467,24 @@ func UpdateProject(c *gin.Context) {
 		// Update the image URL (can be empty to remove the image from the project)
 		project.ImageURL = newImageURL
 	}
-	
+
 	if input.Status != "" {
 		project.Status = input.Status
 	}
 	database.DB.Save(&project)
 
-	// Sync roles: delete all existing then re-insert
+	// Sync roles: collect existing role IDs, remove their members, then delete all and re-insert
 	if input.Roles != nil {
+		var existingRoles []models.ProjectRole
+		database.DB.Where("project_id = ?", project.ID).Find(&existingRoles)
+		if len(existingRoles) > 0 {
+			existingRoleIDs := make([]uint, len(existingRoles))
+			for i, r := range existingRoles {
+				existingRoleIDs[i] = r.ID
+			}
+			// Remove all member applications assigned to roles that are being deleted
+			database.DB.Where("role_id IN ?", existingRoleIDs).Delete(&models.ProjectMember{})
+		}
 		database.DB.Where("project_id = ?", project.ID).Delete(&models.ProjectRole{})
 		for _, r := range input.Roles {
 			if r.Title == "" && r.SkillName == "" {
@@ -629,11 +647,14 @@ func DeleteProjectRole(c *gin.Context) {
 	if !ok {
 		return
 	}
-	result := database.DB.Where("id = ? AND project_id = ?", c.Param("role_id"), project.ID).Delete(&models.ProjectRole{})
-	if result.RowsAffected == 0 {
+	var role models.ProjectRole
+	if err := database.DB.Where("id = ? AND project_id = ?", c.Param("role_id"), project.ID).First(&role).Error; err != nil {
 		c.JSON(http.StatusNotFound, gin.H{"error": "Role não encontrada."})
 		return
 	}
+	// Remove all member applications (any status) assigned to this role
+	database.DB.Where("role_id = ?", role.ID).Delete(&models.ProjectMember{})
+	database.DB.Delete(&role)
 	c.JSON(http.StatusOK, gin.H{"message": "Role removida."})
 }
 
@@ -705,25 +726,25 @@ func RespondApplication(c *gin.Context) {
 		c.JSON(http.StatusNotFound, gin.H{"error": "Candidatura não encontrada."})
 		return
 	}
-	
+
 	// Não permitir mudanças se já foi aceite
 	if member.Status == "accepted" {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "Esta candidatura já foi aceite e não pode ser alterada."})
 		return
 	}
-	
+
 	newStatus := "accepted"
 	if input.Action == "reject" {
 		newStatus = "rejected"
 	}
-	
+
 	database.DB.Model(&member).Update("status", newStatus)
-	
+
 	// Atualizar o status na mensagem de candidatura
 	database.DB.Model(&models.Message{}).
 		Where("meta_member_id = ? AND message_type = ?", member.ID, "application").
 		Update("meta_status", newStatus)
-	
+
 	if newStatus == "accepted" && member.RoleID != 0 {
 		database.DB.Model(&models.ProjectRole{}).Where("id = ? AND filled < spots", member.RoleID).UpdateColumn("filled", gorm.Expr("filled + 1"))
 	} else if newStatus == "rejected" && member.RoleID != 0 {
@@ -732,10 +753,10 @@ func RespondApplication(c *gin.Context) {
 			database.DB.Model(&models.ProjectRole{}).Where("id = ? AND filled > 0", member.RoleID).UpdateColumn("filled", gorm.Expr("filled - 1"))
 		}
 	}
-	
+
 	// Verificar se o projeto ficou cheio
 	checkAndUpdateProjectFullStatus(project.ID)
-	
+
 	c.JSON(http.StatusOK, gin.H{"message": "Candidatura " + newStatus + ".", "status": newStatus})
 }
 
@@ -749,7 +770,7 @@ func ownerGuard(c *gin.Context) (models.Project, bool) {
 	}
 	var project models.Project
 	param := c.Param("id")
-	
+
 	// Try to find by slug first, fallback to ID
 	err := database.DB.Preload("Owners").Where("slug = ?", param).First(&project).Error
 	if err != nil {
@@ -760,7 +781,7 @@ func ownerGuard(c *gin.Context) (models.Project, bool) {
 			return models.Project{}, false
 		}
 	}
-	
+
 	for _, o := range project.Owners {
 		if o.UserID == user.ID {
 			return project, true
@@ -774,11 +795,11 @@ func ownerGuard(c *gin.Context) (models.Project, bool) {
 func checkAndUpdateProjectFullStatus(projectID uint) {
 	var roles []models.ProjectRole
 	database.DB.Where("project_id = ?", projectID).Find(&roles)
-	
+
 	if len(roles) == 0 {
 		return
 	}
-	
+
 	allFull := true
 	for _, role := range roles {
 		if role.Filled < role.Spots {
@@ -786,10 +807,10 @@ func checkAndUpdateProjectFullStatus(projectID uint) {
 			break
 		}
 	}
-	
+
 	var project models.Project
 	database.DB.First(&project, projectID)
-	
+
 	// Atualizar status para "full" se todas as vagas estão preenchidas e status é "open"
 	if allFull && project.Status == "open" {
 		database.DB.Model(&project).Update("status", "full")
@@ -819,29 +840,64 @@ func RemoveProjectMember(c *gin.Context) {
 	if !ok {
 		return
 	}
-	
+
 	var member models.ProjectMember
 	if err := database.DB.Where("id = ? AND project_id = ?", c.Param("member_id"), project.ID).First(&member).Error; err != nil {
 		c.JSON(http.StatusNotFound, gin.H{"error": "Membro não encontrado."})
 		return
 	}
-	
+
 	// Não permitir remover se não está aceite
 	if member.Status != "accepted" {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "Apenas membros aceites podem ser removidos."})
 		return
 	}
-	
+
 	// Decrementar filled se o membro estava numa role
 	if member.RoleID != 0 {
 		database.DB.Model(&models.ProjectRole{}).Where("id = ? AND filled > 0", member.RoleID).UpdateColumn("filled", gorm.Expr("filled - 1"))
 	}
-	
+
 	// Remover o membro
 	database.DB.Delete(&member)
-	
+
 	// Verificar se o projeto ainda está cheio
 	checkAndUpdateProjectFullStatus(project.ID)
-	
+
 	c.JSON(http.StatusOK, gin.H{"message": "Membro removido com sucesso."})
+}
+
+// GetMyApplications - Devolve as candidaturas do utilizador autenticado num projeto específico
+//
+// @Summary      As minhas candidaturas
+// @Description  Devolve todas as candidaturas do utilizador autenticado para um projeto
+// @Tags         projects
+// @Produce      json
+// @Security     BearerAuth
+// @Param        id  path  string  true  "Slug ou ID do projeto"
+// @Success      200  {array}   models.ProjectMember
+// @Failure      404  {object}  map[string]string
+// @Router       /projects/{id}/my-applications [get]
+func GetMyApplications(c *gin.Context) {
+	firebaseUID := c.GetString("firebase_uid")
+	var user models.User
+	if err := database.DB.Where("firebase_uid = ?", firebaseUID).First(&user).Error; err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "Utilizador não encontrado."})
+		return
+	}
+
+	var project models.Project
+	param := c.Param("id")
+	err := database.DB.Where("slug = ?", param).First(&project).Error
+	if err != nil {
+		err = database.DB.First(&project, param).Error
+		if err != nil {
+			c.JSON(http.StatusNotFound, gin.H{"error": "Projeto não encontrado."})
+			return
+		}
+	}
+
+	var applications []models.ProjectMember
+	database.DB.Where("project_id = ? AND user_id = ?", project.ID, user.ID).Find(&applications)
+	c.JSON(http.StatusOK, applications)
 }

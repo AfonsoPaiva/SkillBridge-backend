@@ -151,6 +151,7 @@ func Setup(r *gin.Engine) {
 		protected.PUT("/projects/:id/status", handlers.UpdateProjectStatus)
 		protected.POST("/projects/:id/join", handlers.JoinProject)
 		protected.GET("/projects/:id/applications", handlers.GetApplications)
+		protected.GET("/projects/:id/my-applications", handlers.GetMyApplications)
 		protected.PUT("/projects/:id/applications/:member_id", handlers.RespondApplication)
 		protected.DELETE("/projects/:id/members/:member_id", handlers.RemoveProjectMember)
 		protected.POST("/projects/:id/owners", handlers.AddProjectOwner)
