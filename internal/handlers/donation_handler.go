@@ -5,13 +5,56 @@ import (
 	"io"
 	"log"
 	"net/http"
-	"github.com/paiva/SkillBridge/Backend/config"
+	"sync"
+	"time"
 
 	"github.com/gin-gonic/gin"
+	"github.com/paiva/SkillBridge/Backend/config"
 	"github.com/stripe/stripe-go/v76"
 	"github.com/stripe/stripe-go/v76/checkout/session"
 	"github.com/stripe/stripe-go/v76/webhook"
 )
+
+// ---------------------------------------------------------------------------
+// IP-based rate limiting for the unauthenticated donation checkout endpoint.
+// Limiting to 5 checkout sessions per hour per IP prevents Stripe API abuse
+// without requiring donors to have an account.
+// ---------------------------------------------------------------------------
+
+var (
+	donationRateMux  sync.Mutex
+	donationAttempts = make(map[string][]time.Time)
+)
+
+const (
+	donationRateMax    = 5
+	donationRateWindow = time.Hour
+)
+
+// checkDonationRateLimit returns true when the IP is within the allowed quota.
+// It also evicts entries older than the window to bound memory growth.
+func checkDonationRateLimit(ip string) bool {
+	donationRateMux.Lock()
+	defer donationRateMux.Unlock()
+
+	now := time.Now()
+	cutoff := now.Add(-donationRateWindow)
+
+	prior := donationAttempts[ip]
+	valid := prior[:0]
+	for _, t := range prior {
+		if t.After(cutoff) {
+			valid = append(valid, t)
+		}
+	}
+
+	if len(valid) >= donationRateMax {
+		return false
+	}
+
+	donationAttempts[ip] = append(valid, now)
+	return true
+}
 
 func stripeReady(c *gin.Context) bool {
 	if config.AppConfig.StripeSecretKey == "" {
@@ -35,6 +78,14 @@ func stripeReady(c *gin.Context) bool {
 // @Router       /donations/embedded-checkout [post]
 func CreateEmbeddedCheckoutSession(c *gin.Context) {
 	if !stripeReady(c) {
+		return
+	}
+
+	// Enforce per-IP rate limit before touching the Stripe API.
+	// c.ClientIP() resolves X-Forwarded-For / X-Real-IP automatically (Gin trusts
+	// the proxy headers set by Cloud Run's load balancer).
+	if !checkDonationRateLimit(c.ClientIP()) {
+		c.JSON(http.StatusTooManyRequests, gin.H{"error": "Demasiados pedidos. Tente novamente mais tarde."})
 		return
 	}
 
