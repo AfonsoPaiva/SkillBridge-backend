@@ -1,5 +1,5 @@
 {
-  "count": 563,
+  "count": 1214,
   "sections": [
     {
       "id": "linguagens-programacao",
@@ -27,7 +27,22 @@
         "Lua",
         "Solidity",
         "SQL",
-        "Latim"
+        "Assembly",
+        "COBOL",
+        "Fortran",
+        "Julia",
+        "Groovy",
+        "Clojure",
+        "F#",
+        "Erlang",
+        "VHDL",
+        "Verilog",
+        "Objective-C",
+        "Shell Script",
+        "PowerShell",
+        "Bash",
+        "PL/SQL",
+        "T-SQL"
       ]
     },
     {
@@ -40,6 +55,7 @@
         "Svelte",
         "Next.js",
         "Nuxt.js",
+        "Gatsby",
         "Node.js",
         "Express.js",
         "NestJS",
@@ -50,18 +66,39 @@
         "Laravel",
         "Ruby on Rails",
         "ASP.NET",
+        "ASP.NET Core",
+        "Blazor",
         "HTML/CSS",
         "SASS/SCSS",
+        "Less",
         "Tailwind CSS",
         "Bootstrap",
+        "Bulma",
+        "Materialize",
         "REST APIs",
         "GraphQL",
         "WebSockets",
         "gRPC",
         "Microserviços",
         "Arquitetura de Software",
+        "Serverless",
+        "JAMstack",
         "WordPress",
-        "WebAssembly"
+        "Drupal",
+        "Joomla",
+        "Shopify",
+        "WebAssembly",
+        "Progressive Web Apps",
+        "Single Page Applications",
+        "SEO Técnico",
+        "Web Performance",
+        "Core Web Vitals",
+        "Acessibilidade Web (WCAG)",
+        "NoCode/LowCode",
+        "Web Scraping",
+        "OAuth",
+        "JWT",
+        "Webhooks"
       ]
     },
     {
@@ -75,7 +112,20 @@
         "Desenvolvimento iOS",
         "Desenvolvimento Android",
         "SwiftUI",
-        "Jetpack Compose"
+        "Jetpack Compose",
+        "Kotlin Multiplatform",
+        "Cordova",
+        "Capacitor",
+        "NativeScript",
+        "App Clip Development",
+        "Wearables Development",
+        "TVOS Development",
+        "Mobile UI/UX",
+        "Mobile Testing",
+        "App Store Optimization",
+        "Mobile DevOps",
+        "ARCore",
+        "ARKit"
       ]
     },
     {
@@ -85,6 +135,8 @@
         "Machine Learning",
         "Deep Learning",
         "Inteligência Artificial",
+        "IA Generativa",
+        "Prompt Engineering",
         "Análise de Dados",
         "Ciência de Dados",
         "Big Data",
@@ -97,9 +149,23 @@
         "NumPy",
         "Power BI",
         "Tableau",
-        "Processamento de Linguagem Natural",
+        "Qlik",
+        "Apache Spark",
+        "Hadoop",
+        "Processamento de Linguagem Natural (NLP)",
         "Visão Computacional",
-        "MLOps"
+        "MLOps",
+        "Aprendizagem por Reforço",
+        "Modelos de Linguagem de Grande Escala (LLMs)",
+        "Data Mining",
+        "ETL",
+        "Data Warehousing",
+        "Data Governance",
+        "Engenharia de Features",
+        "Análise Preditiva",
+        "Séries Temporais",
+        "Estatística Computacional",
+        "Jupyter Notebooks"
       ]
     },
     {
@@ -115,7 +181,20 @@
         "SQLite",
         "Cassandra",
         "Oracle Database",
-        "Microsoft SQL Server"
+        "Microsoft SQL Server",
+        "MariaDB",
+        "Firebase Realtime Database",
+        "Firestore",
+        "DynamoDB",
+        "Neo4j",
+        "CouchDB",
+        "InfluxDB",
+        "Modelação de Dados",
+        "Normalização de BD",
+        "Otimização de Queries",
+        "Índices",
+        "Transações",
+        "Replicação"
       ]
     },
     {
@@ -127,18 +206,34 @@
         "AWS",
         "Azure",
         "Google Cloud",
+        "DigitalOcean",
+        "Heroku",
+        "Vercel",
+        "Netlify",
         "Terraform",
         "Ansible",
+        "Puppet",
+        "Chef",
         "Jenkins",
         "CI/CD",
         "DevOps",
+        "GitOps",
         "Linux",
+        "Unix",
+        "Windows Server",
         "Git",
         "GitHub Actions",
         "GitLab CI",
+        "Bitbucket Pipelines",
         "Prometheus",
         "Grafana",
-        "Nginx"
+        "Nginx",
+        "Apache",
+        "Vagrant",
+        "Infrastructure as Code",
+        "Monitorização",
+        "Gestão de Logs",
+        "Site Reliability Engineering"
       ]
     },
     {
@@ -153,7 +248,18 @@
         "Forense Digital",
         "Gestão de Vulnerabilidades",
         "RGPD e Proteção de Dados",
-        "Criptografia"
+        "Criptografia",
+        "Segurança de Redes",
+        "Segurança de Aplicações Web",
+        "OWASP Top 10",
+        "Análise de Malware",
+        "Resposta a Incidentes",
+        "Segurança em Cloud",
+        "IAM (Identity and Access Management)",
+        "Engenharia Social",
+        "OSINT",
+        "Hardening de Sistemas",
+        "Normas ISO 27001"
       ]
     },
     {
@@ -163,9 +269,19 @@
         "Blockchain",
         "Web3",
         "Smart Contracts",
+        "Solidity",
+        "Ethereum",
         "Criptomoedas",
         "DeFi",
-        "NFTs"
+        "NFTs",
+        "Hyperledger",
+        "Consensus Mechanisms",
+        "dApps",
+        "Metamask",
+        "IPFS",
+        "Tokenomics",
+        "DAO",
+        "Layer 2 Solutions"
       ]
     },
     {
@@ -174,15 +290,23 @@
       "skills": [
         "Arduino",
         "Raspberry Pi",
+        "ESP32",
         "IoT",
         "Robótica",
         "Eletrónica",
         "Impressão 3D",
         "CAD",
         "AutoCAD",
+        "SolidWorks",
         "Sistemas Embebidos",
         "FPGA",
-        "PCB Design"
+        "PCB Design",
+        "Microcontroladores",
+        "Sensores",
+        "Atuadores",
+        "ROS (Robot Operating System)",
+        "Casa Inteligente",
+        "Mecatrónica"
       ]
     },
     {
@@ -201,7 +325,14 @@
         "InVision",
         "Testes de Usabilidade",
         "Acessibilidade Digital",
-        "Design System"
+        "Design System",
+        "User Research",
+        "Personas",
+        "Jornada do Utilizador",
+        "Mapa de Empatia",
+        "Testes A/B",
+        "Design de Interação",
+        "Arquitetura de Informação"
       ]
     },
     {
@@ -213,13 +344,18 @@
         "Photoshop",
         "InDesign",
         "CorelDRAW",
+        "Affinity Designer",
         "Identidade Visual",
         "Branding",
         "Tipografia",
         "Packaging",
         "Design Editorial",
         "Sinalética",
-        "Design de Comunicação"
+        "Design de Comunicação",
+        "Infografia",
+        "Design de Posters",
+        "Serigrafia",
+        "Arte Final"
       ]
     },
     {
@@ -232,10 +368,16 @@
         "Blender",
         "Maya",
         "Cinema 4D",
+        "3ds Max",
+        "ZBrush",
         "Animação 3D",
         "VFX",
         "Realidade Virtual",
-        "Realidade Aumentada"
+        "Realidade Aumentada",
+        "Renderização",
+        "Texturização",
+        "Iluminação 3D",
+        "Captura de Movimento"
       ]
     },
     {
@@ -244,12 +386,19 @@
       "skills": [
         "Unity",
         "Unreal Engine",
+        "Godot",
         "Desenvolvimento de Jogos",
         "Game Design",
         "Narrativa de Jogos",
         "Level Design",
         "Game Art",
-        "Banda Desenhada"
+        "Banda Desenhada",
+        "Pixel Art",
+        "Voxel Art",
+        "Física de Jogos",
+        "IA para Jogos",
+        "Multiplayer",
+        "eSports Management"
       ]
     },
     {
@@ -260,14 +409,19 @@
         "Adobe Premiere",
         "Final Cut Pro",
         "DaVinci Resolve",
+        "iMovie",
         "Fotografia",
         "Edição de Fotografia",
         "Lightroom",
+        "Capture One",
         "Captação de Vídeo",
         "Realização de Cinema",
         "Argumento",
         "Animação",
-        "Drone / Videografia Aérea"
+        "Drone / Videografia Aérea",
+        "Direção de Fotografia",
+        "Correção de Cor",
+        "Streaming ao Vivo"
       ]
     },
     {
@@ -282,8 +436,13 @@
         "Ableton Live",
         "Logic Pro",
         "Pro Tools",
+        "FL Studio",
         "Sound Design",
-        "Música Eletrónica"
+        "Música Eletrónica",
+        "Foley",
+        "Gravação de Campo",
+        "MIDI",
+        "Síntese Sonora"
       ]
     },
     {
@@ -294,6 +453,7 @@
         "SEO",
         "SEM",
         "Google Analytics",
+        "Google Tag Manager",
         "Redes Sociais",
         "Content Marketing",
         "Email Marketing",
@@ -301,10 +461,16 @@
         "Publicidade",
         "Google Ads",
         "Meta Ads",
+        "TikTok Ads",
+        "LinkedIn Ads",
         "Inbound Marketing",
         "Marketing de Afiliados",
         "E-commerce",
-        "CRM"
+        "CRM",
+        "Marketing de Influência",
+        "Growth Hacking",
+        "Análise de Métricas",
+        "Automação de Marketing"
       ]
     },
     {
@@ -326,7 +492,10 @@
         "Public Speaking",
         "Comunicação",
         "Escrita Técnica",
-        "Documentação"
+        "Documentação",
+        "Fact-Checking",
+        "Media Training",
+        "Gestão de Crise de Comunicação"
       ]
     },
     {
@@ -339,11 +508,18 @@
         "Kanban",
         "JIRA",
         "Trello",
+        "Asana",
+        "Monday.com",
         "Prince2",
         "PMI / PMP",
         "Gestão de Riscos",
         "OKRs",
-        "Planeamento Estratégico"
+        "Planeamento Estratégico",
+        "Waterfall",
+        "Lean",
+        "Design Sprint",
+        "Estimativas e Orçamentação",
+        "Gestão de Stakeholders"
       ]
     },
     {
@@ -365,7 +541,12 @@
         "Liderança",
         "Coaching",
         "Mentoria",
-        "Inteligência Emocional"
+        "Inteligência Emocional",
+        "Design Thinking",
+        "Inovação",
+        "Venture Capital",
+        "Crowdfunding",
+        "Internacionalização de Empresas"
       ]
     },
     {
@@ -385,7 +566,10 @@
         "Seguros",
         "Fintech",
         "Valuation",
-        "Modelos Financeiros"
+        "Modelos Financeiros",
+        "IFRS",
+        "OCDE Guidelines",
+        "ESG Investing"
       ]
     },
     {
@@ -404,7 +588,10 @@
         "Comércio Internacional",
         "Negócios Internacionais",
         "Revenue Management",
-        "Atendimento ao Cliente"
+        "Atendimento ao Cliente",
+        "Análise de Mercado",
+        "Economia Comportamental",
+        "Desenvolvimento Económico"
       ]
     },
     {
@@ -440,7 +627,10 @@
         "Ginecologia e Obstetrícia",
         "Oftalmologia",
         "Dermatologia",
-        "Medicina do Trabalho"
+        "Medicina do Trabalho",
+        "Telemedicina",
+        "Bioética",
+        "Literacia em Saúde"
       ]
     },
     {
@@ -457,7 +647,11 @@
         "Intervenção em Crise",
         "Psicopedagogia",
         "Mindfulness",
-        "Terapia Cognitivo-Comportamental"
+        "Terapia Cognitivo-Comportamental",
+        "Psicometria",
+        "Psicologia Social",
+        "Psicologia do Desenvolvimento",
+        "Terapia Familiar"
       ]
     },
     {
@@ -479,7 +673,11 @@
         "Mediação e Arbitragem",
         "Propriedade Intelectual",
         "RGPD",
-        "Direito Digital"
+        "Direito Digital",
+        "Direito Marítimo",
+        "Direito da Aviação",
+        "Legal Tech",
+        "Compliance"
       ]
     },
     {
@@ -494,14 +692,18 @@
         "Gestão da Construção",
         "BIM",
         "Revit",
+        "ArchiCAD",
         "SolidWorks",
         "ANSYS",
+        "SAP2000",
         "Arquitetura",
         "Urbanismo",
         "Planeamento Urbano",
         "Reabilitação de Edifícios",
         "Design de Interiores",
-        "Paisagismo"
+        "Paisagismo",
+        "Fotogrametria",
+        "Patologia da Construção"
       ]
     },
     {
@@ -517,7 +719,12 @@
         "Lean Manufacturing",
         "Six Sigma",
         "Indústria 4.0",
-        "Manutenção Industrial"
+        "Manutenção Industrial",
+        "CNC",
+        "Pneumática",
+        "Hidráulica",
+        "Robótica Industrial",
+        "Simulação de Processos"
       ]
     },
     {
@@ -529,9 +736,13 @@
         "Telecomunicações",
         "Eletrónica Industrial",
         "Redes de Computadores",
+        "CCNA",
         "5G",
         "Fibra Ótica",
-        "Domótica"
+        "Domótica",
+        "Eletrónica de Potência",
+        "Instalações Elétricas",
+        "Smart Grids"
       ]
     },
     {
@@ -543,7 +754,11 @@
         "Engenharia de Materiais",
         "Nanotecnologia",
         "Polímeros",
-        "Metalurgia"
+        "Metalurgia",
+        "Cerâmica Técnica",
+        "Compósitos",
+        "Catálise",
+        "Fenómenos de Transporte"
       ]
     },
     {
@@ -553,11 +768,15 @@
         "Engenharia do Ambiente",
         "Tratamento de Águas",
         "Engenharia Biomédica",
+        "Bioprocessos",
         "Engenharia Aeroespacial",
         "Engenharia Naval",
         "Engenharia Geográfica",
         "Engenharia de Segurança",
-        "Sistemas de Informação Geográfica (SIG)"
+        "Sistemas de Informação Geográfica (SIG)",
+        "Engenharia de Petróleos",
+        "Engenharia de Minas",
+        "Engenharia Nuclear"
       ]
     },
     {
@@ -574,7 +793,12 @@
         "Química",
         "Química Orgânica",
         "Química Inorgânica",
-        "Astronomia"
+        "Astronomia",
+        "Geometria",
+        "Topologia",
+        "Métodos Numéricos",
+        "Termodinâmica",
+        "Eletromagnetismo"
       ]
     },
     {
@@ -596,7 +820,12 @@
         "Sustentabilidade",
         "Certificação Ambiental",
         "Engenharia do Ambiente",
-        "Ciências do Ambiente"
+        "Ciências do Ambiente",
+        "Ecologia",
+        "Zoologia",
+        "Botânica",
+        "Micologia",
+        "Paleontologia"
       ]
     },
     {
@@ -619,7 +848,9 @@
         "Lusofonia",
         "Criminologia",
         "Ciências Forenses",
-        "Geografia Humana"
+        "Geografia Humana",
+        "Democracia e Governança",
+        "Estudos Europeus"
       ]
     },
     {
@@ -636,13 +867,16 @@
         "Mandarim",
         "Árabe",
         "Japonês",
+        "Russo",
         "Latim",
+        "Grego Antigo",
         "Linguística",
         "Tradução e Interpretação",
         "Lexicografia",
         "Escrita Académica",
         "Revisão de Texto",
-        "Tradução"
+        "Tradução",
+        "Linguística Computacional"
       ]
     },
     {
@@ -662,7 +896,9 @@
         "Avaliação Educativa",
         "Ensino",
         "Metodologia de Investigação",
-        "Investigação"
+        "Investigação",
+        "Tutoria",
+        "Coaching Educacional"
       ]
     },
     {
@@ -681,7 +917,8 @@
         "Museologia",
         "Ilustração",
         "Arte Digital",
-        "Arte Urbana"
+        "Arte Urbana",
+        "Fotografia Artística"
       ]
     },
     {
@@ -695,7 +932,9 @@
         "Produção Executiva",
         "Direção de Fotografia",
         "Montagem de Cinema",
-        "Distribuição de Cinema"
+        "Distribuição de Cinema",
+        "Crítica Cinematográfica",
+        "Cinema Documental"
       ]
     },
     {
@@ -708,7 +947,8 @@
         "Têxteis e Materiais",
         "Gestão de Moda",
         "Ergonomia",
-        "Design de Produto"
+        "Design de Produto",
+        "Prototipagem Rápida"
       ]
     },
     {
@@ -726,7 +966,9 @@
         "Etnomusicologia",
         "Regência",
         "Música de Câmara",
-        "Improvisação Musical"
+        "Improvisação Musical",
+        "Coro",
+        "Musicoterapia"
       ]
     },
     {
@@ -738,10 +980,13 @@
         "Encenação",
         "Dança",
         "Dança Contemporânea",
+        "Ballet",
         "Expressão Dramática",
         "Performance",
         "Circo e Artes de Rua",
-        "Puppetry"
+        "Puppetry",
+        "Cenografia",
+        "Figurino"
       ]
     },
     {
@@ -760,7 +1005,9 @@
         "Futebol",
         "Natação",
         "Atletismo",
-        "Psicologia do Desporto"
+        "Psicologia do Desporto",
+        "Preparação Física",
+        "Análise de Performance"
       ]
     },
     {
@@ -777,7 +1024,8 @@
         "Animação Turística",
         "Enoturismo",
         "Turismo de Natureza",
-        "Turismo Sustentável"
+        "Turismo Sustentável",
+        "Revenue Management Hoteleiro"
       ]
     },
     {
@@ -793,7 +1041,8 @@
         "Agricultura de Precisão",
         "Aquacultura",
         "Paisagismo e Horticultura",
-        "Agroindústria"
+        "Agroindústria",
+        "Segurança Alimentar Agrícola"
       ]
     },
     {
@@ -806,7 +1055,9 @@
         "Segurança Alimentar",
         "Medicina do Trabalho",
         "Emergência Médica",
-        "Gestão de Catástrofes"
+        "Gestão de Catástrofes",
+        "Bombeiro",
+        "Segurança Contra Incêndios"
       ]
     },
     {
@@ -825,7 +1076,13 @@
         "Metodologia de Investigação",
         "Investigação",
         "Gestão de Conflitos",
-        "Orientação Vocacional"
+        "Orientação Vocacional",
+        "Comunicação Interpessoal",
+        "Adaptabilidade",
+        "Ética Profissional",
+        "Liderança",
+        "Autonomia",
+        "Resiliência"
       ]
     }
   ]
