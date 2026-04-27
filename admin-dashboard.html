@@ -749,7 +749,10 @@
     if (!p) return;
     var ownerName = p.owner ? (p.owner.name + ' (ID: ' + p.owner_id + ')') : ('ID: ' + p.owner_id);
     var rolesFormatted = p.roles && p.roles.length ? p.roles.map(function(r) {
-      return r.title + ' (' + r.skill_name + ') - ' + r.spots + ' spot(s)';
+      var roleSkills = Array.isArray(r.skill_names) && r.skill_names.length
+        ? r.skill_names.join(', ')
+        : (r.skill_name || '\u2014');
+      return r.title + ' (' + roleSkills + ') - ' + r.spots + ' spot(s)';
     }) : [];
     var membersFormatted = p.members && p.members.length ? p.members.map(function(m) {
       return (m.user ? m.user.name : 'User ID: ' + m.user_id) + ' - ' + m.role;

@@ -3,6 +3,7 @@ package database
 import (
 	"fmt"
 	"log"
+	"strings"
 
 	"github.com/paiva/SkillBridge/Backend/config"
 	"github.com/paiva/SkillBridge/Backend/internal/models"
@@ -50,7 +51,8 @@ func Connect() {
 	alterIfMissing("project_members", "status", "VARCHAR(20) NOT NULL DEFAULT 'pending'")
 	alterIfMissing("reviews", "status", "VARCHAR(20) NOT NULL DEFAULT 'pending'")
 	alterIfMissing("users", "skills", "JSONB DEFAULT '[]'")
-	alterIfMissing("project_roles", "skill_name", "VARCHAR(100) DEFAULT ''")
+	alterIfMissing("project_roles", "skill_names", "JSONB DEFAULT '[]'")
+	migrateProjectRoleSkillNames()
 	// Onboarding guest preferences migrated to user profile
 	alterIfMissing("users", "role", "VARCHAR(20) NOT NULL DEFAULT ''")
 	alterIfMissing("users", "area", "VARCHAR(100) NOT NULL DEFAULT ''")
@@ -62,7 +64,7 @@ func Connect() {
 	alterIfMissing("project_roles", "spots", "INT NOT NULL DEFAULT 1")
 	// Migrate project_roles.filled from BOOL to INT (tracks count, not just flag)
 	migrateFilled()
-	// Make legacy skill_id column nullable (we now use skill_name string field)
+	// Make legacy skill_id column nullable (we now use skill_names JSON field)
 	makeNullable("project_roles", "skill_id")
 	// Make reviews.project_id nullable (reviews can now be general, not project-specific)
 	makeNullable("reviews", "project_id")
@@ -78,14 +80,38 @@ func Connect() {
 	alterIfMissing("users", "email_verified", "BOOL NOT NULL DEFAULT FALSE")
 }
 
+type legacyProjectRoleSkillRow struct {
+	ID         uint
+	SkillName  string
+	SkillNames models.StringList
+}
+
+func migrateProjectRoleSkillNames() {
+	if !columnExists("project_roles", "skill_names") || !columnExists("project_roles", "skill_name") {
+		return
+	}
+
+	var roles []legacyProjectRoleSkillRow
+	if err := DB.Table("project_roles").Select("id", "skill_name", "skill_names").Find(&roles).Error; err != nil {
+		log.Printf("[migrate] Erro ao carregar competências legadas das vagas: %v", err)
+		return
+	}
+
+	for _, role := range roles {
+		legacySkill := strings.TrimSpace(role.SkillName)
+		if len(role.SkillNames) > 0 || legacySkill == "" {
+			continue
+		}
+
+		if err := DB.Table("project_roles").Where("id = ?", role.ID).Update("skill_names", models.StringList{legacySkill}).Error; err != nil {
+			log.Printf("[migrate] Erro ao migrar competências da vaga %d: %v", role.ID, err)
+		}
+	}
+}
+
 // alterIfMissing adiciona uma coluna a uma tabela se ela ainda não existir.
 func alterIfMissing(table, column, definition string) {
-	var count int64
-	DB.Raw(
-		"SELECT COUNT(*) FROM information_schema.columns WHERE table_name = ? AND column_name = ?",
-		table, column,
-	).Scan(&count)
-	if count == 0 {
+	if !columnExists(table, column) {
 		sql := "ALTER TABLE " + table + " ADD COLUMN IF NOT EXISTS " + column + " " + definition
 		if err := DB.Exec(sql).Error; err != nil {
 			log.Printf("[migrate] Erro ao adicionar coluna %s.%s: %v", table, column, err)
@@ -93,6 +119,15 @@ func alterIfMissing(table, column, definition string) {
 			log.Printf("[migrate] Coluna %s.%s adicionada.", table, column)
 		}
 	}
+}
+
+func columnExists(table, column string) bool {
+	var count int64
+	DB.Raw(
+		"SELECT COUNT(*) FROM information_schema.columns WHERE table_name = ? AND column_name = ?",
+		table, column,
+	).Scan(&count)
+	return count > 0
 }
 
 // migrateFilled converts project_roles.filled from BOOL to INT if needed.

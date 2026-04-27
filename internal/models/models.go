@@ -142,13 +142,13 @@ type ProjectOwner struct {
 // PROJECT_ROLE - Perfil que o projeto procura (ex: "Designer UI")
 // --------------------------------------------------
 type ProjectRole struct {
-	ID          uint   `gorm:"primaryKey;autoIncrement" json:"id"`
-	ProjectID   uint   `gorm:"not null;index" json:"project_id"`
-	Title       string `gorm:"type:varchar(200)" json:"title"`
-	SkillName   string `gorm:"type:varchar(100)" json:"skill_name"`
-	Description string `json:"description"`
-	Spots       int    `gorm:"type:int4;default:1" json:"spots"`
-	Filled      int    `gorm:"type:int4;default:0" json:"filled"`
+	ID          uint       `gorm:"primaryKey;autoIncrement" json:"id"`
+	ProjectID   uint       `gorm:"not null;index" json:"project_id"`
+	Title       string     `gorm:"type:varchar(200)" json:"title"`
+	SkillNames  StringList `gorm:"type:jsonb;default:'[]'" json:"skill_names"`
+	Description string     `json:"description"`
+	Spots       int        `gorm:"type:int4;default:1" json:"spots"`
+	Filled      int        `gorm:"type:int4;default:0" json:"filled"`
 }
 
 // --------------------------------------------------

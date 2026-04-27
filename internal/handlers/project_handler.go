@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"log"
 	"net/http"
+	"strings"
 
 	"github.com/gin-gonic/gin"
 	"github.com/paiva/SkillBridge/Backend/config"
@@ -13,6 +14,77 @@ import (
 	"github.com/paiva/SkillBridge/Backend/internal/storage"
 	"gorm.io/gorm"
 )
+
+type projectRoleInput struct {
+	Title       string   `json:"title"`
+	SkillNames  []string `json:"skill_names"`
+	SkillName   string   `json:"skill_name"`
+	Description string   `json:"description"`
+	Spots       int      `json:"spots"`
+}
+
+func normalizeProjectRoleSkillNames(skillNames []string, legacySkillName string) models.StringList {
+	if len(skillNames) == 0 {
+		legacySkillName = strings.TrimSpace(legacySkillName)
+		if legacySkillName != "" {
+			skillNames = []string{legacySkillName}
+		}
+	}
+
+	normalized := make(models.StringList, 0, len(skillNames))
+	seen := make(map[string]struct{}, len(skillNames))
+	for _, skill := range skillNames {
+		skill = strings.TrimSpace(skill)
+		if skill == "" {
+			continue
+		}
+		key := strings.ToLower(skill)
+		if _, exists := seen[key]; exists {
+			continue
+		}
+		seen[key] = struct{}{}
+		normalized = append(normalized, skill)
+	}
+
+	return normalized
+}
+
+func prepareProjectRoles(inputs []projectRoleInput, requireSkills bool) ([]models.ProjectRole, error) {
+	roles := make([]models.ProjectRole, 0, len(inputs))
+	for _, input := range inputs {
+		skillNames := normalizeProjectRoleSkillNames(input.SkillNames, input.SkillName)
+		title := strings.TrimSpace(input.Title)
+
+		if title == "" && len(skillNames) == 0 {
+			if requireSkills {
+				return nil, fmt.Errorf("cada vaga tem de incluir pelo menos uma competência")
+			}
+			continue
+		}
+		if requireSkills && len(skillNames) == 0 {
+			return nil, fmt.Errorf("cada vaga tem de incluir pelo menos uma competência")
+		}
+		for _, skill := range skillNames {
+			if !config.IsValidSkill(skill) {
+				return nil, fmt.Errorf("competência não reconhecida: %s", skill)
+			}
+		}
+
+		spots := input.Spots
+		if spots < 1 {
+			spots = 1
+		}
+
+		roles = append(roles, models.ProjectRole{
+			Title:       title,
+			SkillNames:  skillNames,
+			Description: input.Description,
+			Spots:       spots,
+		})
+	}
+
+	return roles, nil
+}
 
 // ensureUniqueSlug checks if a slug is unique and appends a counter if needed.
 // excludeID allows updating a project without conflicting with itself.
@@ -83,19 +155,20 @@ func CreateProject(c *gin.Context) {
 	}
 
 	var input struct {
-		Title       string `json:"title" binding:"required"`
-		Description string `json:"description"`
-		ImageURL    string `json:"image_url"`
-		Status      string `json:"status"`
-		Roles       []struct {
-			Title       string `json:"title"`
-			SkillName   string `json:"skill_name"`
-			Description string `json:"description"`
-			Spots       int    `json:"spots"`
-		} `json:"roles"`
+		Title       string             `json:"title" binding:"required"`
+		Description string             `json:"description"`
+		ImageURL    string             `json:"image_url"`
+		Status      string             `json:"status"`
+		Roles       []projectRoleInput `json:"roles"`
 	}
 
 	if err := c.ShouldBindJSON(&input); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	roles, err := prepareProjectRoles(input.Roles, false)
+	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
@@ -121,22 +194,9 @@ func CreateProject(c *gin.Context) {
 	database.DB.Create(&project)
 
 	// Save inline roles
-	for _, r := range input.Roles {
-		if r.Title == "" && r.SkillName == "" {
-			continue
-		}
-		spots := r.Spots
-		if spots < 1 {
-			spots = 1
-		}
-		role := models.ProjectRole{
-			ProjectID:   project.ID,
-			Title:       r.Title,
-			SkillName:   r.SkillName,
-			Description: r.Description,
-			Spots:       spots,
-		}
-		database.DB.Create(&role)
+	for i := range roles {
+		roles[i].ProjectID = project.ID
+		database.DB.Create(&roles[i])
 	}
 
 	// Registar o criador como primeiro proprietário
@@ -425,20 +485,25 @@ func UpdateProject(c *gin.Context) {
 		return
 	}
 	var input struct {
-		Title       string  `json:"title"`
-		Description string  `json:"description"`
-		ImageURL    *string `json:"image_url"` // Pointer to distinguish between not provided and empty
-		Status      string  `json:"status"`
-		Roles       []struct {
-			Title       string `json:"title"`
-			SkillName   string `json:"skill_name"`
-			Description string `json:"description"`
-			Spots       int    `json:"spots"`
-		} `json:"roles"`
+		Title       string             `json:"title"`
+		Description string             `json:"description"`
+		ImageURL    *string            `json:"image_url"` // Pointer to distinguish between not provided and empty
+		Status      string             `json:"status"`
+		Roles       []projectRoleInput `json:"roles"`
 	}
 	if err := c.ShouldBindJSON(&input); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
+	}
+
+	var roles []models.ProjectRole
+	if input.Roles != nil {
+		preparedRoles, err := prepareProjectRoles(input.Roles, false)
+		if err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+			return
+		}
+		roles = preparedRoles
 	}
 	if input.Title != "" {
 		project.Title = input.Title
@@ -486,22 +551,9 @@ func UpdateProject(c *gin.Context) {
 			database.DB.Where("role_id IN ?", existingRoleIDs).Delete(&models.ProjectMember{})
 		}
 		database.DB.Where("project_id = ?", project.ID).Delete(&models.ProjectRole{})
-		for _, r := range input.Roles {
-			if r.Title == "" && r.SkillName == "" {
-				continue
-			}
-			spots := r.Spots
-			if spots < 1 {
-				spots = 1
-			}
-			role := models.ProjectRole{
-				ProjectID:   project.ID,
-				Title:       r.Title,
-				SkillName:   r.SkillName,
-				Description: r.Description,
-				Spots:       spots,
-			}
-			database.DB.Create(&role)
+		for i := range roles {
+			roles[i].ProjectID = project.ID
+			database.DB.Create(&roles[i])
 		}
 	}
 
@@ -591,7 +643,7 @@ func UpdateProjectStatus(c *gin.Context) {
 // @Produce      json
 // @Security     BearerAuth
 // @Param        id     path  int                                               true  "ID do projeto"
-// @Param        input  body  object{skill_id=integer,description=string}  true  "Dados da role"
+// @Param        input  body  object{skill_names=[]string,description=string}  true  "Dados da role"
 // @Success      201  {object}  models.ProjectRole
 // @Failure      400  {object}  map[string]string
 // @Failure      403  {object}  map[string]string
@@ -601,31 +653,18 @@ func CreateProjectRole(c *gin.Context) {
 	if !ok {
 		return
 	}
-	var input struct {
-		Title       string `json:"title"`
-		SkillName   string `json:"skill_name" binding:"required"`
-		Description string `json:"description"`
-		Spots       int    `json:"spots"`
-	}
+	var input projectRoleInput
 	if err := c.ShouldBindJSON(&input); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
-	if !config.IsValidSkill(input.SkillName) {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Competência não reconhecida."})
+	roles, err := prepareProjectRoles([]projectRoleInput{input}, true)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
-	spots := input.Spots
-	if spots <= 0 {
-		spots = 1
-	}
-	role := models.ProjectRole{
-		ProjectID:   project.ID,
-		Title:       input.Title,
-		SkillName:   input.SkillName,
-		Description: input.Description,
-		Spots:       spots,
-	}
+	role := roles[0]
+	role.ProjectID = project.ID
 	database.DB.Create(&role)
 	c.JSON(http.StatusCreated, role)
 }
