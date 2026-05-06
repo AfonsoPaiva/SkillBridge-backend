@@ -10,6 +10,7 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/paiva/SkillBridge/Backend/config"
 	"github.com/paiva/SkillBridge/Backend/internal/database"
+	"github.com/paiva/SkillBridge/Backend/internal/email"
 	"github.com/paiva/SkillBridge/Backend/internal/models"
 	"github.com/paiva/SkillBridge/Backend/internal/storage"
 	"gorm.io/gorm"
@@ -415,6 +416,14 @@ func JoinProject(c *gin.Context) {
 			MetaMemberID:     &memberID,
 			MetaStatus:       "pending",
 		})
+
+		// Send email notification to project owner (best-effort, non-blocking)
+		go func() {
+			projectURL := fmt.Sprintf("%s/projects/%s", config.AppConfig.FrontendURL, project.Slug)
+			if err := email.SendProjectApplication(projectOwner.Email, projectOwner.Name, project.Title, user.Name, projectURL); err != nil {
+				log.Printf("[email] Erro ao enviar email de candidatura para %s: %v", projectOwner.Email, err)
+			}
+		}()
 	}
 
 	c.JSON(http.StatusCreated, gin.H{"message": "Candidatura enviada. Aguarda aprovação do proprietário."})

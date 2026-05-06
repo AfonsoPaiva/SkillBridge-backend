@@ -1,10 +1,14 @@
 package handlers
 
 import (
+	"fmt"
+	"log"
 	"net/http"
 
 	"github.com/gin-gonic/gin"
+	"github.com/paiva/SkillBridge/Backend/config"
 	"github.com/paiva/SkillBridge/Backend/internal/database"
+	"github.com/paiva/SkillBridge/Backend/internal/email"
 	"github.com/paiva/SkillBridge/Backend/internal/models"
 )
 
@@ -60,6 +64,14 @@ func FollowUser(c *gin.Context) {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Erro ao seguir utilizador."})
 		return
 	}
+
+	// Send follow notification email (best-effort, non-blocking)
+	go func() {
+		profileURL := fmt.Sprintf("%s/users/%s", config.AppConfig.FrontendURL, target.Slug)
+		if err := email.SendFollowNotification(target.Email, target.Name, me.Name, profileURL); err != nil {
+			log.Printf("[email] Erro ao enviar email de follow para %s: %v", target.Email, err)
+		}
+	}()
 
 	c.JSON(http.StatusOK, gin.H{"message": "A seguir utilizador com sucesso."})
 }

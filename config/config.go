@@ -100,9 +100,9 @@ type Config struct {
 	StripeSecretKey         string
 	StripeWebhookSecret     string
 	StripeDonationURL       string
-	FrontendURL             string // Base URL of frontend application
+	FrontendURL             string   // Base URL of frontend application
 	AllowedOrigins          []string // Lista de origens permitidas para CORS (separadas por vírgula)
-	BackendURL              string // Base URL of this backend (for generating absolute image URLs)
+	BackendURL              string   // Base URL of this backend (for generating absolute image URLs)
 	UploadsDir              string
 	Env                     string
 	GCSBucketName           string // Google Cloud Storage bucket name
@@ -110,6 +110,8 @@ type Config struct {
 	MailgunAPIKey           string
 	MailgunDomain           string
 	MailgunSender           string
+	ResendAPIKey            string   // Resend API key para envio de emails
+	EmailFromAddress        string   // Email "from" para Resend (ex: noreply@skillbridge.pt)
 	AdminUIDs               []string // Firebase UIDs com acesso admin
 	AdminSecretKey          string   // Chave secreta adicional para rotas de admin (deprecated)
 	AdminAllowedIPs         []string // Lista de IPs permitidos para acesso admin (opcional)
@@ -117,8 +119,8 @@ type Config struct {
 	FirebaseAuthDomain      string   // <project>.firebaseapp.com
 	FirebaseProjectID       string   // Project ID
 	// Rate limiting
-	TOTPMaxAttempts         int      // Máximo de tentativas TOTP por período
-	TOTPRateLimitWindow     int      // Janela de tempo em segundos para rate limit
+	TOTPMaxAttempts     int // Máximo de tentativas TOTP por período
+	TOTPRateLimitWindow int // Janela de tempo em segundos para rate limit
 }
 
 var AppConfig Config
@@ -151,6 +153,8 @@ func Load() {
 		MailgunAPIKey:           getEnv("MAILGUN_API_KEY", ""),
 		MailgunDomain:           getEnv("MAILGUN_DOMAIN", ""),
 		MailgunSender:           getEnv("MAILGUN_SENDER", "noreply@skillbridge.pt"),
+		ResendAPIKey:            getEnv("RESEND_API_KEY", ""),
+		EmailFromAddress:        getEnv("EMAIL_FROM_ADDRESS", "onboarding@resend.dev"),
 		AdminUIDs:               parseList(getEnv("ADMIN_UIDS", "")),
 		AdminSecretKey:          getEnv("ADMIN_SECRET_KEY", ""),
 		AdminAllowedIPs:         parseList(getEnv("ADMIN_ALLOWED_IPS", "")),

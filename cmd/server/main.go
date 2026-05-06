@@ -7,6 +7,7 @@ import (
 
 	"github.com/paiva/SkillBridge/Backend/config"
 	"github.com/paiva/SkillBridge/Backend/internal/database"
+	"github.com/paiva/SkillBridge/Backend/internal/email"
 	"github.com/paiva/SkillBridge/Backend/internal/handlers"
 	"github.com/paiva/SkillBridge/Backend/internal/middleware"
 	"github.com/paiva/SkillBridge/Backend/internal/notifications"
@@ -32,6 +33,11 @@ func main() {
 
 	// 3. Inicializar Firebase Auth
 	middleware.InitFirebase()
+
+	// 3.1 Inicializar Resend para envio de emails
+	if err := email.InitResend(); err != nil {
+		log.Printf("[email] Erro ao inicializar Resend: %v", err)
+	}
 
 	// 4. Inicializar Google Cloud Storage
 	if err := storage.InitGCS(); err != nil {

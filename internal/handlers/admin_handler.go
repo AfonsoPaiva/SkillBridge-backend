@@ -1,6 +1,7 @@
 package handlers
 
 import (
+	"fmt"
 	"log"
 	"net/http"
 	"strconv"
@@ -10,6 +11,7 @@ import (
 	"github.com/paiva/SkillBridge/Backend/config"
 	"github.com/paiva/SkillBridge/Backend/internal/audit"
 	"github.com/paiva/SkillBridge/Backend/internal/database"
+	"github.com/paiva/SkillBridge/Backend/internal/email"
 	"github.com/paiva/SkillBridge/Backend/internal/middleware"
 	"github.com/paiva/SkillBridge/Backend/internal/models"
 	"github.com/paiva/SkillBridge/Backend/internal/storage"
@@ -362,6 +364,20 @@ func AdminDecideReview(c *gin.Context) {
 
 	if input.Status == "approved" {
 		audit.LogAction(c, audit.ActionReviewApprove, "Approved review ID=%d", review.ID)
+
+		// Send approval notification email to the reviewer (best-effort, non-blocking)
+		go func() {
+			var reviewer models.User
+			if err := database.DB.First(&reviewer, review.ReviewerID).Error; err == nil {
+				var reviewed models.User
+				if err := database.DB.First(&reviewed, review.ReviewedID).Error; err == nil {
+					profileURL := fmt.Sprintf("%s/users/%s", config.AppConfig.FrontendURL, reviewed.Slug)
+					if err := email.SendReviewApproved(reviewer.Email, reviewer.Name, reviewed.Name, review.Rating, profileURL); err != nil {
+						log.Printf("[email] Erro ao enviar email de review aprovada para %s: %v", reviewer.Email, err)
+					}
+				}
+			}
+		}()
 	} else {
 		audit.LogAction(c, audit.ActionReviewReject, "Rejected review ID=%d", review.ID)
 	}

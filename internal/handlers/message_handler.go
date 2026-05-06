@@ -38,7 +38,9 @@ import (
 	"time"
 
 	"github.com/gin-gonic/gin"
+	"github.com/paiva/SkillBridge/Backend/config"
 	"github.com/paiva/SkillBridge/Backend/internal/database"
+	"github.com/paiva/SkillBridge/Backend/internal/email"
 	"github.com/paiva/SkillBridge/Backend/internal/models"
 	"github.com/paiva/SkillBridge/Backend/internal/notifications"
 )
@@ -48,9 +50,9 @@ import (
 // ─────────────────────────────────────────────────────────────
 
 const (
-	MaxMessageLength          = 100 // Maximum plaintext message length
-	MaxEncryptedContentLength = 300 // Maximum encrypted content length (base64)
-	MaxMessagesPerMinute      = 15  // Maximum messages per user per minute
+	MaxMessageLength          = 400  // Maximum plaintext message length
+	MaxEncryptedContentLength = 2000 // Maximum encrypted content length (base64)
+	MaxMessagesPerMinute      = 15   // Maximum messages per user per minute
 )
 
 // Rate limiter: tracks message counts per user
@@ -386,6 +388,25 @@ func SendMessage(c *gin.Context) {
 	if recipientID == me.ID {
 		recipientID = conv.UserBID
 	}
+
+	// Check if recipient now has 5+ unread messages (async, non-blocking)
+	go func() {
+		var unreadCount int64
+		database.DB.Model(&models.Message{}).
+			Where("sender_id = ? AND read_at IS NULL", recipientID).
+			Count(&unreadCount)
+
+		// If recipient has 5 or more unread messages, send an email notification
+		if unreadCount >= 5 {
+			var recipient models.User
+			if err := database.DB.First(&recipient, recipientID).Error; err == nil {
+				conversationURL := fmt.Sprintf("%s/messages", config.AppConfig.FrontendURL)
+				if err := email.SendMessagesThreshold(recipient.Email, recipient.Name, int(unreadCount), conversationURL); err != nil {
+					log.Printf("[email] Erro ao enviar email de threshold de mensagens para %s: %v", recipient.Email, err)
+				}
+			}
+		}
+	}()
 
 	var recipientTokens []models.PushDeviceToken
 	if err := database.DB.Where("user_id = ?", recipientID).Find(&recipientTokens).Error; err == nil {

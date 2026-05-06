@@ -7,7 +7,9 @@ import (
 	"strings"
 	"time"
 
+	"github.com/paiva/SkillBridge/Backend/config"
 	"github.com/paiva/SkillBridge/Backend/internal/database"
+	"github.com/paiva/SkillBridge/Backend/internal/email"
 	"github.com/paiva/SkillBridge/Backend/internal/middleware"
 	"github.com/paiva/SkillBridge/Backend/internal/models"
 	"github.com/paiva/SkillBridge/Backend/internal/storage"
@@ -144,6 +146,14 @@ func RegisterUser(c *gin.Context) {
 	}
 
 	log.Printf("[register] Utilizador criado com sucesso: %s (%s)", user.Name, user.Email)
+
+	// Send welcome email (best-effort, non-blocking)
+	go func() {
+		if err := email.SendWelcome(user.Name, user.Email, config.AppConfig.FrontendURL); err != nil {
+			log.Printf("[email] Erro ao enviar email de boas-vindas para %s: %v", user.Email, err)
+		}
+	}()
+
 	c.JSON(http.StatusCreated, gin.H{"message": "Utilizador criado com sucesso.", "user": user})
 }
 
