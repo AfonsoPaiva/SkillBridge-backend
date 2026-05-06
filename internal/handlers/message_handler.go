@@ -389,19 +389,26 @@ func SendMessage(c *gin.Context) {
 		recipientID = conv.UserBID
 	}
 
-	// Check if recipient now has 5+ unread messages (async, non-blocking)
+	// Email threshold de mensagens não lidas:
+	// - unread = mensagens em que o destinatário é "me" e o sender NÃO é "me" (read_at NULL)
+	// - enviar email apenas quando atravessa o threshold (de <5 para >=5)
 	go func() {
-		var unreadCount int64
+		var unreadBefore int64
 		database.DB.Model(&models.Message{}).
-			Where("sender_id = ? AND read_at IS NULL", recipientID).
-			Count(&unreadCount)
+			Where("sender_id != ? AND read_at IS NULL", recipientID).
+			Count(&unreadBefore)
 
-		// If recipient has 5 or more unread messages, send an email notification
-		if unreadCount >= 5 {
+		var unreadAfter int64
+		database.DB.Model(&models.Message{}).
+			Where("sender_id != ? AND read_at IS NULL", recipientID).
+			Count(&unreadAfter)
+
+		// Envia apenas quando atravessa o threshold
+		if unreadBefore < 5 && unreadAfter >= 5 {
 			var recipient models.User
 			if err := database.DB.First(&recipient, recipientID).Error; err == nil {
 				conversationURL := fmt.Sprintf("%s/messages", config.AppConfig.FrontendURL)
-				if err := email.SendMessagesThreshold(recipient.Email, recipient.Name, int(unreadCount), conversationURL); err != nil {
+				if err := email.SendMessagesThreshold(recipient.Email, recipient.Name, int(unreadAfter), conversationURL); err != nil {
 					log.Printf("[email] Erro ao enviar email de threshold de mensagens para %s: %v", recipient.Email, err)
 				}
 			}

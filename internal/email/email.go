@@ -28,10 +28,6 @@ func InitResend() error {
 }
 
 // send envia um email via Resend
-// from: endereço "noreply@" ou similar (deve estar verificado em Resend)
-// to: endereço do destinatário
-// subject: assunto do email
-// html: conteúdo HTML do email
 func send(from, to, subject, html string) error {
 	if emailClient == nil {
 		log.Printf("[email] Resend não inicializado — email para %s ignorado", to)
@@ -55,56 +51,49 @@ func send(from, to, subject, html string) error {
 	return nil
 }
 
-// getEmailFrom retorna o endereço "from" configurado (fallback para noreply@resend.dev)
 func getEmailFrom() string {
 	if config.AppConfig.EmailFromAddress != "" {
 		return config.AppConfig.EmailFromAddress
 	}
-	return "onboarding@resend.dev" // Fallback Resend default
+	return "onboarding@resend.dev"
 }
 
 // ─────────────────────────────────────────────────────────────
 // EMAIL TEMPLATES
 // ─────────────────────────────────────────────────────────────
 
-// SendWelcome envia um email de boas-vindas após registo
 func SendWelcome(name, email string, frontendURL string) error {
-	subject := "Bem-vindo ao SkillBridge! 🎉"
-	html := fmt.Sprintf(welcomeTemplate, name, frontendURL, frontendURL)
+	subject := "Bem-vindo ao SkillBridge"
+	html := fmt.Sprintf(welcomeTemplate, name, frontendURL)
 	return send(getEmailFrom(), email, subject, html)
 }
 
-// SendProjectApplication notifica o proprietário de um projeto sobre uma nova candidatura
-func SendProjectApplication(projectOwnerEmail, projectOwnerName, projectTitle, applicantName string, projectURL string) error {
-	subject := fmt.Sprintf("Nova candidatura para o teu projeto: %s", projectTitle)
-	html := fmt.Sprintf(projectApplicationTemplate, projectOwnerName, projectTitle, applicantName, projectURL, projectURL)
+func SendProjectApplication(projectOwnerEmail, projectOwnerName, projectTitle, applicantName string, messagesURL string) error {
+	subject := fmt.Sprintf("Nova candidatura: %s", projectTitle)
+	html := fmt.Sprintf(projectApplicationTemplate, projectOwnerName, projectTitle, applicantName, messagesURL)
 	return send(getEmailFrom(), projectOwnerEmail, subject, html)
 }
 
-// SendMessagesThreshold notifica um utilizador quando recebe mais de 5 mensagens não lidas
-func SendMessagesThreshold(userEmail, userName string, unreadCount int, conversationURL string) error {
-	subject := fmt.Sprintf("Tens %d mensagens não lidas no SkillBridge 💬", unreadCount)
-	html := fmt.Sprintf(messagesThresholdTemplate, userName, unreadCount, conversationURL, conversationURL)
+func SendMessagesThreshold(userEmail, userName string, unreadCount int, messagesURL string) error {
+	subject := fmt.Sprintf("%d mensagens não lidas no SkillBridge", unreadCount)
+	html := fmt.Sprintf(messagesThresholdTemplate, userName, unreadCount, messagesURL)
 	return send(getEmailFrom(), userEmail, subject, html)
 }
 
-// SendFollowNotification notifica um utilizador quando é seguido
 func SendFollowNotification(userEmail, userName, followerName, profileURL string) error {
-	subject := fmt.Sprintf("%s está a seguir-te no SkillBridge 👥", followerName)
-	html := fmt.Sprintf(followNotificationTemplate, userName, followerName, profileURL, profileURL)
+	subject := fmt.Sprintf("%s começou a seguir-te no SkillBridge", followerName)
+	html := fmt.Sprintf(followNotificationTemplate, userName, followerName, profileURL)
 	return send(getEmailFrom(), userEmail, subject, html)
 }
 
-// SendReviewApproved notifica um utilizador quando a sua review foi aprovada
 func SendReviewApproved(userEmail, userName, reviewedName string, rating int, profileURL string) error {
-	subject := fmt.Sprintf("A tua avaliação foi aprovada! ⭐")
-	html := fmt.Sprintf(reviewApprovedTemplate, userName, reviewedName, rating, profileURL, profileURL)
+	subject := "A tua avaliação foi aprovada"
+	html := fmt.Sprintf(reviewApprovedTemplate, userName, rating, reviewedName, profileURL)
 	return send(getEmailFrom(), userEmail, subject, html)
 }
 
-// SendProjectMatches notifica um utilizador sobre projetos disponíveis com skills compatíveis
 func SendProjectMatches(userEmail, userName string, projects []ProjectMatch, projectsURL string) error {
-	subject := "Projetos disponíveis com as tuas competências 🚀"
+	subject := fmt.Sprintf("%d projetos compatíveis com as tuas competências", len(projects))
 
 	projectsHTML := ""
 	for i, proj := range projects {
@@ -113,21 +102,20 @@ func SendProjectMatches(userEmail, userName string, projects []ProjectMatch, pro
 		}
 		projectsHTML += fmt.Sprintf(`
 		<tr>
-			<td style="padding:16px;background:#f9fafb;border-radius:8px;border:1px solid #e5e7eb;">
-				<h4 style="margin:0 0 8px;color:#111827;font-size:16px;font-weight:600;">%s</h4>
-				<p style="margin:0 0 12px;color:#6b7280;font-size:14px;line-height:1.5;">%s</p>
-				<p style="margin:0;color:#9ca3af;font-size:13px;">
+			<td style="padding:20px;background:#f8f9fa;border-radius:8px;border:1px solid #e9ecef;">
+				<h4 style="margin:0 0 8px;color:#1a1a1a;font-size:16px;font-weight:600;">%s</h4>
+				<p style="margin:0 0 12px;color:#4a4a4a;font-size:14px;line-height:1.5;">%s</p>
+				<p style="margin:0;color:#6c757d;font-size:13px;">
 					<strong>Skills:</strong> %s
 				</p>
 			</td>
 		</tr>`, proj.Title, proj.Description, proj.Skills)
 	}
 
-	html := fmt.Sprintf(projectMatchesTemplate, userName, len(projects), projectsHTML, projectsURL, projectsURL)
+	html := fmt.Sprintf(projectMatchesTemplate, userName, len(projects), projectsHTML, projectsURL)
 	return send(getEmailFrom(), userEmail, subject, html)
 }
 
-// ProjectMatch representa um projeto disponível com skills compatíveis
 type ProjectMatch struct {
 	Title       string
 	Description string
@@ -145,16 +133,16 @@ const emailWrapper = `<!DOCTYPE html>
 	<meta charset="UTF-8">
 	<meta name="viewport" content="width=device-width, initial-scale=1.0">
 </head>
-<body style="margin:0;padding:0;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,'Helvetica Neue',Arial,sans-serif;background:#f3f4f6;">
-	<table width="100%%" cellpadding="0" cellspacing="0" style="background:#f3f4f6;padding:40px 20px;">
+<body style="margin:0;padding:0;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,'Helvetica Neue',Arial,sans-serif;background:#f5f5f5;">
+	<table width="100%%" cellpadding="0" cellspacing="0" style="background:#f5f5f5;padding:40px 20px;">
 		<tr>
 			<td align="center">
-				<table width="600" cellpadding="0" cellspacing="0" style="background:white;border-radius:12px;box-shadow:0 4px 6px rgba(0,0,0,0.1);overflow:hidden;">
+				<table width="600" cellpadding="0" cellspacing="0" style="background:#ffffff;border-radius:12px;box-shadow:0 2px 8px rgba(0,0,0,0.08);overflow:hidden;">
 					<!-- Header com Logo -->
 					<tr>
-						<td style="padding:32px 40px;text-align:center;background:linear-gradient(135deg, #68007A 0%%, #9333ea 100%%);">
-							<h1 style="margin:0;color:white;font-size:28px;font-weight:700;letter-spacing:-0.5px;">SkillBridge</h1>
-							<p style="margin:8px 0 0;color:rgba(255,255,255,0.8);font-size:13px;">Conecta Talento com Oportunidade</p>
+						<td style="padding:40px 40px 32px;text-align:center;background:#ffffff;border-bottom:3px solid #68007a;">
+							<img src="https://storage.googleapis.com/skillbridge-uploads/Logo%%20Vertical.png" alt="SkillBridge" style="width:120px;height:auto;margin-bottom:16px;">
+							<p style="margin:0;color:#4a4a4a;font-size:14px;font-weight:500;">Conecta Talento com Oportunidade</p>
 						</td>
 					</tr>
 					<!-- Conteúdo -->
@@ -165,10 +153,10 @@ const emailWrapper = `<!DOCTYPE html>
 					</tr>
 					<!-- Footer -->
 					<tr>
-						<td style="padding:24px 40px;background:#f9fafb;border-top:1px solid #e5e7eb;">
-							<p style="margin:0;color:#6b7280;font-size:13px;text-align:center;">
-								SkillBridge — Plataforma de Colaboração<br>
-								<span style="font-size:12px;color:#9ca3af;">Este é um email automático. Por favor, não respondas a este endereço.</span>
+						<td style="padding:24px 40px;background:#f8f9fa;border-top:1px solid #e9ecef;">
+							<p style="margin:0;color:#6c757d;font-size:13px;text-align:center;line-height:1.6;">
+								SkillBridge — Plataforma de Colaboração Profissional<br>
+								<span style="font-size:12px;color:#999;">Este é um email automático. Por favor, não respondas a este endereço.</span>
 							</p>
 						</td>
 					</tr>
@@ -179,130 +167,130 @@ const emailWrapper = `<!DOCTYPE html>
 </body>
 </html>`
 
-const welcomeTemplate = `<h2 style="margin:0 0 16px;color:#111827;font-size:24px;font-weight:600;">Bem-vindo ao SkillBridge! 🎉</h2>
-<p style="margin:0 0 16px;color:#374151;font-size:16px;line-height:1.6;">
+const welcomeTemplate = `<h2 style="margin:0 0 20px;color:#1a1a1a;font-size:24px;font-weight:600;">Bem-vindo ao SkillBridge</h2>
+<p style="margin:0 0 16px;color:#333;font-size:16px;line-height:1.6;">
 	Olá <strong>%s</strong>,
 </p>
-<p style="margin:0 0 24px;color:#374151;font-size:16px;line-height:1.6;">
-	Obrigado por criares uma conta no SkillBridge! A nossa plataforma liga estudantes a projetos colaborativos reais.
+<p style="margin:0 0 24px;color:#333;font-size:16px;line-height:1.6;">
+	A tua conta foi criada com sucesso. O SkillBridge conecta estudantes e profissionais a projetos colaborativos reais, onde podes desenvolver as tuas competências e construir um portfólio sólido.
 </p>
-<p style="margin:0 0 32px;color:#374151;font-size:16px;line-height:1.6;">
-	Aqui podes:
+<p style="margin:0 0 32px;color:#333;font-size:16px;line-height:1.6;">
+	<strong>Na plataforma podes:</strong>
 </p>
-<ul style="margin:0 0 32px;padding-left:24px;color:#374151;font-size:15px;line-height:1.8;">
-	<li>Explorar projetos disponíveis</li>
-	<li>Candidatar-te a vagas que se adequam às tuas competências</li>
-	<li>Colaborar com outros estudantes</li>
+<ul style="margin:0 0 32px;padding-left:24px;color:#333;font-size:15px;line-height:1.8;">
+	<li>Explorar projetos disponíveis na tua área</li>
+	<li>Candidatar-te a vagas alinhadas com as tuas competências</li>
+	<li>Colaborar com outros profissionais e estudantes</li>
 	<li>Construir o teu portfólio profissional</li>
 </ul>
 <table width="100%%" cellpadding="0" cellspacing="0">
 	<tr>
 		<td align="center">
-			<a href="%s" style="display:inline-block;background:linear-gradient(135deg, #68007A 0%%, #9333ea 100%%);color:white;padding:14px 32px;border-radius:8px;text-decoration:none;font-weight:600;font-size:15px;box-shadow:0 4px 6px rgba(104,0,122,0.25);">
+			<a href="%s" style="display:inline-block;background:#68007a;color:#ffffff;padding:16px 40px;border-radius:6px;text-decoration:none;font-weight:600;font-size:16px;text-align:center;">
 				Explorar Projetos
 			</a>
 		</td>
 	</tr>
 </table>
-<p style="margin:32px 0 0;color:#6b7280;font-size:14px;line-height:1.6;">
-	Se tiveres dúvidas, podes sempre visitar a página inicial em <a href="%s" style="color:#9333ea;text-decoration:none;">skillbridge.com</a>.
+<p style="margin:32px 0 0;color:#666;font-size:14px;line-height:1.6;">
+	Se tiveres alguma dúvida, visita a nossa plataforma em <a href="%s" style="color:#68007a;text-decoration:none;">skillbridge.com</a>.
 </p>`
 
-const projectApplicationTemplate = `<h2 style="margin:0 0 16px;color:#111827;font-size:24px;font-weight:600;">Nova Candidatura 📬</h2>
-<p style="margin:0 0 16px;color:#374151;font-size:16px;line-height:1.6;">
+const projectApplicationTemplate = `<h2 style="margin:0 0 20px;color:#1a1a1a;font-size:24px;font-weight:600;">Nova Candidatura Recebida</h2>
+<p style="margin:0 0 16px;color:#333;font-size:16px;line-height:1.6;">
 	Olá <strong>%s</strong>,
 </p>
-<p style="margin:0 0 24px;color:#374151;font-size:16px;line-height:1.6;">
-	<strong>%s</strong> candidatou-se ao teu projeto <strong>"%s"</strong>!
+<p style="margin:0 0 24px;color:#333;font-size:16px;line-height:1.6;">
+	<strong>%s</strong> candidatou-se ao teu projeto <strong>"%s"</strong>.
 </p>
-<p style="margin:0 0 32px;color:#6b7280;font-size:15px;line-height:1.6;">
-	Podes rever a candidatura e responder (aceitar ou rejeitar) diretamente na plataforma.
+<p style="margin:0 0 32px;color:#666;font-size:15px;line-height:1.6;">
+	Analisa o perfil do candidato e responde à candidatura através das tuas mensagens na plataforma.
 </p>
 <table width="100%%" cellpadding="0" cellspacing="0">
 	<tr>
 		<td align="center">
-			<a href="%s" style="display:inline-block;background:linear-gradient(135deg, #68007A 0%%, #9333ea 100%%);color:white;padding:14px 32px;border-radius:8px;text-decoration:none;font-weight:600;font-size:15px;box-shadow:0 4px 6px rgba(104,0,122,0.25);">
-				Ver Candidatura
+			<a href="%s" style="display:inline-block;background:#68007a;color:#ffffff;padding:16px 40px;border-radius:6px;text-decoration:none;font-weight:600;font-size:16px;text-align:center;">
+				Ver Mensagens
 			</a>
 		</td>
 	</tr>
 </table>
-<p style="margin:24px 0 0;color:#6b7280;font-size:13px;">
-	Vai para a tua dashboard em <a href="%s" style="color:#9333ea;text-decoration:none;">skillbridge.com</a> para gerir candidaturas.
+<p style="margin:32px 0 0;color:#666;font-size:14px;line-height:1.6;">
+	Acede às tuas <a href="%s" style="color:#68007a;text-decoration:none;">mensagens</a> para gerir todas as candidaturas.
 </p>`
 
-const messagesThresholdTemplate = `<h2 style="margin:0 0 16px;color:#111827;font-size:24px;font-weight:600;">Mensagens Não Lidas 💬</h2>
-<p style="margin:0 0 16px;color:#374151;font-size:16px;line-height:1.6;">
+const messagesThresholdTemplate = `<h2 style="margin:0 0 20px;color:#1a1a1a;font-size:24px;font-weight:600;">Mensagens por Ler</h2>
+<p style="margin:0 0 16px;color:#333;font-size:16px;line-height:1.6;">
 	Olá <strong>%s</strong>,
 </p>
-<p style="margin:0 0 24px;color:#374151;font-size:16px;line-height:1.6;">
-	Tens <strong>%d mensagens não lidas</strong> nas tuas conversas. Vê o que as pessoas têm a dizer!
+<p style="margin:0 0 24px;color:#333;font-size:16px;line-height:1.6;">
+	Tens <strong>%d mensagens não lidas</strong> na tua caixa de entrada. Não deixes passar oportunidades importantes de colaboração.
 </p>
 <table width="100%%" cellpadding="0" cellspacing="0">
 	<tr>
 		<td align="center">
-			<a href="%s" style="display:inline-block;background:linear-gradient(135deg, #68007A 0%%, #9333ea 100%%);color:white;padding:14px 32px;border-radius:8px;text-decoration:none;font-weight:600;font-size:15px;box-shadow:0 4px 6px rgba(104,0,122,0.25);">
-				Ler Mensagens
+			<a href="%s" style="display:inline-block;background:#68007a;color:#ffffff;padding:16px 40px;border-radius:6px;text-decoration:none;font-weight:600;font-size:16px;text-align:center;">
+				Ver Mensagens
 			</a>
 		</td>
 	</tr>
 </table>
-<p style="margin:24px 0 0;color:#6b7280;font-size:13px;">
-	Vai para mensagens em <a href="%s" style="color:#9333ea;text-decoration:none;">skillbridge.com</a>.
+<p style="margin:32px 0 0;color:#666;font-size:14px;line-height:1.6;">
+	Acede às tuas <a href="%s" style="color:#68007a;text-decoration:none;">mensagens</a> no SkillBridge.
 </p>`
 
-const followNotificationTemplate = `<h2 style="margin:0 0 16px;color:#111827;font-size:24px;font-weight:600;">Novo Seguidor 👥</h2>
-<p style="margin:0 0 16px;color:#374151;font-size:16px;line-height:1.6;">
+const followNotificationTemplate = `<h2 style="margin:0 0 20px;color:#1a1a1a;font-size:24px;font-weight:600;">Novo Seguidor</h2>
+<p style="margin:0 0 16px;color:#333;font-size:16px;line-height:1.6;">
 	Olá <strong>%s</strong>,
 </p>
-<p style="margin:0 0 24px;color:#374151;font-size:16px;line-height:1.6;">
-	<strong>%s</strong> está agora a seguir-te no SkillBridge!
+<p style="margin:0 0 24px;color:#333;font-size:16px;line-height:1.6;">
+	<strong>%s</strong> começou a seguir-te no SkillBridge e está interessado no teu trabalho.
 </p>
-<p style="margin:0 0 32px;color:#6b7280;font-size:15px;line-height:1.6;">
-	Podes ver o seu perfil e conhecer melhor os seus projetos e interesses.
+<p style="margin:0 0 32px;color:#666;font-size:15px;line-height:1.6;">
+	Visita o perfil para conheceres melhor os projetos e interesses desta pessoa.
 </p>
 <table width="100%%" cellpadding="0" cellspacing="0">
 	<tr>
 		<td align="center">
-			<a href="%s" style="display:inline-block;background:linear-gradient(135deg, #68007A 0%%, #9333ea 100%%);color:white;padding:14px 32px;border-radius:8px;text-decoration:none;font-weight:600;font-size:15px;box-shadow:0 4px 6px rgba(104,0,122,0.25);">
+			<a href="%s" style="display:inline-block;background:#68007a;color:#ffffff;padding:16px 40px;border-radius:6px;text-decoration:none;font-weight:600;font-size:16px;text-align:center;">
 				Ver Perfil
 			</a>
 		</td>
 	</tr>
 </table>
-<p style="margin:24px 0 0;color:#6b7280;font-size:13px;">
-	Vai para a comunidade em <a href="%s" style="color:#9333ea;text-decoration:none;">skillbridge.com</a>.
+<p style="margin:32px 0 0;color:#666;font-size:14px;line-height:1.6;">
+	Continua a explorar a comunidade em <a href="%s" style="color:#68007a;text-decoration:none;">skillbridge.com</a>.
 </p>`
 
-const reviewApprovedTemplate = `<h2 style="margin:0 0 16px;color:#111827;font-size:24px;font-weight:600;">Avaliação Aprovada! ⭐</h2>
-<p style="margin:0 0 16px;color:#374151;font-size:16px;line-height:1.6;">
+const reviewApprovedTemplate = `<h2 style="margin:0 0 20px;color:#1a1a1a;font-size:24px;font-weight:600;">Avaliação Publicada</h2>
+<p style="margin:0 0 16px;color:#333;font-size:16px;line-height:1.6;">
 	Olá <strong>%s</strong>,
 </p>
-<p style="margin:0 0 24px;color:#374151;font-size:16px;line-height:1.6;">
-	A tua avaliação de <strong>%d estrela(s)</strong> para <strong>%s</strong> foi aprovada e está agora visível no seu perfil!
+<p style="margin:0 0 24px;color:#333;font-size:16px;line-height:1.6;">
+	A tua avaliação de <strong>%d estrela(s)</strong> para <strong>%s</strong> foi aprovada e está agora visível publicamente.
 </p>
-<p style="margin:0 0 32px;color:#6b7280;font-size:15px;line-height:1.6;">
-	As avaliações autênticas ajudam toda a comunidade a conhecer melhor os talentos no SkillBridge.
+<p style="margin:0 0 32px;color:#666;font-size:15px;line-height:1.6;">
+	Avaliações autênticas ajudam a comunidade a tomar decisões informadas sobre colaborações.
 </p>
 <table width="100%%" cellpadding="0" cellspacing="0">
 	<tr>
 		<td align="center">
-			<a href="%s" style="display:inline-block;background:linear-gradient(135deg, #68007A 0%%, #9333ea 100%%);color:white;padding:14px 32px;border-radius:8px;text-decoration:none;font-weight:600;font-size:15px;box-shadow:0 4px 6px rgba(104,0,122,0.25);">
-				Ver Perfil
+			<a href="%s" style="display:inline-block;background:#68007a;color:#ffffff;padding:16px 40px;border-radius:6px;text-decoration:none;font-weight:600;font-size:16px;text-align:center;">
+				Ver Perfil Avaliado
 			</a>
 		</td>
 	</tr>
 </table>
-<p style="margin:24px 0 0;color:#6b7280;font-size:13px;">
-	Vai para <a href="%s" style="color:#9333ea;text-decoration:none;">skillbridge.com</a>.
+<p style="margin:32px 0 0;color:#666;font-size:14px;line-height:1.6;">
+	Continua em <a href="%s" style="color:#68007a;text-decoration:none;">skillbridge.com</a>.
 </p>`
 
-const projectMatchesTemplate = `<h2 style="margin:0 0 16px;color:#111827;font-size:24px;font-weight:600;">Projetos Disponíveis 🚀</h2>
-<p style="margin:0 0 16px;color:#374151;font-size:16px;line-height:1.6;">
+const projectMatchesTemplate = `<h2 style="margin:0 0 20px;color:#1a1a1a;font-size:24px;font-weight:600;">Projetos Compatíveis</h2>
+<p style="margin:0 0 16px;color:#333;font-size:16px;line-height:1.6;">
 	Olá <strong>%s</strong>,
 </p>
-<p style="margin:0 0 24px;color:#374151;font-size:16px;line-height:1.6;">
-	Encontrámos <strong>%d projeto(s)</strong> aberto(s) que correspondem às tuas competências!
+<p style="margin:0 0 24px;color:#333;font-size:16px;line-height:1.6;">
+	Encontrámos <strong>%d projeto(s)</strong> que correspondem às tuas competências e podem ser do teu interesse.
 </p>
 <table width="100%%" cellpadding="0" cellspacing="0" style="margin:0 0 32px;width:100%%;">
 	%s
@@ -310,18 +298,12 @@ const projectMatchesTemplate = `<h2 style="margin:0 0 16px;color:#111827;font-si
 <table width="100%%" cellpadding="0" cellspacing="0">
 	<tr>
 		<td align="center">
-			<a href="%s" style="display:inline-block;background:linear-gradient(135deg, #68007A 0%%, #9333ea 100%%);color:white;padding:14px 32px;border-radius:8px;text-decoration:none;font-weight:600;font-size:15px;box-shadow:0 4px 6px rgba(104,0,122,0.25);">
-				Ver Todos os Projetos
+			<a href="%s" style="display:inline-block;background:#68007a;color:#ffffff;padding:16px 40px;border-radius:6px;text-decoration:none;font-weight:600;font-size:16px;text-align:center;">
+				Ver Projetos Disponíveis
 			</a>
 		</td>
 	</tr>
 </table>
-<p style="margin:24px 0 0;color:#6b7280;font-size:13px;">
-	Explora oportunidades em <a href="%s" style="color:#9333ea;text-decoration:none;">skillbridge.com</a>.
+<p style="margin:32px 0 0;color:#666;font-size:14px;line-height:1.6;">
+	Explora mais oportunidades em <a href="%s" style="color:#68007a;text-decoration:none;">skillbridge.com</a>.
 </p>`
-
-// NotifyUsersWithMatchingSkills notifica utilizadores que têm skills compatíveis com um projeto
-// Esta função deve ser chamada quando um novo projeto é criado ou ativado
-// Função signature para ser chamada do handler com acesso ao database
-// Exemplo: email.NotifyUsersWithMatchingSkills(project, projectSkills)
-// Implementação: passar como callback ou integrar diretamente no handler

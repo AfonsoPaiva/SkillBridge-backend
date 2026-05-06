@@ -16,6 +16,20 @@ import (
 
 var messagingClient *messaging.Client
 
+func buildWebpushTag(payloadData map[string]string) string {
+	// Tag estável para agrupar/substituir notificações.
+	// Ex: "msg:new_message:conv_123:sender_45"
+	typ := strings.TrimSpace(payloadData["type"])
+	if typ == "" {
+		typ = "notification"
+	}
+
+	conversationID := strings.TrimSpace(payloadData["conversation_id"])
+	senderID := strings.TrimSpace(payloadData["sender_id"])
+
+	return fmt.Sprintf("msg:%s:conv_%s:sender_%s", typ, conversationID, senderID)
+}
+
 // InitFirebaseMessaging initializes Firebase Cloud Messaging client.
 // Failure is non-fatal so the API can still run without push notifications.
 func InitFirebaseMessaging() error {
@@ -88,6 +102,9 @@ func SendMessagePush(tokens []string, title string, body string, data map[string
 				Body:  body,
 				Icon:  "/assets/favicon-192.png",
 				Badge: "/assets/favicon-192.png",
+				// Tag estável para evitar “acumular” notificações antigas com a mesma finalidade.
+				// (Webpush usa Tag/CollapseKey para agrupar/substituir em vez de criar sempre uma nova.)
+				Tag: buildWebpushTag(payloadData),
 			},
 			FCMOptions: &messaging.WebpushFCMOptions{
 				Link: messageLink,
