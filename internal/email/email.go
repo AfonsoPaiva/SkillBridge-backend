@@ -64,31 +64,35 @@ func getEmailFrom() string {
 
 func SendWelcome(name, email string, frontendURL string) error {
 	subject := "Bem-vindo ao SkillBridge"
-	html := fmt.Sprintf(welcomeTemplate, name, frontendURL)
+	html := fmt.Sprintf(welcomeTemplate, name, frontendURL, frontendURL)
 	return send(getEmailFrom(), email, subject, html)
 }
 
 func SendProjectApplication(projectOwnerEmail, projectOwnerName, projectTitle, applicantName string, messagesURL string) error {
 	subject := fmt.Sprintf("Nova candidatura: %s", projectTitle)
-	html := fmt.Sprintf(projectApplicationTemplate, projectOwnerName, projectTitle, applicantName, messagesURL)
+	// projectApplicationTemplate: ownerName, applicantName, projectTitle, messagesURL
+	html := fmt.Sprintf(projectApplicationTemplate, projectOwnerName, applicantName, projectTitle, messagesURL)
 	return send(getEmailFrom(), projectOwnerEmail, subject, html)
 }
 
 func SendMessagesThreshold(userEmail, userName string, unreadCount int, messagesURL string) error {
 	subject := fmt.Sprintf("%d mensagens não lidas no SkillBridge", unreadCount)
-	html := fmt.Sprintf(messagesThresholdTemplate, userName, unreadCount, messagesURL)
+	// messagesThresholdTemplate: userName, unreadCount, messagesURL, messagesURL
+	html := fmt.Sprintf(messagesThresholdTemplate, userName, unreadCount, messagesURL, messagesURL)
 	return send(getEmailFrom(), userEmail, subject, html)
 }
 
 func SendFollowNotification(userEmail, userName, followerName, profileURL string) error {
 	subject := fmt.Sprintf("%s começou a seguir-te no SkillBridge", followerName)
-	html := fmt.Sprintf(followNotificationTemplate, userName, followerName, profileURL)
+	// followNotificationTemplate: userName, followerName, profileURL, profileURL
+	html := fmt.Sprintf(followNotificationTemplate, userName, followerName, profileURL, profileURL)
 	return send(getEmailFrom(), userEmail, subject, html)
 }
 
 func SendReviewApproved(userEmail, userName, reviewedName string, rating int, profileURL string) error {
 	subject := "A tua avaliação foi aprovada"
-	html := fmt.Sprintf(reviewApprovedTemplate, userName, rating, reviewedName, profileURL)
+	// reviewApprovedTemplate: userName, rating, reviewedName, profileURL, profileURL
+	html := fmt.Sprintf(reviewApprovedTemplate, userName, rating, reviewedName, profileURL, profileURL)
 	return send(getEmailFrom(), userEmail, subject, html)
 }
 
@@ -113,6 +117,20 @@ func SendProjectMatches(userEmail, userName string, projects []ProjectMatch, pro
 	}
 
 	html := fmt.Sprintf(projectMatchesTemplate, userName, len(projects), projectsHTML, projectsURL)
+	return send(getEmailFrom(), userEmail, subject, html)
+}
+
+// SendProjectDecisionApproved envia email ao candidato quando a candidatura é aprovada
+func SendProjectDecisionApproved(userEmail, userName, projectTitle, projectURL, ownerName string) error {
+	subject := fmt.Sprintf("A tua candidatura foi aprovada: %s", projectTitle)
+	html := fmt.Sprintf(projectDecisionApprovedTemplate, userName, ownerName, projectTitle, projectURL, projectURL)
+	return send(getEmailFrom(), userEmail, subject, html)
+}
+
+// SendProjectDecisionRejected envia email ao candidato quando a candidatura é rejeitada
+func SendProjectDecisionRejected(userEmail, userName, projectTitle, projectURL, ownerName string) error {
+	subject := fmt.Sprintf("A tua candidatura foi rejeitada: %s", projectTitle)
+	html := fmt.Sprintf(projectDecisionRejectedTemplate, userName, ownerName, projectTitle, projectURL, projectURL)
 	return send(getEmailFrom(), userEmail, subject, html)
 }
 
@@ -277,6 +295,49 @@ const reviewApprovedTemplate = `<h2 style="margin:0 0 20px;color:#1a1a1a;font-si
 		<td align="center">
 			<a href="%s" style="display:inline-block;background:#68007a;color:#ffffff;padding:16px 40px;border-radius:6px;text-decoration:none;font-weight:600;font-size:16px;text-align:center;">
 				Ver Perfil Avaliado
+			</a>
+		</td>
+	</tr>
+</table>
+<p style="margin:32px 0 0;color:#666;font-size:14px;line-height:1.6;">
+	Continua em <a href="%s" style="color:#68007a;text-decoration:none;">skillbridge.com</a>.
+</p>`
+
+const projectDecisionApprovedTemplate = `<h2 style="margin:0 0 20px;color:#1a1a1a;font-size:24px;font-weight:600;">Candidatura aprovada ✅</h2>
+<p style="margin:0 0 16px;color:#333;font-size:16px;line-height:1.6;">
+	Olá <strong>%s</strong>,
+</p>
+<p style="margin:0 0 24px;color:#333;font-size:16px;line-height:1.6;">
+	A tua candidatura ao projeto <strong>%s</strong> foi <strong>aprovada</strong>. O <strong>%s</strong> vai agora avançar convosco.
+</p>
+<table width="100%%" cellpadding="0" cellspacing="0">
+	<tr>
+		<td align="center">
+			<a href="%s" style="display:inline-block;background:#68007a;color:#ffffff;padding:16px 40px;border-radius:6px;text-decoration:none;font-weight:600;font-size:16px;text-align:center;">
+				Ver Mensagens
+			</a>
+		</td>
+	</tr>
+</table>
+<p style="margin:32px 0 0;color:#666;font-size:14px;line-height:1.6;">
+	Continua em <a href="%s" style="color:#68007a;text-decoration:none;">skillbridge.com</a>.
+</p>`
+
+const projectDecisionRejectedTemplate = `<h2 style="margin:0 0 20px;color:#1a1a1a;font-size:24px;font-weight:600;">Candidatura rejeitada ❌</h2>
+<p style="margin:0 0 16px;color:#333;font-size:16px;line-height:1.6;">
+	Olá <strong>%s</strong>,
+</p>
+<p style="margin:0 0 24px;color:#333;font-size:16px;line-height:1.6;">
+	Lamentamos informar-te que a tua candidatura ao projeto <strong>%s</strong> foi <strong>rejeitada</strong> pelo <strong>%s</strong>.
+</p>
+<p style="margin:0 0 24px;color:#666;font-size:14px;line-height:1.6;">
+	Podes tentar novamente noutros projetos e continua a explorar oportunidades na plataforma.
+</p>
+<table width="100%%" cellpadding="0" cellspacing="0">
+	<tr>
+		<td align="center">
+			<a href="%s" style="display:inline-block;background:#68007a;color:#ffffff;padding:16px 40px;border-radius:6px;text-decoration:none;font-weight:600;font-size:16px;text-align:center;">
+				Explorar Projetos
 			</a>
 		</td>
 	</tr>

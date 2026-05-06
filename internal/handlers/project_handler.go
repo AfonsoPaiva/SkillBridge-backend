@@ -775,15 +775,18 @@ func RespondApplication(c *gin.Context) {
 		return
 	}
 
-	// Não permitir mudanças se já foi aceite
-	if member.Status == "accepted" {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Esta candidatura já foi aceite e não pode ser alterada."})
-		return
-	}
-
+	previousStatus := member.Status
 	newStatus := "accepted"
 	if input.Action == "reject" {
 		newStatus = "rejected"
+	}
+
+	// Só enviar email se houve transição real (tipicamente pending -> accepted/rejected)
+	shouldNotifyDecision := previousStatus == "pending" && (newStatus == "accepted" || newStatus == "rejected")
+
+	if previousStatus == "accepted" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Esta candidatura já foi aceite e não pode ser alterada."})
+		return
 	}
 
 	database.DB.Model(&member).Update("status", newStatus)
@@ -796,10 +799,30 @@ func RespondApplication(c *gin.Context) {
 	if newStatus == "accepted" && member.RoleID != 0 {
 		database.DB.Model(&models.ProjectRole{}).Where("id = ? AND filled < spots", member.RoleID).UpdateColumn("filled", gorm.Expr("filled + 1"))
 	} else if newStatus == "rejected" && member.RoleID != 0 {
-		// Se estava accepted antes e agora rejeitou, decrementa filled
-		if member.Status == "accepted" {
-			database.DB.Model(&models.ProjectRole{}).Where("id = ? AND filled > 0", member.RoleID).UpdateColumn("filled", gorm.Expr("filled - 1"))
-		}
+		// Rejeitar só deve acontecer a pending; portanto não decrementamos aqui.
+	}
+
+	// Email ao candidato quando o owner decide aceitar/rejeitar
+	if shouldNotifyDecision {
+		go func(candidateID uint, decision string, roleID uint, projectID uint, ownerID uint) {
+			var candidate models.User
+			if err := database.DB.First(&candidate, candidateID).Error; err != nil {
+				return
+			}
+
+			var owner models.User
+			if err := database.DB.First(&owner, ownerID).Error; err != nil {
+				owner.Name = ""
+			}
+
+			projectURL := fmt.Sprintf("%s/projects/%s", config.AppConfig.FrontendURL, project.Slug)
+
+			if decision == "accepted" {
+				_ = email.SendProjectDecisionApproved(candidate.Email, candidate.Name, project.Title, projectURL, owner.Name)
+			} else if decision == "rejected" {
+				_ = email.SendProjectDecisionRejected(candidate.Email, candidate.Name, project.Title, projectURL, owner.Name)
+			}
+		}(member.UserID, newStatus, member.RoleID, project.ID, project.OwnerID)
 	}
 
 	// Verificar se o projeto ficou cheio

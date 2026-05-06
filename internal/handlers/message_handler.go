@@ -375,6 +375,18 @@ func SendMessage(c *gin.Context) {
 		}
 	}
 
+	// Push notification to the other conversation participant (best-effort)
+	recipientID := conv.UserAID
+	if recipientID == me.ID {
+		recipientID = conv.UserBID
+	}
+
+	// unreadBefore: mensagens recebidas pelo destinatário (sender != recipient) ainda não lidas (read_at NULL)
+	var unreadBefore int64
+	database.DB.Model(&models.Message{}).
+		Where("sender_id != ? AND read_at IS NULL", recipientID).
+		Count(&unreadBefore)
+
 	msg := models.Message{
 		ConversationID:   conv.ID,
 		SenderID:         me.ID,
@@ -383,28 +395,18 @@ func SendMessage(c *gin.Context) {
 	}
 	database.DB.Create(&msg)
 
-	// Push notification to the other conversation participant (best-effort)
-	recipientID := conv.UserAID
-	if recipientID == me.ID {
-		recipientID = conv.UserBID
-	}
-
-	// Email threshold de mensagens não lidas:
-	// - unread = mensagens em que o destinatário é "me" e o sender NÃO é "me" (read_at NULL)
-	// - enviar email apenas quando atravessa o threshold (de <5 para >=5)
-	go func() {
-		var unreadBefore int64
-		database.DB.Model(&models.Message{}).
-			Where("sender_id != ? AND read_at IS NULL", recipientID).
-			Count(&unreadBefore)
-
+	// Depois do Create (async): calcular unreadAfter e disparar:
+	// - email threshold (>=5)
+	// - push threshold ( > 5 , i.e. mais do que 5) apenas quando cruza
+	go func(unreadBeforeSnapshot int64) {
 		var unreadAfter int64
 		database.DB.Model(&models.Message{}).
 			Where("sender_id != ? AND read_at IS NULL", recipientID).
 			Count(&unreadAfter)
 
-		// Envia apenas quando atravessa o threshold
-		if unreadBefore < 5 && unreadAfter >= 5 {
+		// Email threshold de mensagens não lidas:
+		// Enviar apenas quando atravessa o threshold (de <5 para >=5)
+		if unreadBeforeSnapshot < 5 && unreadAfter >= 5 {
 			var recipient models.User
 			if err := database.DB.First(&recipient, recipientID).Error; err == nil {
 				conversationURL := fmt.Sprintf("%s/messages", config.AppConfig.FrontendURL)
@@ -413,38 +415,37 @@ func SendMessage(c *gin.Context) {
 				}
 			}
 		}
-	}()
 
-	var recipientTokens []models.PushDeviceToken
-	if err := database.DB.Where("user_id = ?", recipientID).Find(&recipientTokens).Error; err == nil {
-		tokens := make([]string, 0, len(recipientTokens))
-		for _, t := range recipientTokens {
-			if t.Token != "" {
-				tokens = append(tokens, t.Token)
+		// Push threshold: "apenas quando unread > 5" e só na transição (para não repetir)
+		if unreadBeforeSnapshot <= 5 && unreadAfter > 5 {
+			var recipientTokens []models.PushDeviceToken
+			if err := database.DB.Where("user_id = ?", recipientID).Find(&recipientTokens).Error; err == nil {
+				tokens := make([]string, 0, len(recipientTokens))
+				for _, t := range recipientTokens {
+					if t.Token != "" {
+						tokens = append(tokens, t.Token)
+					}
+				}
+
+				if len(tokens) > 0 {
+					notificationBody := "Recebeu mais de 5 mensagens não lidas no SkillBridge."
+					if me.Name != "" {
+						notificationBody = fmt.Sprintf("%s enviou-lhe mais mensagens no SkillBridge.", me.Name)
+					}
+
+					if err := notifications.SendMessagePush(tokens, "Mensagens não lidas", notificationBody, map[string]string{
+						"type":            "new_message_threshold",
+						"conversation_id": fmt.Sprintf("%d", conv.ID),
+						"sender_id":       fmt.Sprintf("%d", me.ID),
+					}); err != nil {
+						log.Printf("[push] failed to send threshold notification (conv=%d recipient=%d): %v", conv.ID, recipientID, err)
+					}
+				}
 			}
 		}
+	}(unreadBefore)
 
-		log.Printf("[push] conversation=%d recipient=%d tokens_found=%d", conv.ID, recipientID, len(tokens))
-
-		if len(tokens) > 0 {
-			notificationBody := "Recebeu uma nova mensagem no SkillBridge."
-			if me.Name != "" {
-				notificationBody = fmt.Sprintf("%s enviou-lhe uma nova mensagem.", me.Name)
-			}
-
-			if err := notifications.SendMessagePush(tokens, "Nova mensagem", notificationBody, map[string]string{
-				"type":            "new_message",
-				"conversation_id": fmt.Sprintf("%d", conv.ID),
-				"sender_id":       fmt.Sprintf("%d", me.ID),
-			}); err != nil {
-				log.Printf("[push] failed to send message notification (conv=%d recipient=%d): %v", conv.ID, recipientID, err)
-			}
-		} else {
-			log.Printf("[push] skipped send (conv=%d recipient=%d): no tokens", conv.ID, recipientID)
-		}
-	} else {
-		log.Printf("[push] failed to query recipient tokens (conv=%d recipient=%d): %v", conv.ID, recipientID, err)
-	}
+	// push de mensagens fica exclusivamente no threshold (unreadAfter > 5)
 
 	// Return sender info (no email)
 	database.DB.Preload("Sender").First(&msg, msg.ID)
