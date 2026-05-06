@@ -70,28 +70,24 @@ func SendWelcome(name, email string, frontendURL string) error {
 
 func SendProjectApplication(projectOwnerEmail, projectOwnerName, projectTitle, applicantName string, messagesURL string) error {
 	subject := fmt.Sprintf("Nova candidatura: %s", projectTitle)
-	// projectApplicationTemplate: ownerName, applicantName, projectTitle, messagesURL
 	html := fmt.Sprintf(projectApplicationTemplate, projectOwnerName, applicantName, projectTitle, messagesURL)
 	return send(getEmailFrom(), projectOwnerEmail, subject, html)
 }
 
 func SendMessagesThreshold(userEmail, userName string, unreadCount int, messagesURL string) error {
 	subject := fmt.Sprintf("%d mensagens não lidas no SkillBridge", unreadCount)
-	// messagesThresholdTemplate: userName, unreadCount, messagesURL, messagesURL
 	html := fmt.Sprintf(messagesThresholdTemplate, userName, unreadCount, messagesURL, messagesURL)
 	return send(getEmailFrom(), userEmail, subject, html)
 }
 
 func SendFollowNotification(userEmail, userName, followerName, profileURL string) error {
 	subject := fmt.Sprintf("%s começou a seguir-te no SkillBridge", followerName)
-	// followNotificationTemplate: userName, followerName, profileURL, profileURL
 	html := fmt.Sprintf(followNotificationTemplate, userName, followerName, profileURL, profileURL)
 	return send(getEmailFrom(), userEmail, subject, html)
 }
 
 func SendReviewApproved(userEmail, userName, reviewedName string, rating int, profileURL string) error {
 	subject := "A tua avaliação foi aprovada"
-	// reviewApprovedTemplate: userName, rating, reviewedName, profileURL, profileURL
 	html := fmt.Sprintf(reviewApprovedTemplate, userName, rating, reviewedName, profileURL, profileURL)
 	return send(getEmailFrom(), userEmail, subject, html)
 }
@@ -150,8 +146,9 @@ const emailWrapper = `<!DOCTYPE html>
 <head>
 	<meta charset="UTF-8">
 	<meta name="viewport" content="width=device-width, initial-scale=1.0">
+	<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
 </head>
-<body style="margin:0;padding:0;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,'Helvetica Neue',Arial,sans-serif;background:#f5f5f5;">
+<body style="margin:0;padding:0;font-family:'Plus Jakarta Sans',-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,'Helvetica Neue',Arial,sans-serif;background:#f5f5f5;">
 	<table width="100%%" cellpadding="0" cellspacing="0" style="background:#f5f5f5;padding:40px 20px;">
 		<tr>
 			<td align="center">
