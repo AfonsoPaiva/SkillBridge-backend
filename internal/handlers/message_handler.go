@@ -396,8 +396,8 @@ func SendMessage(c *gin.Context) {
 	database.DB.Create(&msg)
 
 	// Depois do Create (async): calcular unreadAfter e disparar:
-	// - email threshold (>=5)
-	// - push threshold ( > 5 , i.e. mais do que 5) apenas quando cruza
+	// - email: enviar a TODOS quando >10 mensagens não lidas
+	// - push: enviar apenas quando >10 e só para quem tem notificações ativas
 	go func(unreadBeforeSnapshot int64) {
 		var unreadAfter int64
 		database.DB.Model(&models.Message{}).
@@ -405,8 +405,8 @@ func SendMessage(c *gin.Context) {
 			Count(&unreadAfter)
 
 		// Email threshold de mensagens não lidas:
-		// Enviar apenas quando atravessa o threshold (de <5 para >=5)
-		if unreadBeforeSnapshot < 5 && unreadAfter >= 5 {
+		// Enviar para TODOS os utilizadores quando têm mais de 10 mensagens não lidas
+		if unreadAfter > 10 {
 			var recipient models.User
 			if err := database.DB.First(&recipient, recipientID).Error; err == nil {
 				conversationURL := fmt.Sprintf("%s/messages", config.AppConfig.FrontendURL)
@@ -416,36 +416,24 @@ func SendMessage(c *gin.Context) {
 			}
 		}
 
-		// Push threshold: "apenas quando unread > 5" e só na transição (para não repetir)
-		if unreadBeforeSnapshot <= 5 && unreadAfter > 5 {
-			var recipientTokens []models.PushDeviceToken
-			if err := database.DB.Where("user_id = ?", recipientID).Find(&recipientTokens).Error; err == nil {
-				tokens := make([]string, 0, len(recipientTokens))
-				for _, t := range recipientTokens {
-					if t.Token != "" {
-						tokens = append(tokens, t.Token)
-					}
-				}
+		// Push threshold: enviar para TODOS os utilizadores quando >10 mensagens não lidas
+		// Usa Firebase Cloud Messaging Topic para atingir todos sem depender de tokens registados
+		if unreadAfter > 10 {
+			topic := fmt.Sprintf("user_messages_%d", recipientID)
+			notificationBody := "Recebeu mais de 10 mensagens não lidas no SkillBridge."
+			if me.Name != "" {
+				notificationBody = fmt.Sprintf("%s enviou-lhe mais mensagens no SkillBridge.", me.Name)
+			}
 
-				if len(tokens) > 0 {
-					notificationBody := "Recebeu mais de 5 mensagens não lidas no SkillBridge."
-					if me.Name != "" {
-						notificationBody = fmt.Sprintf("%s enviou-lhe mais mensagens no SkillBridge.", me.Name)
-					}
-
-					if err := notifications.SendMessagePush(tokens, "Mensagens não lidas", notificationBody, map[string]string{
-						"type":            "new_message_threshold",
-						"conversation_id": fmt.Sprintf("%d", conv.ID),
-						"sender_id":       fmt.Sprintf("%d", me.ID),
-					}); err != nil {
-						log.Printf("[push] failed to send threshold notification (conv=%d recipient=%d): %v", conv.ID, recipientID, err)
-					}
-				}
+			if err := notifications.SendMessagePushToTopic(topic, "Mensagens não lidas", notificationBody, map[string]string{
+				"type":            "new_message_threshold",
+				"conversation_id": fmt.Sprintf("%d", conv.ID),
+				"sender_id":       fmt.Sprintf("%d", me.ID),
+			}); err != nil {
+				log.Printf("[push] Erro ao enviar notificação para tópico %s: %v", topic, err)
 			}
 		}
 	}(unreadBefore)
-
-	// push de mensagens fica exclusivamente no threshold (unreadAfter > 5)
 
 	// Return sender info (no email)
 	database.DB.Preload("Sender").First(&msg, msg.ID)
@@ -626,6 +614,15 @@ func RegisterPushToken(c *gin.Context) {
 		record.LastSeenAt = now
 		database.DB.Save(&record)
 		log.Printf("[push] token updated user=%d platform=%s", me.ID, platform)
+
+		// Re-subscribe to the user's topic
+		topic := fmt.Sprintf("user_messages_%d", me.ID)
+		go func() {
+			if err := notifications.SubscribeToTopic(topic, []string{input.Token}); err != nil {
+				log.Printf("[push] erro ao subscrever token ao tópico %s: %v", topic, err)
+			}
+		}()
+
 		c.JSON(http.StatusOK, gin.H{"message": "Token atualizado com sucesso."})
 		return
 	}
@@ -639,6 +636,14 @@ func RegisterPushToken(c *gin.Context) {
 	}
 	database.DB.Create(&record)
 	log.Printf("[push] token registered user=%d platform=%s", me.ID, platform)
+
+	// Subscribe the token to the user's topic so they receive messages sent to that topic
+	topic := fmt.Sprintf("user_messages_%d", me.ID)
+	go func() {
+		if err := notifications.SubscribeToTopic(topic, []string{input.Token}); err != nil {
+			log.Printf("[push] erro ao subscrever token ao tópico %s: %v", topic, err)
+		}
+	}()
 
 	c.JSON(http.StatusCreated, gin.H{"message": "Token registado com sucesso."})
 }

@@ -137,3 +137,92 @@ func SendMessagePush(tokens []string, title string, body string, data map[string
 
 	return nil
 }
+
+// SendMessagePushToTopic sends a push notification to all users subscribed to a topic.
+// This allows sending to all users without requiring individual device tokens.
+func SendMessagePushToTopic(topic string, title string, body string, data map[string]string) error {
+	if messagingClient == nil {
+		return fmt.Errorf("fcm messaging client not initialized")
+	}
+
+	ctx, cancel := context.WithTimeout(context.Background(), 8*time.Second)
+	defer cancel()
+
+	frontendURL := strings.TrimSpace(config.AppConfig.FrontendURL)
+	frontendURL = strings.TrimRight(frontendURL, "/")
+	if frontendURL == "" {
+		frontendURL = "https://skillbridge.pt"
+	}
+
+	messageLink := frontendURL + "/messages"
+
+	payloadData := make(map[string]string, len(data)+1)
+	for k, v := range data {
+		payloadData[k] = v
+	}
+
+	if conversationID := strings.TrimSpace(payloadData["conversation_id"]); conversationID != "" {
+		messageLink = frontendURL + "/messages/" + conversationID
+	}
+
+	payloadData["url"] = messageLink
+
+	msg := &messaging.Message{
+		Topic: topic,
+		Notification: &messaging.Notification{
+			Title: title,
+			Body:  body,
+		},
+		Data: payloadData,
+		Webpush: &messaging.WebpushConfig{
+			Notification: &messaging.WebpushNotification{
+				Title: title,
+				Body:  body,
+				Icon:  "/assets/favicon-192.png",
+				Badge: "/assets/favicon-192.png",
+				Tag:   buildWebpushTag(payloadData),
+			},
+			FCMOptions: &messaging.WebpushFCMOptions{
+				Link: messageLink,
+			},
+		},
+	}
+
+	id, err := messagingClient.Send(ctx, msg)
+	if err != nil {
+		log.Printf("[push] failed to send to topic %s: %v", topic, err)
+		return err
+	}
+
+	log.Printf("[push] sent to topic %s with ID: %s", topic, id)
+	return nil
+}
+
+// SubscribeToTopic subscribes a device token to a Firebase Cloud Messaging topic.
+// This allows sending messages to all devices subscribed to that topic.
+func SubscribeToTopic(topic string, tokens []string) error {
+	if messagingClient == nil {
+		return fmt.Errorf("fcm messaging client not initialized")
+	}
+
+	if len(tokens) == 0 {
+		return fmt.Errorf("no tokens provided")
+	}
+
+	ctx, cancel := context.WithTimeout(context.Background(), 8*time.Second)
+	defer cancel()
+
+	resp, err := messagingClient.SubscribeToTopic(ctx, tokens, topic)
+	if err != nil {
+		log.Printf("[push] failed to subscribe tokens to topic %s: %v", topic, err)
+		return err
+	}
+
+	if resp.FailureCount > 0 {
+		log.Printf("[push] topic subscription partial: success=%d failures=%d (topic=%s)", resp.SuccessCount, resp.FailureCount, topic)
+	} else {
+		log.Printf("[push] subscribed %d tokens to topic %s", resp.SuccessCount, topic)
+	}
+
+	return nil
+}
