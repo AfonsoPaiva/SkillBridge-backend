@@ -52,10 +52,11 @@ func send(from, to, subject, html string) error {
 }
 
 func getEmailFrom() string {
+	address := "onboarding@resend.dev"
 	if config.AppConfig.EmailFromAddress != "" {
-		return config.AppConfig.EmailFromAddress
+		address = config.AppConfig.EmailFromAddress
 	}
-	return "onboarding@resend.dev"
+	return fmt.Sprintf("SkillBridge <%s>", address)
 }
 
 // ─────────────────────────────────────────────────────────────

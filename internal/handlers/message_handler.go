@@ -405,8 +405,8 @@ func SendMessage(c *gin.Context) {
 			Count(&unreadAfter)
 
 		// Email threshold de mensagens não lidas:
-		// Enviar para TODOS os utilizadores quando têm mais de 10 mensagens não lidas
-		if unreadAfter > 10 {
+		// Enviar apenas quando atinge múltiplos de 10 mensagens não lidas (10, 20, 30...)
+		if unreadAfter >= 10 && unreadAfter%10 == 0 {
 			var recipient models.User
 			if err := database.DB.First(&recipient, recipientID).Error; err == nil {
 				conversationURL := fmt.Sprintf("%s/messages", config.AppConfig.FrontendURL)
@@ -416,13 +416,12 @@ func SendMessage(c *gin.Context) {
 			}
 		}
 
-		// Push threshold: enviar para TODOS os utilizadores quando >10 mensagens não lidas
-		// Usa Firebase Cloud Messaging Topic para atingir todos sem depender de tokens registados
-		if unreadAfter > 10 {
+		// Push threshold: enviar apenas quando atinge múltiplos de 10 mensagens não lidas
+		if unreadAfter >= 10 && unreadAfter%10 == 0 {
 			topic := fmt.Sprintf("user_messages_%d", recipientID)
-			notificationBody := "Recebeu mais de 10 mensagens não lidas no SkillBridge."
+			notificationBody := fmt.Sprintf("Recebeu %d mensagens não lidas no SkillBridge.", unreadAfter)
 			if me.Name != "" {
-				notificationBody = fmt.Sprintf("%s enviou-lhe mais mensagens no SkillBridge.", me.Name)
+				notificationBody = fmt.Sprintf("%s e outros enviaram-lhe %d mensagens não lidas.", me.Name, unreadAfter)
 			}
 
 			if err := notifications.SendMessagePushToTopic(topic, "Mensagens não lidas", notificationBody, map[string]string{
