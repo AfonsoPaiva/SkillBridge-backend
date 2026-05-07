@@ -209,7 +209,7 @@ const welcomeTemplate = `<h2 style="margin:0 0 20px;color:#1a1a1a;font-size:24px
 	</tr>
 </table>
 <p style="margin:32px 0 0;color:#666;font-size:14px;line-height:1.6;">
-	Se tiveres alguma dúvida, visita a nossa plataforma em <a href="%s" style="color:#68007a;text-decoration:none;">skillbridge.com</a>.
+	Se tiveres alguma dúvida, visita a nossa plataforma em <a href="%s" style="color:#68007a;text-decoration:none;">skillbridge.pt</a>.
 </p>`
 
 const projectApplicationTemplate = `<h2 style="margin:0 0 20px;color:#1a1a1a;font-size:24px;font-weight:600;">Nova Candidatura Recebida</h2>
@@ -275,7 +275,7 @@ const followNotificationTemplate = `<h2 style="margin:0 0 20px;color:#1a1a1a;fon
 	</tr>
 </table>
 <p style="margin:32px 0 0;color:#666;font-size:14px;line-height:1.6;">
-	Continua a explorar a comunidade em <a href="%s" style="color:#68007a;text-decoration:none;">skillbridge.com</a>.
+	Continua a explorar a comunidade em <a href="%s" style="color:#68007a;text-decoration:none;">skillbridge.pt</a>.
 </p>`
 
 const reviewApprovedTemplate = `<h2 style="margin:0 0 20px;color:#1a1a1a;font-size:24px;font-weight:600;">Avaliação Publicada</h2>
@@ -298,7 +298,7 @@ const reviewApprovedTemplate = `<h2 style="margin:0 0 20px;color:#1a1a1a;font-si
 	</tr>
 </table>
 <p style="margin:32px 0 0;color:#666;font-size:14px;line-height:1.6;">
-	Continua em <a href="%s" style="color:#68007a;text-decoration:none;">skillbridge.com</a>.
+	Continua em <a href="%s" style="color:#68007a;text-decoration:none;">skillbridge.pt</a>.
 </p>`
 
 const projectDecisionApprovedTemplate = `<h2 style="margin:0 0 20px;color:#1a1a1a;font-size:24px;font-weight:600;">Candidatura aprovada ✅</h2>
@@ -318,7 +318,7 @@ const projectDecisionApprovedTemplate = `<h2 style="margin:0 0 20px;color:#1a1a1
 	</tr>
 </table>
 <p style="margin:32px 0 0;color:#666;font-size:14px;line-height:1.6;">
-	Continua em <a href="%s" style="color:#68007a;text-decoration:none;">skillbridge.com</a>.
+	Continua em <a href="%s" style="color:#68007a;text-decoration:none;">skillbridge.pt</a>.
 </p>`
 
 const projectDecisionRejectedTemplate = `<h2 style="margin:0 0 20px;color:#1a1a1a;font-size:24px;font-weight:600;">Candidatura rejeitada ❌</h2>
@@ -341,7 +341,7 @@ const projectDecisionRejectedTemplate = `<h2 style="margin:0 0 20px;color:#1a1a1
 	</tr>
 </table>
 <p style="margin:32px 0 0;color:#666;font-size:14px;line-height:1.6;">
-	Continua em <a href="%s" style="color:#68007a;text-decoration:none;">skillbridge.com</a>.
+	Continua em <a href="%s" style="color:#68007a;text-decoration:none;">skillbridge.pt</a>.
 </p>`
 
 const projectMatchesTemplate = `<h2 style="margin:0 0 20px;color:#1a1a1a;font-size:24px;font-weight:600;">Projetos Compatíveis</h2>
@@ -364,5 +364,5 @@ const projectMatchesTemplate = `<h2 style="margin:0 0 20px;color:#1a1a1a;font-si
 	</tr>
 </table>
 <p style="margin:32px 0 0;color:#666;font-size:14px;line-height:1.6;">
-	Explora mais oportunidades em <a href="%s" style="color:#68007a;text-decoration:none;">skillbridge.com</a>.
+	Explora mais oportunidades em <a href="%s" style="color:#68007a;text-decoration:none;">skillbridge.pt</a>.
 </p>`
