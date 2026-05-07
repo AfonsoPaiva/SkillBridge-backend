@@ -6,6 +6,7 @@ import (
 	"log"
 	"net/http"
 	"strings"
+	"time"
 
 	"github.com/gin-gonic/gin"
 	"github.com/paiva/SkillBridge/Backend/config"
@@ -359,22 +360,30 @@ func JoinProject(c *gin.Context) {
 	if input.RoleID != 0 {
 		dupQuery = dupQuery.Where("role_id = ?", input.RoleID)
 	}
+	var member models.ProjectMember
 	if dupQuery.First(&existing).Error == nil {
-		msg := "Já tens uma candidatura neste projeto."
-		if input.RoleID != 0 {
-			msg = "Já tens uma candidatura para esta vaga."
+		if existing.Status != "rejected" {
+			msg := "Já tens uma candidatura neste projeto."
+			if input.RoleID != 0 {
+				msg = "Já tens uma candidatura para esta vaga."
+			}
+			c.JSON(http.StatusConflict, gin.H{"error": msg, "status": existing.Status})
+			return
 		}
-		c.JSON(http.StatusConflict, gin.H{"error": msg, "status": existing.Status})
-		return
+		// Se foi rejeitado, "reabrimos" a candidatura
+		existing.Status = "pending"
+		existing.JoinedAt = time.Now()
+		database.DB.Save(&existing)
+		member = existing
+	} else {
+		member = models.ProjectMember{
+			ProjectID: project.ID,
+			UserID:    user.ID,
+			RoleID:    input.RoleID,
+			Status:    "pending",
+		}
+		database.DB.Create(&member)
 	}
-
-	member := models.ProjectMember{
-		ProjectID: project.ID,
-		UserID:    user.ID,
-		RoleID:    input.RoleID,
-		Status:    "pending",
-	}
-	database.DB.Create(&member)
 
 	// Create (or reuse) conversation between applicant and project owner,
 	// then post a system message so the owner can accept/reject in-chat.

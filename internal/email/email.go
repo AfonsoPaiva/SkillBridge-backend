@@ -120,14 +120,14 @@ func SendProjectMatches(userEmail, userName string, projects []ProjectMatch, pro
 // SendProjectDecisionApproved envia email ao candidato quando a candidatura é aprovada
 func SendProjectDecisionApproved(userEmail, userName, projectTitle, projectURL, ownerName string) error {
 	subject := fmt.Sprintf("A tua candidatura foi aprovada: %s", projectTitle)
-	html := fmt.Sprintf(projectDecisionApprovedTemplate, userName, ownerName, projectTitle, projectURL, projectURL)
+	html := fmt.Sprintf(projectDecisionApprovedTemplate, userName, projectTitle, ownerName, projectURL, projectURL)
 	return send(getEmailFrom(), userEmail, subject, html)
 }
 
 // SendProjectDecisionRejected envia email ao candidato quando a candidatura é rejeitada
 func SendProjectDecisionRejected(userEmail, userName, projectTitle, projectURL, ownerName string) error {
 	subject := fmt.Sprintf("A tua candidatura foi rejeitada: %s", projectTitle)
-	html := fmt.Sprintf(projectDecisionRejectedTemplate, userName, ownerName, projectTitle, projectURL, projectURL)
+	html := fmt.Sprintf(projectDecisionRejectedTemplate, userName, projectTitle, ownerName, projectURL, projectURL)
 	return send(getEmailFrom(), userEmail, subject, html)
 }
 
