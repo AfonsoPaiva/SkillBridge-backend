@@ -117,6 +117,12 @@ func SendProjectMatches(userEmail, userName string, projects []ProjectMatch, pro
 	return send(getEmailFrom(), userEmail, subject, html)
 }
 
+func SendPerfectProjectMatch(userEmail, userName, projectTitle, projectDescription, skills, projectURL string) error {
+	subject := "Encontramos o projeto perfeito para ti!"
+	html := fmt.Sprintf(perfectProjectTemplate, userName, projectTitle, projectDescription, skills, projectURL, projectURL)
+	return send(getEmailFrom(), userEmail, subject, html)
+}
+
 // SendProjectDecisionApproved envia email ao candidato quando a candidatura é aprovada
 func SendProjectDecisionApproved(userEmail, userName, projectTitle, projectURL, ownerName string) error {
 	subject := fmt.Sprintf("A tua candidatura foi aprovada: %s", projectTitle)
@@ -365,4 +371,35 @@ const projectMatchesTemplate = `<h2 style="margin:0 0 20px;color:#1a1a1a;font-si
 </table>
 <p style="margin:32px 0 0;color:#666;font-size:14px;line-height:1.6;">
 	Explora mais oportunidades em <a href="%s" style="color:#68007a;text-decoration:none;">skillbridge.pt</a>.
+</p>`
+
+const perfectProjectTemplate = `<h2 style="margin:0 0 20px;color:#1a1a1a;font-size:24px;font-weight:600;">O Projeto Perfeito para Ti</h2>
+<p style="margin:0 0 16px;color:#333;font-size:16px;line-height:1.6;">
+	Olá <strong>%s</strong>,
+</p>
+<p style="margin:0 0 24px;color:#333;font-size:16px;line-height:1.6;">
+	Acabou de ser criado um novo projeto que corresponde perfeitamente às tuas competências!
+</p>
+<table width="100%%" cellpadding="0" cellspacing="0" style="margin:0 0 32px;width:100%%;">
+	<tr>
+		<td style="padding:20px;background:#f8f9fa;border-radius:8px;border:1px solid #e9ecef;">
+			<h4 style="margin:0 0 8px;color:#1a1a1a;font-size:16px;font-weight:600;">%s</h4>
+			<p style="margin:0 0 12px;color:#4a4a4a;font-size:14px;line-height:1.5;">%s</p>
+			<p style="margin:0;color:#6c757d;font-size:13px;">
+				<strong>Skills procuradas:</strong> %s
+			</p>
+		</td>
+	</tr>
+</table>
+<table width="100%%" cellpadding="0" cellspacing="0">
+	<tr>
+		<td align="center">
+			<a href="%s" style="display:inline-block;background:#68007a;color:#ffffff;padding:16px 40px;border-radius:6px;text-decoration:none;font-weight:600;font-size:16px;text-align:center;">
+				Ver Detalhes do Projeto
+			</a>
+		</td>
+	</tr>
+</table>
+<p style="margin:32px 0 0;color:#666;font-size:14px;line-height:1.6;">
+	Não percas esta oportunidade. Candidata-te já em <a href="%s" style="color:#68007a;text-decoration:none;">skillbridge.pt</a>.
 </p>`

@@ -210,6 +210,10 @@ func CreateProject(c *gin.Context) {
 
 	// Return project with roles preloaded
 	database.DB.Preload("Roles").First(&project, project.ID)
+
+	// Notificar utilizadores com competências compatíveis (non-blocking)
+	go notifyMatchingUsers(project, project.Roles)
+
 	c.JSON(http.StatusCreated, gin.H{"message": "Projeto criado.", "project": project})
 }
 
@@ -980,4 +984,49 @@ func GetMyApplications(c *gin.Context) {
 	var applications []models.ProjectMember
 	database.DB.Where("project_id = ? AND user_id = ?", project.ID, user.ID).Find(&applications)
 	c.JSON(http.StatusOK, applications)
+}
+
+// notifyMatchingUsers encontra utilizadores com competências compatíveis e envia email.
+func notifyMatchingUsers(project models.Project, roles []models.ProjectRole) {
+	skillMap := make(map[string]bool)
+	for _, role := range roles {
+		for _, skill := range role.SkillNames {
+			skillMap[skill] = true
+		}
+	}
+
+	if len(skillMap) == 0 {
+		return
+	}
+
+	uniqueSkills := make([]string, 0, len(skillMap))
+	for skill := range skillMap {
+		uniqueSkills = append(uniqueSkills, skill)
+	}
+
+	// Encontrar utilizadores que tenham pelo menos uma das competências do projeto.
+	// Usamos jsonb_exists_any em vez do operador ?| para evitar conflitos com placeholders do GORM.
+	var users []models.User
+	query := `SELECT * FROM users WHERE id != ? AND jsonb_exists_any(skills, ?)`
+	err := database.DB.Raw(query, project.OwnerID, uniqueSkills).Scan(&users).Error
+
+	if err != nil {
+		log.Printf("[notify] Erro ao procurar utilizadores compatíveis: %v", err)
+		return
+	}
+
+	if len(users) == 0 {
+		return
+	}
+
+	projectURL := fmt.Sprintf("%s/projects/%s", config.AppConfig.FrontendURL, project.Slug)
+	skillsStr := strings.Join(uniqueSkills, ", ")
+
+	log.Printf("[notify] A enviar emails de projeto perfeito para %d utilizadores (Projeto: %s)", len(users), project.Title)
+
+	for _, user := range users {
+		if err := email.SendPerfectProjectMatch(user.Email, user.Name, project.Title, project.Description, skillsStr, projectURL); err != nil {
+			log.Printf("[email] Erro ao enviar email de match para %s: %v", user.Email, err)
+		}
+	}
 }
