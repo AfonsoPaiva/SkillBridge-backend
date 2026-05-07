@@ -580,6 +580,12 @@ func UpdateProject(c *gin.Context) {
 	}
 
 	database.DB.Preload("Roles").First(&project, project.ID)
+	
+	// Notificar utilizadores com competências compatíveis (se as vagas foram alteradas)
+	if input.Roles != nil {
+		go notifyMatchingUsers(project, project.Roles)
+	}
+
 	c.JSON(http.StatusOK, gin.H{"message": "Projeto atualizado.", "project": project})
 }
 
@@ -688,6 +694,10 @@ func CreateProjectRole(c *gin.Context) {
 	role := roles[0]
 	role.ProjectID = project.ID
 	database.DB.Create(&role)
+	
+	// Notificar utilizadores com competências compatíveis
+	go notifyMatchingUsers(project, []models.ProjectRole{role})
+
 	c.JSON(http.StatusCreated, role)
 }
 
@@ -1004,11 +1014,18 @@ func notifyMatchingUsers(project models.Project, roles []models.ProjectRole) {
 		uniqueSkills = append(uniqueSkills, skill)
 	}
 
+	// Converter uniqueSkills para JSON para passar à query Postgres
+	skillsJSON, _ := models.StringList(uniqueSkills).Value()
+
 	// Encontrar utilizadores que tenham pelo menos uma das competências do projeto.
-	// Usamos jsonb_exists_any em vez do operador ?| para evitar conflitos com placeholders do GORM.
+	// Convertemos o JSON para um array Postgres text[] para usar no jsonb_exists_any.
 	var users []models.User
-	query := `SELECT * FROM users WHERE id != ? AND jsonb_exists_any(skills, ?)`
-	err := database.DB.Raw(query, project.OwnerID, uniqueSkills).Scan(&users).Error
+	query := `
+		SELECT * FROM users 
+		WHERE id != ? 
+		AND jsonb_exists_any(skills, (SELECT array_agg(x) FROM jsonb_array_elements_text(?) x))`
+	
+	err := database.DB.Raw(query, project.OwnerID, skillsJSON).Scan(&users).Error
 
 	if err != nil {
 		log.Printf("[notify] Erro ao procurar utilizadores compatíveis: %v", err)
