@@ -18,6 +18,7 @@ import (
 )
 
 type projectRoleInput struct {
+	ID          uint     `json:"id,omitempty"`
 	Title       string   `json:"title"`
 	SkillNames  []string `json:"skill_names"`
 	SkillName   string   `json:"skill_name"`
@@ -78,6 +79,7 @@ func prepareProjectRoles(inputs []projectRoleInput, requireSkills bool) ([]model
 		}
 
 		roles = append(roles, models.ProjectRole{
+			ID:          input.ID,
 			Title:       title,
 			SkillNames:  skillNames,
 			Description: input.Description,
@@ -560,22 +562,42 @@ func UpdateProject(c *gin.Context) {
 	}
 	database.DB.Save(&project)
 
-	// Sync roles: collect existing role IDs, remove their members, then delete all and re-insert
+	// Sync roles: collect existing role IDs, update existing, add new, and delete removed ones
 	if input.Roles != nil {
 		var existingRoles []models.ProjectRole
 		database.DB.Where("project_id = ?", project.ID).Find(&existingRoles)
-		if len(existingRoles) > 0 {
-			existingRoleIDs := make([]uint, len(existingRoles))
-			for i, r := range existingRoles {
-				existingRoleIDs[i] = r.ID
-			}
-			// Remove all member applications assigned to roles that are being deleted
-			database.DB.Where("role_id IN ?", existingRoleIDs).Delete(&models.ProjectMember{})
+		
+		existingRoleMap := make(map[uint]models.ProjectRole)
+		for _, r := range existingRoles {
+			existingRoleMap[r.ID] = r
 		}
-		database.DB.Where("project_id = ?", project.ID).Delete(&models.ProjectRole{})
-		for i := range roles {
-			roles[i].ProjectID = project.ID
-			database.DB.Create(&roles[i])
+
+		for _, role := range roles {
+			if role.ID != 0 && existingRoleMap[role.ID].ID != 0 {
+				// Update existing
+				database.DB.Model(&models.ProjectRole{}).Where("id = ? AND project_id = ?", role.ID, project.ID).Updates(map[string]interface{}{
+					"title": role.Title,
+					"skill_names": role.SkillNames,
+					"description": role.Description,
+					"spots": role.Spots,
+				})
+				delete(existingRoleMap, role.ID)
+			} else {
+				// Create new
+				role.ID = 0
+				role.ProjectID = project.ID
+				database.DB.Create(&role)
+			}
+		}
+
+		// Any remaining roles in existingRoleMap should be deleted
+		if len(existingRoleMap) > 0 {
+			var idsToDelete []uint
+			for id := range existingRoleMap {
+				idsToDelete = append(idsToDelete, id)
+			}
+			database.DB.Where("role_id IN ?", idsToDelete).Delete(&models.ProjectMember{})
+			database.DB.Where("id IN ?", idsToDelete).Delete(&models.ProjectRole{})
 		}
 	}
 
