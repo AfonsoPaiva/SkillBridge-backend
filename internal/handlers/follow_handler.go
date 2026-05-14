@@ -65,13 +65,13 @@ func FollowUser(c *gin.Context) {
 		return
 	}
 
-	// Send follow notification email (best-effort, non-blocking)
-	go func() {
-		profileURL := fmt.Sprintf("%s/users/%s", config.AppConfig.FrontendURL, target.Slug)
-		if err := email.SendFollowNotification(target.Email, target.Name, me.Name, profileURL); err != nil {
-			log.Printf("[email] Erro ao enviar email de follow para %s: %v", target.Email, err)
-		}
-	}()
+	// Agendar notificação de follow com debouncing inteligente.
+	// Se o utilizador seguir, deixar de seguir e voltar a seguir dentro da janela,
+	// apenas um email é enviado no fim da janela (ou cancelado se deixar de seguir).
+	go func(actorID uint, targetEmail, targetName, followerName, targetSlug string) {
+		profileURL := fmt.Sprintf("%s/users/%s", config.AppConfig.FrontendURL, targetSlug)
+		email.ScheduleFollowEmail(actorID, targetEmail, targetName, followerName, profileURL)
+	}(me.ID, target.Email, target.Name, me.Name, target.Slug)
 
 	c.JSON(http.StatusOK, gin.H{"message": "A seguir utilizador com sucesso."})
 }
@@ -100,6 +100,16 @@ func UnfollowUser(c *gin.Context) {
 	}
 
 	database.DB.Where("follower_id = ? AND following_id = ?", me.ID, target.ID).Delete(&models.Follow{})
+
+	// Cancelar email de follow pendente — se o utilizador deixou de seguir antes da
+	// janela de debounce expirar, não faz sentido enviar a notificação de "novo seguidor".
+	go func(actorID uint, targetEmail string) {
+		cancelled := email.CancelFollowEmail(actorID, targetEmail)
+		if cancelled {
+			log.Printf("[follow] Email de follow para %s cancelado (utilizador deixou de seguir)", targetEmail)
+		}
+	}(me.ID, target.Email)
+
 	c.JSON(http.StatusOK, gin.H{"message": "Deixou de seguir o utilizador."})
 }
 

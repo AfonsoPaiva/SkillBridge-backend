@@ -1019,6 +1019,9 @@ func GetMyApplications(c *gin.Context) {
 }
 
 // notifyMatchingUsers encontra utilizadores com competências compatíveis e envia email.
+// Aplica rate limiting por actor (dono do projeto) para prevenir spam:
+// - Máximo de PerUserDailyLimit emails provocados por este actor por dia
+// - Máximo global de DailyEmailLimit emails por dia (protege o plano Resend)
 func notifyMatchingUsers(project models.Project, roles []models.ProjectRole) {
 	skillMap := make(map[string]bool)
 	for _, role := range roles {
@@ -1046,7 +1049,7 @@ func notifyMatchingUsers(project models.Project, roles []models.ProjectRole) {
 		SELECT * FROM users 
 		WHERE id != ? 
 		AND jsonb_exists_any(skills, (SELECT array_agg(x) FROM jsonb_array_elements_text(?) x))`
-	
+
 	err := database.DB.Raw(query, project.OwnerID, skillsJSON).Scan(&users).Error
 
 	if err != nil {
@@ -1061,11 +1064,21 @@ func notifyMatchingUsers(project models.Project, roles []models.ProjectRole) {
 	projectURL := fmt.Sprintf("%s/projects/%s", config.AppConfig.FrontendURL, project.Slug)
 	skillsStr := strings.Join(uniqueSkills, ", ")
 
-	log.Printf("[notify] A enviar emails de projeto perfeito para %d utilizadores (Projeto: %s)", len(users), project.Title)
+	log.Printf("[notify] A agendar emails de match para %d utilizadores (Projeto: %d — %s, Actor: %d)",
+		len(users), project.ID, project.Title, project.OwnerID)
 
 	for _, user := range users {
-		if err := email.SendPerfectProjectMatch(user.Email, user.Name, project.Title, project.Description, skillsStr, projectURL); err != nil {
-			log.Printf("[email] Erro ao enviar email de match para %s: %v", user.Email, err)
-		}
+		// Usa debouncing por (actor, utilizador-alvo, projecto):
+		// Se o dono editar as skills várias vezes na mesma janela de 30 min,
+		// apenas um email é enviado por destinatário com os dados mais recentes.
+		// O rate limit global e por actor é aplicado no momento do envio real.
+		email.ScheduleProjectMatchEmail(
+			project.OwnerID, project.ID,
+			user.Email, user.Name,
+			project.Title, project.Description,
+			skillsStr, projectURL,
+		)
 	}
+
+	log.Printf("[notify] %d notificações de match agendadas (serão enviadas após janela de debounce)", len(users))
 }
