@@ -1,12 +1,15 @@
 package handlers
 
 import (
+	"context"
 	"fmt"
 	"log"
 	"net/http"
 	"strconv"
 	"strings"
 
+	gcs "cloud.google.com/go/storage"
+	"google.golang.org/api/iterator"
 	"github.com/gin-gonic/gin"
 	"github.com/paiva/SkillBridge/Backend/config"
 	"github.com/paiva/SkillBridge/Backend/internal/audit"
@@ -148,6 +151,85 @@ func AdminGetUser(c *gin.Context) {
 	c.JSON(http.StatusOK, user)
 }
 
+// AdminUpdateUser - Atualiza os dados de um utilizador (admin)
+//
+// @Summary      [Admin] Atualizar utilizador
+// @Description  Atualiza os dados do utilizador
+// @Tags         admin
+// @Accept       json
+// @Produce      json
+// @Security     BearerAuth
+// @Param        id  path  int  true  "ID do utilizador"
+// @Success      200  {object}  map[string]interface{}
+// @Router       /admin/users/{id} [put]
+func AdminUpdateUser(c *gin.Context) {
+	var user models.User
+	if err := database.DB.First(&user, c.Param("id")).Error; err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "Utilizador não encontrado."})
+		return
+	}
+
+	var input struct {
+		Name       string            `json:"name"`
+		Email      string            `json:"email"`
+		University string            `json:"university"`
+		Course     string            `json:"course"`
+		Year       string            `json:"year"`
+		Role       string            `json:"role"`
+		Bio        string            `json:"bio"`
+		AvatarURL  *string           `json:"avatar_url"`
+		Skills     models.StringList `json:"skills"`
+	}
+
+	if err := c.ShouldBindJSON(&input); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	if input.AvatarURL != nil {
+		newAvatarURL := *input.AvatarURL
+		if user.AvatarURL != "" && newAvatarURL != user.AvatarURL {
+			oldObjectName := extractGCSObjectName(user.AvatarURL)
+			if oldObjectName != "" {
+				if err := storage.DeleteFile(oldObjectName); err != nil {
+					log.Printf("Warning: Failed to delete old avatar %s: %v", oldObjectName, err)
+				}
+			}
+		}
+		user.AvatarURL = newAvatarURL
+	}
+
+	if input.Name != "" {
+		user.Name = input.Name
+	}
+	if input.Email != "" {
+		user.Email = input.Email
+	}
+	if input.University != "" {
+		user.University = input.University
+	}
+	if input.Course != "" {
+		user.Course = input.Course
+	}
+	if input.Year != "" {
+		user.Year = input.Year
+	}
+	if input.Role != "" {
+		user.Role = input.Role
+	}
+	if input.Bio != "" {
+		user.Bio = input.Bio
+	}
+	if input.Skills != nil {
+		user.Skills = input.Skills
+	}
+
+	database.DB.Save(&user)
+	audit.LogAction(c, audit.ActionUserUpdate, "Updated user ID=%d Name=%s", user.ID, user.Name)
+
+	c.JSON(http.StatusOK, gin.H{"message": "Utilizador atualizado.", "user": user})
+}
+
 // AdminDeleteUser - Elimina um utilizador (admin)
 //
 // @Summary      [Admin] Eliminar utilizador
@@ -247,6 +329,107 @@ func AdminListProjects(c *gin.Context) {
 	var projects []models.Project
 	database.DB.Preload("Owner").Preload("Roles").Preload("Members.User").Order("created_at DESC").Find(&projects)
 	c.JSON(http.StatusOK, projects)
+}
+
+// AdminUpdateProject - Atualiza um projeto e as suas vagas (admin)
+//
+// @Summary      [Admin] Atualizar projeto
+// @Description  Atualiza um projeto e vagas associadas
+// @Tags         admin
+// @Accept       json
+// @Produce      json
+// @Security     BearerAuth
+// @Param        id  path  int  true  "ID do projeto"
+// @Success      200  {object}  map[string]interface{}
+// @Router       /admin/projects/{id} [put]
+func AdminUpdateProject(c *gin.Context) {
+	var project models.Project
+	if err := database.DB.Preload("Roles").First(&project, c.Param("id")).Error; err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "Projeto não encontrado."})
+		return
+	}
+
+	var input struct {
+		Title       string             `json:"title"`
+		Description string             `json:"description"`
+		Status      string             `json:"status"`
+		ImageURL    *string            `json:"image_url"`
+		Roles       []projectRoleInput `json:"roles"`
+	}
+	if err := c.ShouldBindJSON(&input); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	if input.ImageURL != nil {
+		newImageURL := *input.ImageURL
+		if project.ImageURL != "" && newImageURL != project.ImageURL {
+			oldObjectName := extractGCSObjectName(project.ImageURL)
+			if oldObjectName != "" {
+				if err := storage.DeleteFile(oldObjectName); err != nil {
+					log.Printf("Warning: Failed to delete old project image %s: %v", oldObjectName, err)
+				}
+			}
+		}
+		project.ImageURL = newImageURL
+	}
+
+	if input.Title != "" {
+		project.Title = input.Title
+	}
+	if input.Description != "" {
+		project.Description = input.Description
+	}
+	if input.Status != "" {
+		project.Status = input.Status
+	}
+	database.DB.Save(&project)
+
+	if input.Roles != nil {
+		roles, err := prepareProjectRoles(input.Roles, false)
+		if err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+			return
+		}
+
+		var existingRoles []models.ProjectRole
+		database.DB.Where("project_id = ?", project.ID).Find(&existingRoles)
+
+		existingRoleMap := make(map[uint]models.ProjectRole)
+		for _, r := range existingRoles {
+			existingRoleMap[r.ID] = r
+		}
+
+		for _, role := range roles {
+			if role.ID != 0 && existingRoleMap[role.ID].ID != 0 {
+				database.DB.Model(&models.ProjectRole{}).Where("id = ? AND project_id = ?", role.ID, project.ID).Updates(map[string]interface{}{
+					"title":       role.Title,
+					"skill_names": role.SkillNames,
+					"description": role.Description,
+					"spots":       role.Spots,
+				})
+				delete(existingRoleMap, role.ID)
+			} else {
+				role.ID = 0
+				role.ProjectID = project.ID
+				database.DB.Create(&role)
+			}
+		}
+
+		if len(existingRoleMap) > 0 {
+			var idsToDelete []uint
+			for id := range existingRoleMap {
+				idsToDelete = append(idsToDelete, id)
+			}
+			database.DB.Where("role_id IN ?", idsToDelete).Delete(&models.ProjectMember{})
+			database.DB.Where("id IN ?", idsToDelete).Delete(&models.ProjectRole{})
+		}
+	}
+
+	database.DB.Preload("Roles").Preload("Owner").Preload("Members.User").First(&project, project.ID)
+	audit.LogAction(c, audit.ActionProjectUpdate, "Updated project ID=%d Title=%s", project.ID, project.Title)
+
+	c.JSON(http.StatusOK, gin.H{"message": "Projeto atualizado.", "project": project})
 }
 
 // AdminDeleteProject - Elimina um projeto (admin)
@@ -450,3 +633,105 @@ func AdminGetAuditLogs(c *gin.Context) {
 
 	c.JSON(http.StatusOK, logs)
 }
+
+// AdminCleanUnusedImages - Limpa imagens no GCS que não estão a ser utilizadas
+//
+// @Summary      [Admin] Limpar imagens não utilizadas
+// @Description  Compara as imagens ativas da DB com o GCS e remove órfãs
+// @Tags         admin
+// @Produce      json
+// @Security     BearerAuth
+// @Success      200  {object}  map[string]interface{}
+// @Router       /admin/clean-unused-images [post]
+func AdminCleanUnusedImages(c *gin.Context) {
+	if storage.GCSClient == nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "GCS client not initialized"})
+		return
+	}
+
+	// 1. Obter todos os avatares ativos da DB
+	var userAvatars []string
+	database.DB.Model(&models.User{}).Where("avatar_url != '' AND avatar_url IS NOT NULL").Pluck("avatar_url", &userAvatars)
+
+	// 2. Obter todas as imagens de projeto ativas da DB
+	var projectImages []string
+	database.DB.Model(&models.Project{}).Where("image_url != '' AND image_url IS NOT NULL").Pluck("image_url", &projectImages)
+
+	// 3. Mapear nomes de objetos ativos
+	activeObjects := make(map[string]bool)
+	for _, url := range userAvatars {
+		objName := extractGCSObjectName(url)
+		if objName != "" {
+			activeObjects[objName] = true
+		}
+	}
+	for _, url := range projectImages {
+		objName := extractGCSObjectName(url)
+		if objName != "" {
+			activeObjects[objName] = true
+		}
+	}
+
+	ctx := context.Background()
+	bucketName := config.AppConfig.GCSBucketName
+	bucket := storage.GCSClient.Bucket(bucketName)
+
+	var deleted []string
+
+	// 4. Listar e apagar avatares órfãos no GCS
+	itAvatars := bucket.Objects(ctx, &gcs.Query{Prefix: "avatars/"})
+	for {
+		attrs, err := itAvatars.Next()
+		if err == iterator.Done {
+			break
+		}
+		if err != nil {
+			log.Printf("Error iterating avatars GCS: %v", err)
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "Erro ao listar avatares do GCS", "details": err.Error()})
+			return
+		}
+		// Ignorar o próprio prefixo como diretório virtual (se houver)
+		if attrs.Name == "avatars/" {
+			continue
+		}
+		if !activeObjects[attrs.Name] {
+			if err := bucket.Object(attrs.Name).Delete(ctx); err != nil {
+				log.Printf("Warning: failed to delete unused avatar %s: %v", attrs.Name, err)
+			} else {
+				deleted = append(deleted, attrs.Name)
+			}
+		}
+	}
+
+	// 5. Listar e apagar imagens de projeto órfãs no GCS
+	itProjects := bucket.Objects(ctx, &gcs.Query{Prefix: "projects/"})
+	for {
+		attrs, err := itProjects.Next()
+		if err == iterator.Done {
+			break
+		}
+		if err != nil {
+			log.Printf("Error iterating projects GCS: %v", err)
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "Erro ao listar imagens de projeto do GCS", "details": err.Error()})
+			return
+		}
+		// Ignorar prefixo
+		if attrs.Name == "projects/" {
+			continue
+		}
+		if !activeObjects[attrs.Name] {
+			if err := bucket.Object(attrs.Name).Delete(ctx); err != nil {
+				log.Printf("Warning: failed to delete unused project image %s: %v", attrs.Name, err)
+			} else {
+				deleted = append(deleted, attrs.Name)
+			}
+		}
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"message": "Limpeza concluída com sucesso.",
+		"deleted_count": len(deleted),
+		"deleted_files": deleted,
+	})
+}
+

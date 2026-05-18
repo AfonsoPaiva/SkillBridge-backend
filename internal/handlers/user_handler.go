@@ -245,7 +245,7 @@ func UpdateProfile(c *gin.Context) {
 		Course       string              `json:"course"`
 		Year         string              `json:"year"`
 		Bio          string              `json:"bio"`
-		AvatarURL    string              `json:"avatar_url"`
+		AvatarURL    *string             `json:"avatar_url"`
 		Role         string              `json:"role"` // needs_help | helper
 		ContactLinks models.ContactLinks `json:"contact_links"`
 	}
@@ -256,13 +256,17 @@ func UpdateProfile(c *gin.Context) {
 	}
 
 	// If avatar is being updated, delete old avatar from GCS
-	if input.AvatarURL != "" && user.AvatarURL != "" && input.AvatarURL != user.AvatarURL {
-		oldObjectName := extractGCSObjectName(user.AvatarURL)
-		if oldObjectName != "" {
-			if err := storage.DeleteFile(oldObjectName); err != nil {
-				log.Printf("Warning: Failed to delete old avatar %s: %v", oldObjectName, err)
+	if input.AvatarURL != nil {
+		newAvatarURL := *input.AvatarURL
+		if user.AvatarURL != "" && newAvatarURL != user.AvatarURL {
+			oldObjectName := extractGCSObjectName(user.AvatarURL)
+			if oldObjectName != "" {
+				if err := storage.DeleteFile(oldObjectName); err != nil {
+					log.Printf("Warning: Failed to delete old avatar %s: %v", oldObjectName, err)
+				}
 			}
 		}
+		user.AvatarURL = newAvatarURL
 	}
 
 	// If name is being updated, regenerate slug
@@ -272,8 +276,28 @@ func UpdateProfile(c *gin.Context) {
 		user.Slug = newSlug
 	}
 
-	database.DB.Model(&user).Updates(input)
-	database.DB.First(&user, user.ID)
+	// Update user model fields directly
+	if input.Name != "" {
+		user.Name = input.Name
+	}
+	if input.University != "" {
+		user.University = input.University
+	}
+	if input.Course != "" {
+		user.Course = input.Course
+	}
+	if input.Year != "" {
+		user.Year = input.Year
+	}
+	if input.Bio != "" {
+		user.Bio = input.Bio
+	}
+	if input.Role != "" {
+		user.Role = input.Role
+	}
+	user.ContactLinks = input.ContactLinks
+
+	database.DB.Save(&user)
 	c.JSON(http.StatusOK, gin.H{"message": "Perfil atualizado.", "user": user})
 }
 

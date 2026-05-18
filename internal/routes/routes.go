@@ -245,13 +245,16 @@ func Setup(r *gin.Engine) {
 	{
 		admin.GET("/users", handlers.AdminListUsers)
 		admin.GET("/users/:id", handlers.AdminGetUser)
+		admin.PUT("/users/:id", handlers.AdminUpdateUser)
 		admin.DELETE("/users/:id", handlers.AdminDeleteUser)
 		admin.GET("/projects", handlers.AdminListProjects)
+		admin.PUT("/projects/:id", handlers.AdminUpdateProject)
 		admin.DELETE("/projects/:id", handlers.AdminDeleteProject)
 		admin.GET("/donations", handlers.AdminListDonations)
 		admin.GET("/reviews", handlers.AdminListReviews)
 		admin.PUT("/reviews/:id", handlers.AdminDecideReview)
 		admin.DELETE("/reviews/:id", handlers.AdminDeleteReview)
 		admin.GET("/audit-logs", handlers.AdminGetAuditLogs)
+		admin.POST("/clean-unused-images", handlers.AdminCleanUnusedImages)
 	}
 }

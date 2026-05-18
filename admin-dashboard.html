@@ -311,6 +311,13 @@
         <div class="stat-card"><div class="num" id="stat-projects">—</div><div class="lbl">Projects</div></div>
         <div class="stat-card"><div class="num" id="stat-reviews">—</div><div class="lbl">Pending Reviews</div></div>
       </div>
+      <div class="card" style="padding: 24px; margin-top: 24px; max-width: 600px;">
+        <h3 style="margin-bottom: 12px; font-size: 16px; font-weight: 600; color: #0f172a;">Storage Maintenance</h3>
+        <p style="color: #64748b; font-size: 13.5px; margin-bottom: 18px; line-height: 1.5;">
+          Compare uploaded images in Google Cloud Storage bucket with database records. Remotely delete any orphaned image files (avatars, project images) that are no longer used. Active and functional images are preserved.
+        </p>
+        <button class="btn btn-danger" id="btn-clean-images" onclick="cleanUnusedImages()">Clean Unused Images</button>
+      </div>
     </div>
 
     <!-- USERS -->
@@ -598,6 +605,25 @@
     } catch(e) { toast(e.message, true); }
   }
 
+  async function cleanUnusedImages() {
+    if (!confirm("Are you sure you want to scan and delete all unused images from the Google Cloud Storage bucket? This action cannot be undone.")) return;
+    const btn = document.getElementById("btn-clean-images");
+    btn.disabled = true;
+    btn.textContent = "Cleaning...";
+    try {
+      const res = await api("POST", "/admin/clean-unused-images");
+      toast("Success: Deleted " + res.deleted_count + " unused image(s).");
+      if (res.deleted_files && res.deleted_files.length) {
+        console.log("Deleted files:", res.deleted_files);
+      }
+    } catch(e) {
+      toast("Error: " + e.message, true);
+    } finally {
+      btn.disabled = false;
+      btn.textContent = "Clean Unused Images";
+    }
+  }
+
   // ── USERS ───────────────────────────────────────────────────
   var _users = [];
   async function loadUsers() {
@@ -632,7 +658,10 @@
         '<td style="max-width:150px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">' + (u.course || '\u2014') + '</td>' +
         '<td>' + roleDisplay + '</td>' +
         '<td>' + fmt(u.created_at) + '</td>' +
-        '<td><button class="btn btn-danger" onclick="event.stopPropagation();event.preventDefault();deleteUser(' + u.id + ');return false;">Delete</button></td>' +
+        '<td>' +
+          '<button class="btn btn-primary" style="margin-right:8px" onclick="event.stopPropagation();event.preventDefault();editUser(' + u.id + ');return false;">Edit</button>' +
+          '<button class="btn btn-danger" onclick="event.stopPropagation();event.preventDefault();deleteUser(' + u.id + ');return false;">Delete</button>' +
+        '</td>' +
         '</tr>';
     }).join("");
   }
@@ -683,6 +712,42 @@
       ]
     );
   }
+
+  async function editUser(id) {
+    var u = _users.find(function(x) { return x.id === id; });
+    if (!u) return;
+    var name = prompt("Name:", u.name || "");
+    if (name === null) return;
+    var email = prompt("Email:", u.email || "");
+    if (email === null) return;
+    var uni = prompt("University:", u.university || "");
+    if (uni === null) return;
+    var course = prompt("Course:", u.course || "");
+    if (course === null) return;
+    var year = prompt("Year:", u.year || "");
+    if (year === null) return;
+    var role = prompt("Role (needs_help / helper):", u.role || "");
+    if (role === null) return;
+    var avatar = prompt("Avatar URL:", u.avatar_url || "");
+    if (avatar === null) return;
+
+    try {
+      await api("PUT", "/admin/users/" + id, {
+        name: name,
+        email: email,
+        university: uni,
+        course: course,
+        year: year,
+        role: role,
+        avatar_url: avatar
+      });
+      toast("User updated successfully");
+      loadUsers();
+    } catch (e) {
+      toast("Failed to update user: " + e.message, true);
+    }
+  }
+
   async function deleteUser(id) {
     var u = _users.find(function(x) { return x.id === id; });
     var name = u ? (u.name || "this user") : "this user";
@@ -739,8 +804,12 @@
         '<td>' + ownerName + '</td>' +
         '<td>' + rolesCount + '</td>' +
         '<td>' + membersCount + '</td>' +
+        '<td>' + membersCount + '</td>' +
         '<td>' + fmt(p.created_at) + '</td>' +
-        '<td><button class="btn btn-danger" onclick="event.stopPropagation();deleteProject(' + p.id + ')">Delete</button></td>' +
+        '<td>' +
+          '<button class="btn btn-primary" style="margin-right:8px" onclick="event.stopPropagation();editProject(' + p.id + ')">Edit</button>' +
+          '<button class="btn btn-danger" onclick="event.stopPropagation();deleteProject(' + p.id + ')">Delete</button>' +
+        '</td>' +
         '</tr>';
     }).join("");
   }
@@ -786,6 +855,47 @@
       ]
     );
   }
+
+  async function editProject(id) {
+    var p = _projects.find(function(x) { return x.id === id; });
+    if (!p) return;
+    var title = prompt("Title:", p.title || "");
+    if (title === null) return;
+    var desc = prompt("Description:", p.description || "");
+    if (desc === null) return;
+    var status = prompt("Status (open / in_progress / completed):", p.status || "open");
+    if (status === null) return;
+    var image = prompt("Image URL:", p.image_url || "");
+    if (image === null) return;
+
+    var roles = p.roles || [];
+    if (confirm("Do you want to edit roles?")) {
+      var rolesStr = prompt("Roles (JSON array format, include id if editing):", JSON.stringify(roles.map(function(r){ return {id: r.id, title: r.title, skill_names: r.skill_names, description: r.description, spots: r.spots}; })));
+      if (rolesStr !== null) {
+        try {
+          roles = JSON.parse(rolesStr);
+        } catch(e) {
+          alert("Invalid JSON for roles.");
+          return;
+        }
+      }
+    }
+
+    try {
+      await api("PUT", "/admin/projects/" + id, {
+        title: title,
+        description: desc,
+        status: status,
+        image_url: image,
+        roles: roles
+      });
+      toast("Project updated successfully");
+      loadProjects();
+    } catch (e) {
+      toast("Failed to update project: " + e.message, true);
+    }
+  }
+
   async function deleteProject(id) {
     var p = _projects.find(function(x) { return x.id === id; });
     var title = p ? (p.title || "this project") : "this project";
