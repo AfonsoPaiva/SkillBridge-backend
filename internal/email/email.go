@@ -7,10 +7,12 @@ package email
 import (
 	"fmt"
 	"log"
+	"time"
 
 	"github.com/paiva/SkillBridge/Backend/config"
 	"github.com/resend/resend-go/v3"
 )
+
 
 var emailClient *resend.Client
 
@@ -27,7 +29,7 @@ func InitResend() error {
 	return nil
 }
 
-// send envia um email via Resend
+// send envia um email via Resend com headers transacionais para garantir entrega na inbox principal
 func send(from, to, subject, html string) error {
 	if emailClient == nil {
 		log.Printf("[email] Resend não inicializado — email para %s ignorado", to)
@@ -39,6 +41,12 @@ func send(from, to, subject, html string) error {
 		To:      []string{to},
 		Subject: subject,
 		Html:    html,
+		Headers: map[string]string{
+			// Sinaliza ao Gmail que é um email transacional individual (não marketing em massa)
+			"X-Entity-Ref-ID": fmt.Sprintf("skillbridge-tx-%d", time.Now().UnixNano()),
+			// Precedência de email normal
+			"Precedence": "normal",
+		},
 	}
 
 	sent, err := emailClient.Emails.Send(params)
@@ -124,10 +132,31 @@ func SendPerfectProjectMatch(userEmail, userName, projectTitle, projectDescripti
 }
 
 // SendCustomMarketing envia um email de marketing com HTML totalmente customizado pelo admin.
-// O conteúdo HTML é enviado diretamente sem qualquer template wrapper adicional.
+// - NÃO está sujeito ao rate limiting diário (global nem por utilizador).
+// - O HTML é enviado diretamente sem qualquer template wrapper adicional.
 func SendCustomMarketing(subject, toEmail, htmlBody string) error {
-	return send(getEmailFrom(), toEmail, subject, htmlBody)
+	if emailClient == nil {
+		log.Printf("[email] Resend não inicializado — marketing email para %s ignorado", toEmail)
+		return nil
+	}
+
+	params := &resend.SendEmailRequest{
+		From:    getEmailFrom(),
+		To:      []string{toEmail},
+		Subject: subject,
+		Html:    htmlBody,
+	}
+
+	sent, err := emailClient.Emails.Send(params)
+	if err != nil {
+		log.Printf("[email] Erro ao enviar marketing email para %s: %v", toEmail, err)
+		return err
+	}
+
+	log.Printf("[email] Marketing email enviado para %s (ID: %s)", toEmail, sent.Id)
+	return nil
 }
+
 
 // SendProjectDecisionApproved envia email ao candidato quando a candidatura é aprovada
 func SendProjectDecisionApproved(userEmail, userName, projectTitle, projectURL, ownerName string) error {
