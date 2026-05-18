@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"strconv"
 	"strings"
+	"time"
 
 	gcs "cloud.google.com/go/storage"
 	"google.golang.org/api/iterator"
@@ -774,38 +775,29 @@ func AdminSendMarketingEmail(c *gin.Context) {
 	audit.LogAction(c, audit.ActionUserUpdate,
 		"Marketing email sent: subject=%q recipients=%d", input.Subject, len(users))
 
-	// Enviar em paralelo com semáforo de 10 goroutines simultâneas
-	type result struct {
-		email string
-		err   error
-	}
+	var sent, failed int
+	var failedEmails []string
 
-	sem := make(chan struct{}, 10)
-	results := make(chan result, len(users))
-
-	for _, u := range users {
+	log.Printf("[marketing email] A iniciar envio sequencial para %d utilizadores com intervalo de 5 segundos...", len(users))
+	for i, u := range users {
 		if u.Email == "" {
 			continue
 		}
-		go func(userEmail string) {
-			sem <- struct{}{}
-			defer func() { <-sem }()
 
-			err := email.SendCustomMarketing(input.Subject, userEmail, input.HTML)
-			results <- result{email: userEmail, err: err}
-		}(u.Email)
-	}
+		// Adiciona o delay de 5 segundos sugerido entre envios (exceto no primeiro)
+		if i > 0 {
+			time.Sleep(5 * time.Second)
+		}
 
-	var sent, failed int
-	var failedEmails []string
-	for i := 0; i < len(users); i++ {
-		r := <-results
-		if r.err != nil {
+		log.Printf("[marketing email] [%d/%d] A enviar para %s...", i+1, len(users), u.Email)
+		err := email.SendCustomMarketing(input.Subject, u.Email, input.HTML)
+		if err != nil {
 			failed++
-			failedEmails = append(failedEmails, r.email)
-			log.Printf("[marketing email] Falha para %s: %v", r.email, r.err)
+			failedEmails = append(failedEmails, u.Email)
+			log.Printf("[marketing email] Falha para %s: %v", u.Email, err)
 		} else {
 			sent++
+			log.Printf("[marketing email] [%d/%d] Enviado com sucesso para %s", i+1, len(users), u.Email)
 		}
 	}
 
