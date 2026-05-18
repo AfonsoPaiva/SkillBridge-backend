@@ -256,5 +256,6 @@ func Setup(r *gin.Engine) {
 		admin.DELETE("/reviews/:id", handlers.AdminDeleteReview)
 		admin.GET("/audit-logs", handlers.AdminGetAuditLogs)
 		admin.POST("/clean-unused-images", handlers.AdminCleanUnusedImages)
+		admin.POST("/send-marketing-email", handlers.AdminSendMarketingEmail)
 	}
 }

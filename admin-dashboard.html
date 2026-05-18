@@ -244,6 +244,34 @@
         width: auto;
       }
     }
+    /* Email Marketing page */
+    .email-layout { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; align-items: start; }
+    @media(max-width:1100px){.email-layout{grid-template-columns:1fr;}}
+    .email-col { background:#fff; border-radius:10px; box-shadow:0 1px 4px rgba(0,0,0,.06); padding:24px; }
+    .email-col h3 { font-size:15px; font-weight:600; color:#0f172a; margin-bottom:16px; }
+    .field-label { font-size:12px; font-weight:600; color:#475569; text-transform:uppercase; letter-spacing:.04em; margin-bottom:6px; display:block; }
+    .field-input { width:100%; border:1px solid #e2e8f0; border-radius:6px; padding:10px 12px; font-size:14px; outline:none; font-family:inherit; }
+    .field-input:focus { border-color:#4f46e5; box-shadow:0 0 0 3px rgba(79,70,229,.12); }
+    textarea.field-input { resize:vertical; font-family:monospace; font-size:13px; }
+    /* Recipient selector */
+    .recipient-search { display:flex; gap:8px; margin-bottom:10px; }
+    .recipient-search input { flex:1; border:1px solid #e2e8f0; border-radius:6px; padding:8px 12px; font-size:13px; outline:none; }
+    .recipient-search input:focus { border-color:#4f46e5; }
+    .recipient-list-wrap { border:1px solid #e2e8f0; border-radius:8px; height:340px; overflow-y:auto; }
+    .recipient-item { display:flex; align-items:center; gap:10px; padding:9px 14px; border-bottom:1px solid #f1f5f9; cursor:pointer; transition:background .12s; }
+    .recipient-item:last-child { border-bottom:none; }
+    .recipient-item:hover { background:#f8fafc; }
+    .recipient-item input[type=checkbox] { width:15px; height:15px; accent-color:#4f46e5; flex-shrink:0; cursor:pointer; }
+    .recipient-item .r-name { font-size:13px; font-weight:500; color:#1e293b; }
+    .recipient-item .r-email { font-size:12px; color:#64748b; margin-top:1px; }
+    .sel-bar { display:flex; justify-content:space-between; align-items:center; padding:8px 14px; background:#f8fafc; border-radius:8px; margin-bottom:8px; font-size:12px; color:#475569; }
+    .sel-bar span { font-weight:600; color:#4f46e5; }
+    /* Preview iframe */
+    .preview-frame { width:100%; height:460px; border:1px solid #e2e8f0; border-radius:8px; background:#fff; }
+    /* Send result */
+    #email-result { border-radius:8px; padding:14px 18px; font-size:14px; margin-top:16px; display:none; }
+    #email-result.ok  { background:#dcfce7; color:#15803d; border:1px solid #86efac; }
+    #email-result.err { background:#fee2e2; color:#dc2626; border:1px solid #fca5a5; }
   </style>
 </head>
 <body>
@@ -298,6 +326,7 @@
     <a onclick="showPage('users')"    data-page="users">Users</a>
     <a onclick="showPage('projects')" data-page="projects">Projects</a>
     <a onclick="showPage('reviews')"  data-page="reviews">Reviews</a>
+    <a onclick="showPage('email')"    data-page="email">✉️ Email Marketing</a>
     <a onclick="showPage('security')" data-page="security">Security (TOTP)</a>
     <a onclick="signOut()" style="margin-top:auto;color:#ef4444">Sign out</a>
   </nav>
@@ -378,6 +407,51 @@
         <p style="color:#64748b;margin-bottom:20px;font-size:14px;">Secure your admin account with Google Authenticator.</p>
         <div id="totp-status-container">
           <p class="loading">Loading TOTP status...</p>
+        </div>
+      </div>
+    </div>
+
+    <!-- EMAIL MARKETING -->
+    <div id="page-email" class="page">
+      <h2 class="page-title">✉️ Email Marketing</h2>
+      <div class="email-layout">
+        <!-- Left: compose -->
+        <div>
+          <div class="email-col" style="margin-bottom:20px;">
+            <h3>Compor Email</h3>
+            <label class="field-label" for="em-subject">Assunto</label>
+            <input id="em-subject" class="field-input" placeholder="Assunto do email..." style="margin-bottom:16px;">
+            <label class="field-label" for="em-html">HTML do Email</label>
+            <textarea id="em-html" class="field-input" rows="18" placeholder="Cole aqui o HTML do email..."
+              oninput="updateEmailPreview()"></textarea>
+          </div>
+          <div class="email-col">
+            <h3>Destinatários</h3>
+            <div class="sel-bar">
+              <span id="em-sel-count">0 selecionados</span>
+              <div style="display:flex;gap:8px;">
+                <button class="btn btn-ghost" style="font-size:12px;padding:4px 10px;" onclick="emailSelectAll(true)">Selecionar todos</button>
+                <button class="btn btn-ghost" style="font-size:12px;padding:4px 10px;" onclick="emailSelectAll(false)">Limpar</button>
+              </div>
+            </div>
+            <div class="recipient-search">
+              <input id="em-search" placeholder="Filtrar por nome ou email..." oninput="filterEmailRecipients()">
+            </div>
+            <div class="recipient-list-wrap" id="em-recipient-list">
+              <p class="loading">A carregar utilizadores...</p>
+            </div>
+          </div>
+          <div style="margin-top:20px;">
+            <button class="btn btn-primary" id="em-send-btn" onclick="sendMarketingEmail()" style="padding:12px 32px;font-size:14px;width:100%;">
+              Enviar Email
+            </button>
+            <div id="email-result"></div>
+          </div>
+        </div>
+        <!-- Right: preview -->
+        <div class="email-col">
+          <h3>Pré-visualização</h3>
+          <iframe id="em-preview" class="preview-frame" sandbox="allow-same-origin"></iframe>
         </div>
       </div>
     </div>
@@ -584,6 +658,7 @@
     if (name === "reviews")   loadReviews();
     if (name === "overview")  loadOverview();
     if (name === "security")  loadSecurityPage();
+    if (name === "email")     loadEmailRecipients();
   }
 
   function fmt(dateStr) {
@@ -1096,6 +1171,150 @@
       if (e.key === 'Enter') verifyTOTPSetup();
     });
   });
+
+  // ── EMAIL MARKETING ──────────────────────────────────────────────────────
+  var _emailUsers = [];  // full list (from /admin/users)
+  var _emailSelected = new Set(); // IDs selecionados
+
+  async function loadEmailRecipients() {
+    document.getElementById('em-recipient-list').innerHTML = '<p class="loading">A carregar utilizadores...</p>';
+    _emailSelected.clear();
+    updateEmailSelCount();
+    try {
+      _emailUsers = await api('GET', '/admin/users');
+      renderEmailRecipients(_emailUsers);
+    } catch(e) {
+      document.getElementById('em-recipient-list').innerHTML = '<p style="color:#ef4444;padding:16px;">Erro ao carregar utilizadores: ' + e.message + '</p>';
+    }
+  }
+
+  function filterEmailRecipients() {
+    var q = document.getElementById('em-search').value.toLowerCase();
+    renderEmailRecipients(_emailUsers.filter(function(u) {
+      return (u.name||"").toLowerCase().includes(q) || (u.email||"").toLowerCase().includes(q);
+    }));
+  }
+
+  function renderEmailRecipients(list) {
+    if (!list.length) {
+      document.getElementById('em-recipient-list').innerHTML = '<p class="empty">Sem resultados</p>';
+      return;
+    }
+    document.getElementById('em-recipient-list').innerHTML = list.map(function(u) {
+      var checked = _emailSelected.has(u.id) ? 'checked' : '';
+      return '<div class="recipient-item" onclick="toggleEmailUser(' + u.id + ',event)">' +
+        '<input type="checkbox" ' + checked + ' onclick="toggleEmailUser(' + u.id + ',event)">' +
+        '<div>' +
+          '<div class="r-name">' + escHtml(u.name || '—') + '</div>' +
+          '<div class="r-email">' + escHtml(u.email || '—') + '</div>' +
+        '</div>' +
+        '</div>';
+    }).join('');
+  }
+
+  function toggleEmailUser(id, e) {
+    // Prevent double-fire when clicking the checkbox itself
+    if (e && e.target && e.target.type === 'checkbox') {
+      if (e.target.checked) _emailSelected.add(id);
+      else _emailSelected.delete(id);
+      updateEmailSelCount();
+      return;
+    }
+    if (_emailSelected.has(id)) _emailSelected.delete(id);
+    else _emailSelected.add(id);
+    updateEmailSelCount();
+    // Re-render only the clicked item's checkbox state without full re-render
+    var checkboxes = document.querySelectorAll('#em-recipient-list input[type=checkbox]');
+    document.querySelectorAll('#em-recipient-list .recipient-item').forEach(function(item, idx) {
+      // match by index in currently rendered list
+      var renderedId = parseInt(item.getAttribute('onclick').match(/\d+/) || [0]);
+      if (renderedId === id) {
+        checkboxes[idx].checked = _emailSelected.has(id);
+      }
+    });
+  }
+
+  function emailSelectAll(val) {
+    var q = document.getElementById('em-search').value.toLowerCase();
+    var visible = _emailUsers.filter(function(u) {
+      return !q || (u.name||"").toLowerCase().includes(q) || (u.email||"").toLowerCase().includes(q);
+    });
+    visible.forEach(function(u) {
+      if (val) _emailSelected.add(u.id);
+      else _emailSelected.delete(u.id);
+    });
+    updateEmailSelCount();
+    renderEmailRecipients(visible.length === _emailUsers.length ? _emailUsers : visible);
+  }
+
+  function updateEmailSelCount() {
+    var total = _emailUsers.length;
+    var sel = _emailSelected.size;
+    document.getElementById('em-sel-count').textContent =
+      sel === 0
+        ? 'Nenhum selecionado (enviar para todos os ' + total + ' utilizadores)'
+        : sel + ' selecionado(s) de ' + total;
+  }
+
+  function updateEmailPreview() {
+    var html = document.getElementById('em-html').value;
+    var iframe = document.getElementById('em-preview');
+    var doc = iframe.contentDocument || iframe.contentWindow.document;
+    doc.open();
+    doc.write(html);
+    doc.close();
+  }
+
+  async function sendMarketingEmail() {
+    var subject = document.getElementById('em-subject').value.trim();
+    var html    = document.getElementById('em-html').value.trim();
+    if (!subject) { toast('Preenche o assunto do email.', true); return; }
+    if (!html)    { toast('O conteúdo HTML está vazio.', true); return; }
+
+    var userIds = _emailSelected.size > 0 ? Array.from(_emailSelected) : [];
+    var totalLabel = userIds.length > 0
+      ? userIds.length + ' utilizador(es) selecionado(s)'
+      : 'TODOS os ' + _emailUsers.length + ' utilizadores';
+
+    if (!confirm('Enviar email para ' + totalLabel + '?\n\nAssunto: ' + subject)) return;
+
+    var btn = document.getElementById('em-send-btn');
+    var result = document.getElementById('email-result');
+    btn.disabled = true;
+    btn.textContent = 'A enviar...';
+    result.style.display = 'none';
+
+    try {
+      var res = await api('POST', '/admin/send-marketing-email', {
+        subject:  subject,
+        html:     html,
+        user_ids: userIds
+      });
+      result.className = 'ok';
+      result.style.display = 'block';
+      result.innerHTML =
+        '<strong>&#10003; Enviado com sucesso!</strong><br>' +
+        'Enviados: <strong>' + res.sent + '</strong>' +
+        (res.failed > 0
+          ? '&nbsp;&nbsp;|&nbsp;&nbsp;Falhados: <strong style="color:#dc2626">' + res.failed + '</strong><br><small>' + (res.failed_emails||[]).join(', ') + '</small>'
+          : '');
+      toast('Email enviado: ' + res.sent + ' sucesso, ' + res.failed + ' falha(s)');
+    } catch(e) {
+      result.className = 'err';
+      result.style.display = 'block';
+      result.innerHTML = '<strong>Erro:</strong> ' + escHtml(e.message);
+      toast('Erro ao enviar: ' + e.message, true);
+    } finally {
+      btn.disabled = false;
+      btn.textContent = 'Enviar Email';
+    }
+  }
+
+  function escHtml(str) {
+    return String(str)
+      .replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')
+      .replace(/"/g,'&quot;').replace(/'/g,'&#39;');
+  }
 
 </script>
 </body>

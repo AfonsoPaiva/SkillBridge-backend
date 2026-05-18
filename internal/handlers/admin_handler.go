@@ -735,3 +735,84 @@ func AdminCleanUnusedImages(c *gin.Context) {
 	})
 }
 
+// AdminSendMarketingEmail - Envia email de marketing customizado (admin)
+//
+// @Summary      [Admin] Enviar email de marketing
+// @Description  Envia um email HTML customizado para todos os utilizadores ou para uma seleção
+// @Tags         admin
+// @Accept       json
+// @Produce      json
+// @Security     BearerAuth
+// @Param        input  body  object  true  "Payload com subject, html e lista opcional de user IDs"
+// @Success      200  {object}  map[string]interface{}
+// @Router       /admin/send-marketing-email [post]
+func AdminSendMarketingEmail(c *gin.Context) {
+	var input struct {
+		Subject string `json:"subject" binding:"required"`
+		HTML    string `json:"html" binding:"required"`
+		UserIDs []uint `json:"user_ids"` // empty = todos
+	}
+
+	if err := c.ShouldBindJSON(&input); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	// Recolher destinatários
+	var users []models.User
+	if len(input.UserIDs) > 0 {
+		database.DB.Where("id IN ?", input.UserIDs).Find(&users)
+	} else {
+		database.DB.Where("email != ''").Find(&users)
+	}
+
+	if len(users) == 0 {
+		c.JSON(http.StatusOK, gin.H{"message": "Nenhum destinatário encontrado.", "sent": 0, "failed": 0})
+		return
+	}
+
+	audit.LogAction(c, audit.ActionUserUpdate,
+		"Marketing email sent: subject=%q recipients=%d", input.Subject, len(users))
+
+	// Enviar em paralelo com semáforo de 10 goroutines simultâneas
+	type result struct {
+		email string
+		err   error
+	}
+
+	sem := make(chan struct{}, 10)
+	results := make(chan result, len(users))
+
+	for _, u := range users {
+		if u.Email == "" {
+			continue
+		}
+		go func(userEmail string) {
+			sem <- struct{}{}
+			defer func() { <-sem }()
+
+			err := email.SendCustomMarketing(input.Subject, userEmail, input.HTML)
+			results <- result{email: userEmail, err: err}
+		}(u.Email)
+	}
+
+	var sent, failed int
+	var failedEmails []string
+	for i := 0; i < len(users); i++ {
+		r := <-results
+		if r.err != nil {
+			failed++
+			failedEmails = append(failedEmails, r.email)
+			log.Printf("[marketing email] Falha para %s: %v", r.email, r.err)
+		} else {
+			sent++
+		}
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"message":       fmt.Sprintf("Email enviado para %d destinatário(s).", sent),
+		"sent":          sent,
+		"failed":        failed,
+		"failed_emails": failedEmails,
+	})
+}

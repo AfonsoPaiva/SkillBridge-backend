@@ -123,6 +123,12 @@ func SendPerfectProjectMatch(userEmail, userName, projectTitle, projectDescripti
 	return send(getEmailFrom(), userEmail, subject, html)
 }
 
+// SendCustomMarketing envia um email de marketing com HTML totalmente customizado pelo admin.
+// O conteúdo HTML é enviado diretamente sem qualquer template wrapper adicional.
+func SendCustomMarketing(subject, toEmail, htmlBody string) error {
+	return send(getEmailFrom(), toEmail, subject, htmlBody)
+}
+
 // SendProjectDecisionApproved envia email ao candidato quando a candidatura é aprovada
 func SendProjectDecisionApproved(userEmail, userName, projectTitle, projectURL, ownerName string) error {
 	subject := fmt.Sprintf("A tua candidatura foi aprovada: %s", projectTitle)
