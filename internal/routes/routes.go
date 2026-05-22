@@ -257,5 +257,6 @@ func Setup(r *gin.Engine) {
 		admin.GET("/audit-logs", handlers.AdminGetAuditLogs)
 		admin.POST("/clean-unused-images", handlers.AdminCleanUnusedImages)
 		admin.POST("/send-marketing-email", handlers.AdminSendMarketingEmail)
+		admin.GET("/university-stats", handlers.AdminGetUniversityStats)
 	}
 }

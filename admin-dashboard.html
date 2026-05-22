@@ -2,6 +2,7 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>SkillBridge Admin</title>
   <!-- Favicon and mobile icons -->
   <link rel="icon" type="image/png" sizes="32x32" href="https://storage.googleapis.com/skillbridge-uploads/favicon-32.png">
@@ -142,39 +143,69 @@
     tr.clickable { cursor: pointer; }
     tr.clickable:hover td { background: #eef2ff !important; }
 
-    /* Mobile / tablet improvements */
+    /* ── Mobile nav overlay ───────────────────────── */
+    #nav-overlay {
+      display: none; position: fixed; inset: 0;
+      background: rgba(0,0,0,.45); z-index: 49;
+    }
+    #nav-overlay.open { display: block; }
+
+    /* Hamburger button */
+    #nav-toggle {
+      display: none; background: none; border: none;
+      cursor: pointer; padding: 8px; color: #fff;
+      flex-shrink: 0;
+    }
+    #nav-toggle svg { display: block; }
+
+    /* Mobile topbar strip */
+    #mobile-topbar {
+      display: none;
+      position: sticky; top: 0; z-index: 48;
+      background: #1e293b;
+      align-items: center; gap: 10px;
+      padding: 10px 14px;
+    }
+    #mobile-topbar .app-name {
+      color: #fff; font-size: 15px; font-weight: 600; flex: 1;
+    }
+
+    /* ── Tablet (960px) ───────────────────────────── */
     @media (max-width: 960px) {
+      /* Show mobile topbar, hide desktop nav */
+      #mobile-topbar { display: flex; }
+      #nav-toggle    { display: block; }
+
       .layout { flex-direction: column; }
 
       nav {
-        width: 100%;
-        flex-direction: row;
-        align-items: center;
-        gap: 8px;
-        overflow-x: auto;
-        padding: 10px;
-        position: sticky;
-        top: 0;
-        z-index: 40;
+        position: fixed; top: 0; left: -260px;
+        width: 240px; height: 100vh;
+        flex-direction: column;
+        padding: 72px 0 24px;
+        z-index: 50;
+        transition: left .25s ease;
+        overflow-y: auto;
       }
+      nav.open { left: 0; }
 
-      nav h1 {
-        display: none;
-      }
+      nav h1 { display: block; padding: 0 20px 20px; font-size: 14px; }
 
       nav a {
-        flex: 0 0 auto;
-        border-radius: 8px;
-        padding: 10px 12px;
+        flex: unset;
+        border-radius: 0;
+        padding: 13px 20px;
+        font-size: 14px;
       }
 
       nav a[onclick="signOut()"] {
-        margin-top: 0 !important;
-        margin-left: auto;
+        margin-top: auto !important;
+        margin-left: 0;
       }
 
       main {
         padding: 16px;
+        margin-top: 0;
       }
 
       .stats {
@@ -182,68 +213,63 @@
         grid-template-columns: repeat(2, minmax(0, 1fr));
       }
 
-      .stat-card {
-        min-width: 0;
-        padding: 16px;
-      }
+      .stat-card { min-width: 0; padding: 16px; }
 
-      .toolbar {
-        align-items: stretch;
-      }
-
+      .toolbar { align-items: stretch; }
       .toolbar input,
       .toolbar select,
-      .toolbar button {
-        width: 100% !important;
-      }
+      .toolbar button { width: 100% !important; }
 
-      .card {
-        overflow-x: auto;
-      }
+      .card { overflow-x: auto; }
+      table { min-width: 600px; }
 
-      table {
-        min-width: 760px;
-      }
+      #detail-panel { width: 100%; max-width: 100%; padding: 20px 16px 24px; }
 
-      #detail-panel {
-        width: 100%;
-        max-width: 100%;
-        padding: 20px 16px 24px;
-      }
+      #toast { left: 12px; right: 12px; transform: none; min-width: 0; width: auto; }
     }
 
+    /* ── Phone (560px) ────────────────────────────── */
     @media (max-width: 560px) {
-      .login-box {
-        width: calc(100% - 24px);
-        padding: 24px 16px;
-      }
+      .login-box { width: calc(100% - 24px); padding: 24px 16px; }
 
-      h2.page-title {
-        font-size: 20px;
-      }
+      h2.page-title { font-size: 18px; margin-bottom: 14px; }
 
-      .stats {
-        grid-template-columns: 1fr;
-      }
+      .stats { grid-template-columns: 1fr 1fr; gap: 10px; }
+      .stat-card .num { font-size: 26px; }
+      .stat-card .lbl { font-size: 11px; }
 
-      .stat-card .num {
-        font-size: 28px;
-      }
+      th, td { padding: 9px 10px; font-size: 13px; }
 
-      th,
-      td {
-        padding: 10px 12px;
-      }
+      .kv { flex-direction: column; gap: 4px; }
+      .kv .k { width: auto; }
 
-      .kv {
-        flex-direction: column;
-        gap: 4px;
-      }
+      /* University table compact */
+      .uni-table-wrap .card { overflow-x: auto; }
+      .uni-table-wrap table { min-width: 420px; }
 
-      .kv .k {
-        width: auto;
-      }
+      /* Email page full width */
+      .email-layout { grid-template-columns: 1fr !important; }
+      .preview-frame { height: 280px; }
+      .recipient-list-wrap { height: 220px; }
+
+      /* Storage card full width */
+      .card[style*="max-width"] { max-width: 100% !important; }
+
+      /* Buttons in tables stack */
+      td button { padding: 5px 8px; font-size: 11px; margin: 1px 2px; }
     }
+    /* University stats table */
+    .uni-table-wrap { margin-top: 28px; }
+    .uni-table-wrap h3 { font-size: 15px; font-weight: 600; color: #0f172a; margin-bottom: 14px; }
+    .rank-num { display: inline-flex; align-items: center; justify-content: center; width: 24px; height: 24px; border-radius: 50%; font-size: 11px; font-weight: 700; background: #e0e7ff; color: #4f46e5; }
+    .rank-num.gold   { background: #fef3c7; color: #d97706; }
+    .rank-num.silver { background: #f1f5f9; color: #64748b; }
+    .rank-num.bronze { background: #fdf3e7; color: #c05e0e; }
+    .role-pill { display: inline-block; padding: 1px 8px; border-radius: 999px; font-size: 11px; font-weight: 600; }
+    .role-helper      { background: #dcfce7; color: #16a34a; }
+    .role-needs-help  { background: #eff6ff; color: #2563eb; }
+    .role-both        { background: #f3e8ff; color: #7c3aed; }
+
     /* Email Marketing page */
     .email-layout { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; align-items: start; }
     @media(max-width:1100px){.email-layout{grid-template-columns:1fr;}}
@@ -320,7 +346,18 @@
 
 <!-- MAIN APP -->
 <div class="layout" id="app" style="display:none">
-  <nav>
+  <!-- Mobile topbar -->
+  <div id="mobile-topbar">
+    <button id="nav-toggle" onclick="toggleNav()" aria-label="Menu">
+      <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
+        <line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/>
+      </svg>
+    </button>
+    <span class="app-name">SkillBridge Admin</span>
+  </div>
+  <!-- Nav overlay (closes menu on outside click) -->
+  <div id="nav-overlay" onclick="closeNav()"></div>
+  <nav id="main-nav">
     <h1>SkillBridge Admin</h1>
     <a onclick="showPage('overview')" class="active" data-page="overview">Overview</a>
     <a onclick="showPage('users')"    data-page="users">Users</a>
@@ -340,6 +377,29 @@
         <div class="stat-card"><div class="num" id="stat-projects">—</div><div class="lbl">Projects</div></div>
         <div class="stat-card"><div class="num" id="stat-reviews">—</div><div class="lbl">Pending Reviews</div></div>
       </div>
+
+      <!-- University stats table -->
+      <div class="uni-table-wrap">
+        <h3>🏫 Top 10 Universidades</h3>
+        <div class="card">
+          <table>
+            <thead>
+              <tr>
+                <th>#</th>
+                <th>Universidade</th>
+                <th>Total</th>
+                <th>Helpers</th>
+                <th>Needs Help</th>
+                <th>Both</th>
+              </tr>
+            </thead>
+            <tbody id="uni-stats-body">
+              <tr><td colspan="6" class="loading">A carregar...</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
       <div class="card" style="padding: 24px; margin-top: 24px; max-width: 600px;">
         <h3 style="margin-bottom: 12px; font-size: 16px; font-weight: 600; color: #0f172a;">Storage Maintenance</h3>
         <p style="color: #64748b; font-size: 13.5px; margin-bottom: 18px; line-height: 1.5;">
@@ -633,7 +693,7 @@
         document.getElementById("totp-verify-screen").style.display = "flex";
         throw new Error("TOTP verification required");
       }
-      throw new Error((err.error || res.statusText));
+      throw new Error((err.error));
     }
     return res.json();
   }
@@ -647,8 +707,21 @@
     setTimeout(function() { el.classList.remove("show"); }, 3000);
   }
 
+  // ── MOBILE NAV ──────────────────────────────────────────────
+  function toggleNav() {
+    var nav = document.getElementById("main-nav");
+    var overlay = document.getElementById("nav-overlay");
+    nav.classList.toggle("open");
+    overlay.classList.toggle("open");
+  }
+  function closeNav() {
+    document.getElementById("main-nav").classList.remove("open");
+    document.getElementById("nav-overlay").classList.remove("open");
+  }
+
   // ── NAVIGATION ──────────────────────────────────────────────
   function showPage(name) {
+    closeNav(); // close drawer on mobile when navigating
     document.querySelectorAll(".page").forEach(function(p) { p.classList.remove("active"); });
     document.querySelectorAll("nav a").forEach(function(a) { a.classList.remove("active"); });
     document.getElementById("page-" + name).classList.add("active");
@@ -656,7 +729,7 @@
     if (name === "users")     loadUsers();
     if (name === "projects")  loadProjects();
     if (name === "reviews")   loadReviews();
-    if (name === "overview")  loadOverview();
+    if (name === "overview")  { loadOverview(); loadUniversityStats(); }
     if (name === "security")  loadSecurityPage();
     if (name === "email")     loadEmailRecipients();
   }
@@ -678,6 +751,37 @@
       document.getElementById("stat-projects").textContent = projects.length;
       document.getElementById("stat-reviews").textContent  = reviews.length;
     } catch(e) { toast(e.message, true); }
+  }
+
+  async function loadUniversityStats() {
+    const tbody = document.getElementById("uni-stats-body");
+    tbody.innerHTML = '<tr><td colspan="6" class="loading">A carregar...</td></tr>';
+    try {
+      const rows = await api("GET", "/admin/university-stats");
+      if (!rows || !rows.length) {
+        tbody.innerHTML = '<tr><td colspan="6" class="empty">Sem dados de universidades</td></tr>';
+        return;
+      }
+      tbody.innerHTML = rows.map(function(r, i) {
+        var rank = i + 1;
+        var rankClass = rank === 1 ? 'gold' : rank === 2 ? 'silver' : rank === 3 ? 'bronze' : '';
+        var uni = r.university || '—';
+        var total    = r.total     || 0;
+        var helpers  = r.helpers   || 0;
+        var needsHelp= r.needs_help|| 0;
+        var both     = r.both      || 0;
+        return '<tr>' +
+          '<td><span class="rank-num ' + rankClass + '">' + rank + '</span></td>' +
+          '<td style="font-weight:500">' + escHtml(uni) + '</td>' +
+          '<td><strong>' + total + '</strong></td>' +
+          '<td><span class="role-pill role-helper">' + helpers + '</span></td>' +
+          '<td><span class="role-pill role-needs-help">' + needsHelp + '</span></td>' +
+          '<td><span class="role-pill role-both">' + both + '</span></td>' +
+          '</tr>';
+      }).join('');
+    } catch(e) {
+      tbody.innerHTML = '<tr><td colspan="6" style="color:#ef4444;padding:16px">Erro: ' + escHtml(e.message) + '</td></tr>';
+    }
   }
 
   async function cleanUnusedImages() {

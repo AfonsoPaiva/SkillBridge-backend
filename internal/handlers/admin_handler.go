@@ -808,3 +808,60 @@ func AdminSendMarketingEmail(c *gin.Context) {
 		"failed_emails": failedEmails,
 	})
 }
+
+// AdminGetUniversityStats - Top 10 universidades com mais utentes
+//
+// @Summary      [Admin] Estatísticas por universidade
+// @Description  Devolve as 10 universidades com mais utilizadores, com contagem por role
+// @Tags         admin
+// @Produce      json
+// @Security     BearerAuth
+// @Success      200  {array}  map[string]interface{}
+// @Router       /admin/university-stats [get]
+func AdminGetUniversityStats(c *gin.Context) {
+	type UniversityRow struct {
+		University string `json:"university"`
+		Total      int64  `json:"total"`
+		Helpers    int64  `json:"helpers"`
+		NeedsHelp  int64  `json:"needs_help"`
+		Both       int64  `json:"both"`
+	}
+
+	// Aggregate total users per university (non-empty)
+	type rawRow struct {
+		University string
+		Total      int64
+	}
+	var rows []rawRow
+	database.DB.Model(&models.User{}).
+		Select("university, COUNT(*) AS total").
+		Where("university != '' AND university IS NOT NULL").
+		Group("university").
+		Order("total DESC").
+		Limit(10).
+		Scan(&rows)
+
+	result := make([]UniversityRow, 0, len(rows))
+	for _, r := range rows {
+		var helpers, needsHelp, both int64
+		database.DB.Model(&models.User{}).
+			Where("university = ? AND role = ?", r.University, "helper").
+			Count(&helpers)
+		database.DB.Model(&models.User{}).
+			Where("university = ? AND role = ?", r.University, "needs_help").
+			Count(&needsHelp)
+		database.DB.Model(&models.User{}).
+			Where("university = ? AND role = ?", r.University, "both").
+			Count(&both)
+
+		result = append(result, UniversityRow{
+			University: r.University,
+			Total:      r.Total,
+			Helpers:    helpers,
+			NeedsHelp:  needsHelp,
+			Both:       both,
+		})
+	}
+
+	c.JSON(http.StatusOK, result)
+}
