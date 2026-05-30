@@ -163,6 +163,7 @@ func CreateProject(c *gin.Context) {
 		Description string             `json:"description"`
 		ImageURL    string             `json:"image_url"`
 		Status      string             `json:"status"`
+		Links       models.ProjectLinks `json:"links"`
 		Roles       []projectRoleInput `json:"roles"`
 	}
 
@@ -192,6 +193,7 @@ func CreateProject(c *gin.Context) {
 		Slug:        slug,
 		Description: input.Description,
 		ImageURL:    input.ImageURL,
+		Links:       input.Links,
 		Status:      status,
 	}
 
@@ -509,11 +511,12 @@ func UpdateProject(c *gin.Context) {
 		return
 	}
 	var input struct {
-		Title       string             `json:"title"`
-		Description string             `json:"description"`
-		ImageURL    *string            `json:"image_url"` // Pointer to distinguish between not provided and empty
-		Status      string             `json:"status"`
-		Roles       []projectRoleInput `json:"roles"`
+		Title       string              `json:"title"`
+		Description string              `json:"description"`
+		ImageURL    *string             `json:"image_url"` // Pointer to distinguish between not provided and empty
+		Status      string              `json:"status"`
+		Links       *models.ProjectLinks `json:"links"` // Pointer to distinguish between not provided and empty array
+		Roles       []projectRoleInput  `json:"roles"`
 	}
 	if err := c.ShouldBindJSON(&input); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
@@ -555,6 +558,11 @@ func UpdateProject(c *gin.Context) {
 		}
 		// Update the image URL (can be empty to remove the image from the project)
 		project.ImageURL = newImageURL
+	}
+
+	// Handle links update (only if explicitly provided in the request)
+	if input.Links != nil {
+		project.Links = *input.Links
 	}
 
 	if input.Status != "" {

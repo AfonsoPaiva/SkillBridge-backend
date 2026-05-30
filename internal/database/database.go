@@ -59,6 +59,8 @@ func Connect() {
 	alterIfMissing("users", "contact_links", "JSONB DEFAULT '{}'::JSONB")
 	// Project image
 	alterIfMissing("projects", "image_url", "TEXT DEFAULT ''")
+	// Project external links (GitHub, YouTube, gallery, PDF, etc.)
+	alterIfMissing("projects", "links", "JSONB DEFAULT '[]'")
 	// Project role slots
 	alterIfMissing("project_roles", "title", "VARCHAR(200) DEFAULT ''")
 	alterIfMissing("project_roles", "spots", "INT NOT NULL DEFAULT 1")

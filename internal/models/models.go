@@ -63,6 +63,38 @@ func (s *StringList) Scan(value interface{}) error {
 	return json.Unmarshal(bytes, s)
 }
 
+// ProjectLink represents a single external link associated with a project.
+type ProjectLink struct {
+	Label string `json:"label"`
+	URL   string `json:"url"`
+	Type  string `json:"type"` // github, youtube, gallery, pdf, website, other
+}
+
+// ProjectLinks stores a JSON array of ProjectLink in a single JSONB column.
+type ProjectLinks []ProjectLink
+
+func (pl ProjectLinks) Value() (driver.Value, error) {
+	if pl == nil {
+		return "[]", nil
+	}
+	b, err := json.Marshal(pl)
+	return string(b), err
+}
+
+func (pl *ProjectLinks) Scan(value interface{}) error {
+	var bytes []byte
+	switch v := value.(type) {
+	case []byte:
+		bytes = v
+	case string:
+		bytes = []byte(v)
+	default:
+		*pl = ProjectLinks{}
+		return nil
+	}
+	return json.Unmarshal(bytes, pl)
+}
+
 // --------------------------------------------------
 // USER - Utilizador da plataforma
 // A password é gerida pelo Firebase (não é armazenada aqui)
@@ -111,14 +143,15 @@ type GuestSession struct {
 // PROJECT - Projeto criado por um utilizador
 // --------------------------------------------------
 type Project struct {
-	ID          uint      `gorm:"primaryKey;autoIncrement" json:"id"`
-	OwnerID     uint      `gorm:"not null;index" json:"owner_id"`
-	Title       string    `gorm:"not null" json:"title"`
-	Slug        string    `gorm:"uniqueIndex;not null" json:"slug"`
-	Description string    `json:"description"`
-	Status      string    `gorm:"type:varchar(20);default:'open'" json:"status"` // open / in_progress / completed
-	ImageURL    string    `gorm:"type:text" json:"image_url"`
-	CreatedAt   time.Time `json:"created_at"`
+	ID          uint         `gorm:"primaryKey;autoIncrement" json:"id"`
+	OwnerID     uint         `gorm:"not null;index" json:"owner_id"`
+	Title       string       `gorm:"not null" json:"title"`
+	Slug        string       `gorm:"uniqueIndex;not null" json:"slug"`
+	Description string       `json:"description"`
+	Status      string       `gorm:"type:varchar(20);default:'open'" json:"status"` // open / in_progress / completed
+	ImageURL    string       `gorm:"type:text" json:"image_url"`
+	Links       ProjectLinks `gorm:"type:jsonb;default:'[]'" json:"links"`
+	CreatedAt   time.Time    `json:"created_at"`
 
 	Owner   User            `gorm:"foreignKey:OwnerID" json:"owner,omitempty"`
 	Owners  []ProjectOwner  `gorm:"foreignKey:ProjectID" json:"owners,omitempty"`
