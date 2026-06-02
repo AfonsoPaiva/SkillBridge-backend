@@ -1158,13 +1158,13 @@
         if (r.status === 'pending_manual') displayStatus = 'pending manual';
         if (r.status === 'pending_auto') displayStatus = 'pending auto';
         
-        var actions = '<button class="btn btn-ghost" onclick="viewRecruiter(' + r.id + ')">View</button>';
+        var actions = '<button class="btn btn-ghost" onclick="viewRecruiter(\'' + r.id + '\')">View</button>';
         if (r.status.startsWith('pending')) {
-          actions += '<button class="btn btn-success" style="margin-left:4px" onclick="decideRecruiter(' + r.id + ',\'approved\')">Approve</button>' +
-                     '<button class="btn btn-danger" style="margin-left:4px" onclick="decideRecruiter(' + r.id + ',\'rejected\')">Reject</button>';
+          actions += '<button class="btn btn-success" style="margin-left:4px" onclick="decideRecruiter(\'' + r.id + '\',\'approved\')">Approve</button>' +
+                     '<button class="btn btn-danger" style="margin-left:4px" onclick="decideRecruiter(\'' + r.id + '\',\'rejected\')">Reject</button>';
         }
 
-        return '<tr class="clickable" onclick="if(event.target.tagName!==\'BUTTON\') viewRecruiter(' + r.id + ')">' +
+        return '<tr class="clickable" onclick="if(event.target.tagName!==\'BUTTON\') viewRecruiter(\'' + r.id + '\')">' +
           '<td>' + r.id + '</td>' +
           '<td style="font-weight:600">' + escHtml(r.company_name) + '</td>' +
           '<td>' + escHtml(r.full_name) + '</td>' +
