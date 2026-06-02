@@ -363,7 +363,8 @@
     <a onclick="showPage('users')"    data-page="users">Users</a>
     <a onclick="showPage('projects')" data-page="projects">Projects</a>
     <a onclick="showPage('reviews')"  data-page="reviews">Reviews</a>
-    <a onclick="showPage('email')"    data-page="email">✉️ Email Marketing</a>
+    <a onclick="showPage('recruiters')" data-page="recruiters">Recruiters</a>
+    <a onclick="showPage('email')"    data-page="email">Email Marketing</a>
     <a onclick="showPage('security')" data-page="security">Security (TOTP)</a>
     <a onclick="signOut()" style="margin-top:auto;color:#ef4444">Sign out</a>
   </nav>
@@ -380,7 +381,7 @@
 
       <!-- University stats table -->
       <div class="uni-table-wrap">
-        <h3>🏫 Top 10 Universidades</h3>
+        <h3>Top 10 Universidades</h3>
         <div class="card">
           <table>
             <thead>
@@ -471,9 +472,29 @@
       </div>
     </div>
 
+    <!-- RECRUITERS -->
+    <div id="page-recruiters" class="page">
+      <h2 class="page-title">Recruiters</h2>
+      <div class="toolbar">
+        <select id="recruiter-filter" onchange="loadRecruiters()">
+          <option value="pending">Pending</option>
+          <option value="approved">Approved</option>
+          <option value="rejected">Rejected</option>
+          <option value="all">All</option>
+        </select>
+        <button class="btn btn-ghost" onclick="loadRecruiters()">Refresh</button>
+      </div>
+      <div class="card">
+        <table>
+          <thead><tr><th>ID</th><th>Company</th><th>Name</th><th>Email</th><th>Created</th><th>Status</th><th></th></tr></thead>
+          <tbody id="recruiters-body"><tr><td colspan="7" class="loading">Loading...</td></tr></tbody>
+        </table>
+      </div>
+    </div>
+
     <!-- EMAIL MARKETING -->
     <div id="page-email" class="page">
-      <h2 class="page-title">✉️ Email Marketing</h2>
+      <h2 class="page-title">Email Marketing</h2>
       <div class="email-layout">
         <!-- Left: compose -->
         <div>
@@ -729,6 +750,7 @@
     if (name === "users")     loadUsers();
     if (name === "projects")  loadProjects();
     if (name === "reviews")   loadReviews();
+    if (name === "recruiters") loadRecruiters();
     if (name === "overview")  { loadOverview(); loadUniversityStats(); }
     if (name === "security")  loadSecurityPage();
     if (name === "email")     loadEmailRecipients();
@@ -1115,6 +1137,77 @@
     if (!confirm("Delete this review? This cannot be undone.")) return;
     try { await api("DELETE", "/admin/reviews/" + id); toast("Review deleted"); loadReviews(); }
     catch(e) { toast(e.message, true); }
+  }
+  // ── RECRUITERS ──────────────────────────────────────────────
+  var _recruiters = [];
+  async function loadRecruiters() {
+    document.getElementById("recruiters-body").innerHTML = '<tr><td colspan="7" class="loading">Loading...</td></tr>';
+    try {
+      const status = document.getElementById("recruiter-filter").value;
+      const data = await api("GET", "/admin/recruiters?status=" + status);
+      _recruiters = data || [];
+      if (!_recruiters.length) {
+        document.getElementById("recruiters-body").innerHTML = '<tr><td colspan="7" class="empty">No recruiters found</td></tr>';
+        return;
+      }
+      document.getElementById("recruiters-body").innerHTML = _recruiters.map(function(r) {
+        var badge = 'badge-pending';
+        if (r.status === 'approved') badge = 'badge-approved';
+        if (r.status === 'rejected') badge = 'badge-rejected';
+        
+        var actions = '<button class="btn btn-ghost" onclick="viewRecruiter(' + r.id + ')">View</button>';
+        if (r.status === 'pending') {
+          actions += '<button class="btn btn-success" style="margin-left:4px" onclick="decideRecruiter(' + r.id + ',\'approved\')">Approve</button>' +
+                     '<button class="btn btn-danger" style="margin-left:4px" onclick="decideRecruiter(' + r.id + ',\'rejected\')">Reject</button>';
+        }
+
+        return '<tr class="clickable" onclick="if(event.target.tagName!==\'BUTTON\') viewRecruiter(' + r.id + ')">' +
+          '<td>' + r.id + '</td>' +
+          '<td style="font-weight:600">' + escHtml(r.company_name) + '</td>' +
+          '<td>' + escHtml(r.full_name) + '</td>' +
+          '<td>' + escHtml(r.email) + '</td>' +
+          '<td>' + fmt(r.created_at) + '</td>' +
+          '<td><span class="badge ' + badge + '">' + r.status + '</span></td>' +
+          '<td style="text-align:right">' + actions + '</td>' +
+          '</tr>';
+      }).join('');
+    } catch(e) {
+      document.getElementById("recruiters-body").innerHTML = '<tr><td colspan="7" style="color:#ef4444;padding:16px">Error: ' + escHtml(e.message) + '</td></tr>';
+    }
+  }
+
+  async function decideRecruiter(id, status) {
+    if (!confirm("Are you sure you want to " + status.slice(0,-1) + " this recruiter?")) return;
+    try {
+      const endpoint = status === 'approved' ? "/admin/recruiters/" + id + "/approve" : "/admin/recruiters/" + id + "/reject";
+      await api("POST", endpoint);
+      toast("Recruiter " + status + ".");
+      loadRecruiters();
+    } catch(e) { toast(e.message, true); }
+  }
+
+  function viewRecruiter(id) {
+    const r = _recruiters.find(function(x) { return x.id === id; });
+    if (!r) return;
+    openDetail(
+      "Recruiter Details",
+      r.company_name,
+      [
+        { heading: "Basic Info", rows: [
+          { label: "Company",      value: r.company_name },
+          { label: "Website",      value: r.company_url, link: true },
+          { label: "Full Name",    value: r.full_name },
+          { label: "Email",        value: r.email },
+        ]},
+        { heading: "Vacancy Details", rows: [
+          { label: "Vacancy",      value: r.vacancy_description },
+        ]},
+        { heading: "Status", rows: [
+          { label: "Status",       value: r.status },
+          { label: "Created At",   value: r.created_at ? new Date(r.created_at).toLocaleString() : null },
+        ]}
+      ]
+    );
   }
 
   // ── TOTP / SECURITY ─────────────────────────────────────────
