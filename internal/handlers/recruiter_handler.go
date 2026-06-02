@@ -194,8 +194,12 @@ func AdminListRecruiters(c *gin.Context) {
 	status := c.Query("status")
 
 	query := database.DB.Order("created_at DESC")
-	if status != "" {
-		query = query.Where("status = ?", status)
+	if status != "" && status != "all" {
+		if status == "pending" {
+			query = query.Where("status IN ?", []string{"pending_manual", "pending_auto"})
+		} else {
+			query = query.Where("status = ?", status)
+		}
 	}
 
 	var recruiters []models.Recruiter

@@ -1145,18 +1145,21 @@
     try {
       const status = document.getElementById("recruiter-filter").value;
       const data = await api("GET", "/admin/recruiters?status=" + status);
-      _recruiters = data || [];
+      _recruiters = data.recruiters ? data.recruiters : (Array.isArray(data) ? data : []);
       if (!_recruiters.length) {
         document.getElementById("recruiters-body").innerHTML = '<tr><td colspan="7" class="empty">No recruiters found</td></tr>';
         return;
       }
       document.getElementById("recruiters-body").innerHTML = _recruiters.map(function(r) {
         var badge = 'badge-pending';
+        var displayStatus = r.status;
         if (r.status === 'approved') badge = 'badge-approved';
         if (r.status === 'rejected') badge = 'badge-rejected';
+        if (r.status === 'pending_manual') displayStatus = 'pending manual';
+        if (r.status === 'pending_auto') displayStatus = 'pending auto';
         
         var actions = '<button class="btn btn-ghost" onclick="viewRecruiter(' + r.id + ')">View</button>';
-        if (r.status === 'pending') {
+        if (r.status.startsWith('pending')) {
           actions += '<button class="btn btn-success" style="margin-left:4px" onclick="decideRecruiter(' + r.id + ',\'approved\')">Approve</button>' +
                      '<button class="btn btn-danger" style="margin-left:4px" onclick="decideRecruiter(' + r.id + ',\'rejected\')">Reject</button>';
         }
@@ -1167,7 +1170,7 @@
           '<td>' + escHtml(r.full_name) + '</td>' +
           '<td>' + escHtml(r.email) + '</td>' +
           '<td>' + fmt(r.created_at) + '</td>' +
-          '<td><span class="badge ' + badge + '">' + r.status + '</span></td>' +
+          '<td><span class="badge ' + badge + '">' + displayStatus + '</span></td>' +
           '<td style="text-align:right">' + actions + '</td>' +
           '</tr>';
       }).join('');
