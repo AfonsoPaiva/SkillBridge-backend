@@ -1162,7 +1162,11 @@
         if (r.status.startsWith('pending')) {
           actions += '<button class="btn btn-success" style="margin-left:4px" onclick="decideRecruiter(\'' + r.id + '\',\'approved\')">Approve</button>' +
                      '<button class="btn btn-danger" style="margin-left:4px" onclick="decideRecruiter(\'' + r.id + '\',\'rejected\')">Reject</button>';
+        } else if (r.status === 'approved') {
+          actions += '<button class="btn btn-primary" style="margin-left:4px" onclick="resendRecruiterEmail(\'' + r.id + '\')">Reenviar Email</button>';
         }
+        
+        actions += '<button class="btn btn-danger" style="margin-left:4px" onclick="deleteRecruiter(\'' + r.id + '\')">Delete</button>';
 
         return '<tr class="clickable" onclick="if(event.target.tagName!==\'BUTTON\') viewRecruiter(\'' + r.id + '\')">' +
           '<td>' + r.id + '</td>' +
@@ -1185,6 +1189,23 @@
       const endpoint = status === 'approved' ? "/admin/recruiters/" + id + "/approve" : "/admin/recruiters/" + id + "/reject";
       await api("POST", endpoint);
       toast("Recruiter " + status + ".");
+      loadRecruiters();
+    } catch(e) { toast(e.message, true); }
+  }
+
+  async function resendRecruiterEmail(id) {
+    if (!confirm("Tem a certeza que quer reenviar o email de aprovação com um novo link para este recrutador?")) return;
+    try {
+      await api("POST", "/admin/recruiters/" + id + "/resend-email");
+      toast("Email reenviado com sucesso.");
+    } catch(e) { toast(e.message, true); }
+  }
+
+  async function deleteRecruiter(id) {
+    if (!confirm("Tem a certeza que quer eliminar este recrutador permanentemente? Esta ação não pode ser desfeita.")) return;
+    try {
+      await api("DELETE", "/admin/recruiters/" + id);
+      toast("Recrutador eliminado com sucesso.");
       loadRecruiters();
     } catch(e) { toast(e.message, true); }
   }

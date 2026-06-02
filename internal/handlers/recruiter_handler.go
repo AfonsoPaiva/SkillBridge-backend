@@ -128,6 +128,49 @@ func RecruiterApply(c *gin.Context) {
 	})
 }
 
+// RecruiterRequestLink handles requests from approved recruiters to get a new sign-in link.
+// POST /api/recruiters/request-link
+func RecruiterRequestLink(c *gin.Context) {
+	var input struct {
+		Email string `json:"email" binding:"required,email"`
+	}
+
+	if err := c.ShouldBindJSON(&input); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Email inválido."})
+		return
+	}
+
+	input.Email = strings.ToLower(strings.TrimSpace(input.Email))
+
+	var recruiter models.Recruiter
+	if err := database.DB.Where("email = ?", input.Email).First(&recruiter).Error; err != nil {
+		// Do not leak existence
+		c.JSON(http.StatusOK, gin.H{"message": "Se o email estiver aprovado, receberás um link de acesso em breve."})
+		return
+	}
+
+	if recruiter.Status != "approved" {
+		c.JSON(http.StatusOK, gin.H{"message": "Se o email estiver aprovado, receberás um link de acesso em breve."})
+		return
+	}
+
+	// Generate new Firebase sign-in link
+	continueURL := config.AppConfig.FrontendURL + "/recruiter/auth?email=" + url.QueryEscape(recruiter.Email)
+	signInLink, err := middleware.GenerateSignInLink(recruiter.Email, continueURL)
+	if err != nil {
+		log.Printf("[recruiter] Erro ao gerar link de login para %s: %v", recruiter.Email, err)
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Erro ao gerar link."})
+		return
+	}
+
+	// Send email
+	if err := email.SendRecruiterApproved(recruiter.FullName, recruiter.Email, signInLink); err != nil {
+		log.Printf("[recruiter] Erro ao enviar link de login para %s: %v", recruiter.Email, err)
+	}
+
+	c.JSON(http.StatusOK, gin.H{"message": "Se o email estiver aprovado, receberás um link de acesso em breve."})
+}
+
 // approveRecruiter creates a Firebase user, sets recruiter claims, generates sign-in link, and sends approval email.
 func approveRecruiter(recruiterID string) error {
 	var recruiter models.Recruiter
@@ -260,6 +303,70 @@ func AdminRejectRecruiter(c *gin.Context) {
 
 	log.Printf("[admin] Recrutador rejeitado: %s (%s)", recruiter.CompanyName, recruiter.Email)
 	c.JSON(http.StatusOK, gin.H{"message": "Recrutador rejeitado."})
+}
+
+// AdminDeleteRecruiter permanently deletes a recruiter and their Firebase account.
+// DELETE /api/admin/recruiters/:id
+func AdminDeleteRecruiter(c *gin.Context) {
+	id := c.Param("id")
+
+	var recruiter models.Recruiter
+	if err := database.DB.Where("id = ?", id).First(&recruiter).Error; err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "Recrutador não encontrado."})
+		return
+	}
+
+	// Delete Firebase user if possible
+	if recruiter.FirebaseUID != nil && *recruiter.FirebaseUID != "" {
+		if err := middleware.DeleteUser(*recruiter.FirebaseUID); err != nil {
+			log.Printf("[admin] Erro ao eliminar utilizador Firebase uid=%s do recrutador: %v", *recruiter.FirebaseUID, err)
+		}
+	}
+
+	// Delete recruiter from database
+	if err := database.DB.Delete(&recruiter).Error; err != nil {
+		log.Printf("[admin] Erro ao eliminar recrutador: %v", err)
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Erro ao eliminar recrutador."})
+		return
+	}
+
+	log.Printf("[admin] Recrutador eliminado: ID=%s, Empresa=%s, Email=%s", recruiter.ID, recruiter.CompanyName, recruiter.Email)
+	c.JSON(http.StatusOK, gin.H{"message": "Recrutador eliminado com sucesso."})
+}
+
+// AdminResendRecruiterEmail resends the approval email with a fresh sign-in link.
+// POST /api/admin/recruiters/:id/resend-email
+func AdminResendRecruiterEmail(c *gin.Context) {
+	id := c.Param("id")
+
+	var recruiter models.Recruiter
+	if err := database.DB.Where("id = ?", id).First(&recruiter).Error; err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "Recrutador não encontrado."})
+		return
+	}
+
+	if recruiter.Status != "approved" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Apenas é possível reenviar email para recrutadores aprovados."})
+		return
+	}
+
+	// Generate Firebase sign-in link
+	continueURL := config.AppConfig.FrontendURL + "/recruiter/auth?email=" + url.QueryEscape(recruiter.Email)
+	signInLink, err := middleware.GenerateSignInLink(recruiter.Email, continueURL)
+	if err != nil {
+		log.Printf("[admin] Erro ao gerar link para %s: %v", recruiter.Email, err)
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Erro ao gerar novo link de acesso."})
+		return
+	}
+
+	// Send approval email again
+	if err := email.SendRecruiterApproved(recruiter.FullName, recruiter.Email, signInLink); err != nil {
+		log.Printf("[admin] Erro ao reenviar email para %s: %v", recruiter.Email, err)
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Erro ao enviar o email."})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{"message": "Email reenviado com sucesso."})
 }
 
 // AdminGetPendingRecruitersCount returns the count of pending recruiters.

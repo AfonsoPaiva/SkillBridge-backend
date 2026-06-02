@@ -263,12 +263,15 @@ func Setup(r *gin.Engine) {
 		admin.GET("/recruiters/pending-count", handlers.AdminGetPendingRecruitersCount)
 		admin.POST("/recruiters/:id/approve", handlers.AdminApproveRecruiter)
 		admin.POST("/recruiters/:id/reject", handlers.AdminRejectRecruiter)
+		admin.DELETE("/recruiters/:id", handlers.AdminDeleteRecruiter)
+		admin.POST("/recruiters/:id/resend-email", handlers.AdminResendRecruiterEmail)
 	}
 
 	// --------------------------------------------------
 	// ROTAS DE RECRUTADORES (públicas)
 	// --------------------------------------------------
 	public.POST("/recruiters/apply", handlers.RecruiterApply)
+	public.POST("/recruiters/request-link", handlers.RecruiterRequestLink)
 	public.GET("/vacancies", handlers.GetPublicVacancies)
 
 	// --------------------------------------------------

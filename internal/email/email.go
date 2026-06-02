@@ -446,7 +446,7 @@ const perfectProjectTemplate = `<h2 style="margin:0 0 20px;color:#1a1a1a;font-si
 // SendRecruiterApproved envia email de aprovação com link de acesso (Firebase sign-in link)
 func SendRecruiterApproved(name, toEmail, signInLink string) error {
 	subject := "A sua conta SkillBridge foi aprovada ✓"
-	html := fmt.Sprintf(recruiterApprovedTemplate, name, signInLink, signInLink)
+	html := fmt.Sprintf(recruiterApprovedTemplate, name, signInLink, signInLink, signInLink)
 	return send(getEmailFrom(), toEmail, subject, html)
 }
 
