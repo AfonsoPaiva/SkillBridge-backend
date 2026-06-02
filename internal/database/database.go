@@ -210,6 +210,9 @@ func migrate() error {
 		&models.Follow{},
 		// Audit logging
 		&models.AuditLog{},
+		// Recruiter onboarding & vacancies
+		&models.Recruiter{},
+		&models.Vacancy{},
 	}
 	for _, t := range tables {
 		if !DB.Migrator().HasTable(t) {

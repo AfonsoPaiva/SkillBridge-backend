@@ -258,5 +258,29 @@ func Setup(r *gin.Engine) {
 		admin.POST("/clean-unused-images", handlers.AdminCleanUnusedImages)
 		admin.POST("/send-marketing-email", handlers.AdminSendMarketingEmail)
 		admin.GET("/university-stats", handlers.AdminGetUniversityStats)
+		// Recruiter management
+		admin.GET("/recruiters", handlers.AdminListRecruiters)
+		admin.GET("/recruiters/pending-count", handlers.AdminGetPendingRecruitersCount)
+		admin.POST("/recruiters/:id/approve", handlers.AdminApproveRecruiter)
+		admin.POST("/recruiters/:id/reject", handlers.AdminRejectRecruiter)
+	}
+
+	// --------------------------------------------------
+	// ROTAS DE RECRUTADORES (públicas)
+	// --------------------------------------------------
+	public.POST("/recruiters/apply", handlers.RecruiterApply)
+	public.GET("/vacancies", handlers.GetPublicVacancies)
+
+	// --------------------------------------------------
+	// ROTAS DE RECRUTADORES (autenticadas — Firebase + role recruiter)
+	// --------------------------------------------------
+	recruiter := api.Group("/recruiter")
+	recruiter.Use(middleware.AuthRequired(), middleware.RecruiterRequired())
+	{
+		recruiter.GET("/profile", handlers.GetRecruiterProfile)
+		recruiter.GET("/vacancies", handlers.ListMyVacancies)
+		recruiter.POST("/vacancies", handlers.CreateVacancy)
+		recruiter.PUT("/vacancies/:id", handlers.UpdateVacancy)
+		recruiter.DELETE("/vacancies/:id", handlers.DeleteVacancy)
 	}
 }

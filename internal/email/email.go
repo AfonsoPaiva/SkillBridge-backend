@@ -438,3 +438,104 @@ const perfectProjectTemplate = `<h2 style="margin:0 0 20px;color:#1a1a1a;font-si
 <p style="margin:32px 0 0;color:#666;font-size:14px;line-height:1.6;">
 	Não percas esta oportunidade. Candidata-te já em <a href="%s" style="color:#68007a;text-decoration:none;">skillbridge.pt</a>.
 </p>`
+
+// ─────────────────────────────────────────────────────────────
+// RECRUITER EMAIL FUNCTIONS & TEMPLATES
+// ─────────────────────────────────────────────────────────────
+
+// SendRecruiterApproved envia email de aprovação com link de acesso (Firebase sign-in link)
+func SendRecruiterApproved(name, toEmail, signInLink string) error {
+	subject := "A sua conta SkillBridge foi aprovada ✓"
+	html := fmt.Sprintf(recruiterApprovedTemplate, name, signInLink, signInLink)
+	return send(getEmailFrom(), toEmail, subject, html)
+}
+
+// SendRecruiterRejected envia email de rejeição ao recrutador
+func SendRecruiterRejected(name, toEmail string) error {
+	subject := "Atualização sobre o seu pedido — SkillBridge"
+	html := fmt.Sprintf(recruiterRejectedTemplate, name)
+	return send(getEmailFrom(), toEmail, subject, html)
+}
+
+// SendVacancyExpired envia email quando uma vaga expira, com link de renovação
+func SendVacancyExpired(name, toEmail, vacancyTitle, renewLink string) error {
+	subject := fmt.Sprintf("A sua vaga \"%s\" expirou — SkillBridge", vacancyTitle)
+	html := fmt.Sprintf(vacancyExpiredTemplate, name, vacancyTitle, renewLink, renewLink)
+	return send(getEmailFrom(), toEmail, subject, html)
+}
+
+// SendRecruiterReceived envia confirmação de receção do pedido
+func SendRecruiterReceived(name, toEmail string) error {
+	subject := "Pedido recebido — SkillBridge"
+	html := fmt.Sprintf(recruiterReceivedTemplate, name)
+	return send(getEmailFrom(), toEmail, subject, html)
+}
+
+const recruiterApprovedTemplate = `<h2 style="margin:0 0 20px;color:#1a1a1a;font-size:24px;font-weight:600;">Conta Aprovada ✓</h2>
+<p style="margin:0 0 16px;color:#333;font-size:16px;line-height:1.6;">
+	Olá <strong>%s</strong>,
+</p>
+<p style="margin:0 0 24px;color:#333;font-size:16px;line-height:1.6;">
+	O seu pedido de acesso ao SkillBridge como recrutador foi <strong>aprovado</strong>. Já pode aceder à plataforma e publicar vagas para estudantes e recém-licenciados.
+</p>
+<p style="margin:0 0 32px;color:#666;font-size:15px;line-height:1.6;">
+	Clique no botão abaixo para aceder à sua conta. Este link é válido por <strong>72 horas</strong>.
+</p>
+<table width="100%%" cellpadding="0" cellspacing="0">
+	<tr>
+		<td align="center">
+			<a href="%s" style="display:inline-block;background:#68007a;color:#ffffff;padding:16px 40px;border-radius:6px;text-decoration:none;font-weight:600;font-size:16px;text-align:center;">
+				Aceder à Minha Conta
+			</a>
+		</td>
+	</tr>
+</table>
+<p style="margin:32px 0 0;color:#666;font-size:14px;line-height:1.6;">
+	Se o botão não funcionar, copie e cole este link no seu navegador:<br>
+	<a href="%s" style="color:#68007a;text-decoration:none;word-break:break-all;">%s</a>
+</p>`
+
+const recruiterRejectedTemplate = `<h2 style="margin:0 0 20px;color:#1a1a1a;font-size:24px;font-weight:600;">Atualização do Pedido</h2>
+<p style="margin:0 0 16px;color:#333;font-size:16px;line-height:1.6;">
+	Olá <strong>%s</strong>,
+</p>
+<p style="margin:0 0 24px;color:#333;font-size:16px;line-height:1.6;">
+	Após análise, não nos foi possível aprovar o seu pedido de acesso como recrutador no SkillBridge neste momento.
+</p>
+<p style="margin:0 0 24px;color:#666;font-size:15px;line-height:1.6;">
+	Se acredita que houve um engano ou se tiver informações adicionais, não hesite em contactar-nos respondendo a este email.
+</p>
+<p style="margin:32px 0 0;color:#666;font-size:14px;line-height:1.6;">
+	Obrigado pelo interesse no SkillBridge.
+</p>`
+
+const vacancyExpiredTemplate = `<h2 style="margin:0 0 20px;color:#1a1a1a;font-size:24px;font-weight:600;">Vaga Expirada</h2>
+<p style="margin:0 0 16px;color:#333;font-size:16px;line-height:1.6;">
+	Olá <strong>%s</strong>,
+</p>
+<p style="margin:0 0 24px;color:#333;font-size:16px;line-height:1.6;">
+	A sua vaga <strong>"%s"</strong> expirou após 30 dias no SkillBridge. Se pretender manter a vaga ativa, pode renová-la clicando no botão abaixo.
+</p>
+<table width="100%%" cellpadding="0" cellspacing="0">
+	<tr>
+		<td align="center">
+			<a href="%s" style="display:inline-block;background:#68007a;color:#ffffff;padding:16px 40px;border-radius:6px;text-decoration:none;font-weight:600;font-size:16px;text-align:center;">
+				Renovar Vaga
+			</a>
+		</td>
+	</tr>
+</table>
+<p style="margin:32px 0 0;color:#666;font-size:14px;line-height:1.6;">
+	Gira as suas vagas em <a href="%s" style="color:#68007a;text-decoration:none;">skillbridge.pt</a>.
+</p>`
+
+const recruiterReceivedTemplate = `<h2 style="margin:0 0 20px;color:#1a1a1a;font-size:24px;font-weight:600;">Pedido Recebido</h2>
+<p style="margin:0 0 16px;color:#333;font-size:16px;line-height:1.6;">
+	Olá <strong>%s</strong>,
+</p>
+<p style="margin:0 0 24px;color:#333;font-size:16px;line-height:1.6;">
+	O seu pedido de acesso como recrutador ao SkillBridge foi recebido com sucesso. A nossa equipa irá analisá-lo e enviar-lhe um email com o resultado em breve.
+</p>
+<p style="margin:32px 0 0;color:#666;font-size:14px;line-height:1.6;">
+	Obrigado pelo interesse no SkillBridge.
+</p>`

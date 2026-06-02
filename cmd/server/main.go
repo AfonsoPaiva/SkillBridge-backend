@@ -9,6 +9,7 @@ import (
 	"github.com/paiva/SkillBridge/Backend/internal/database"
 	"github.com/paiva/SkillBridge/Backend/internal/email"
 	"github.com/paiva/SkillBridge/Backend/internal/handlers"
+	"github.com/paiva/SkillBridge/Backend/internal/jobs"
 	"github.com/paiva/SkillBridge/Backend/internal/middleware"
 	"github.com/paiva/SkillBridge/Backend/internal/notifications"
 	"github.com/paiva/SkillBridge/Backend/internal/routes"
@@ -54,6 +55,9 @@ func main() {
 
 	// 5. Conectar ao CockroachDB e aplicar migrações
 	database.Connect()
+
+	// 5.1 Iniciar cron job de expiração de vagas de recrutadores
+	jobs.StartVacancyExpiryJob()
 
 	// 6. Criar servidor Gin
 	r := gin.Default()

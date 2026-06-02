@@ -74,6 +74,13 @@ func AuthRequired() gin.HandlerFunc {
 				c.Set("sign_in_provider", provider)
 			}
 		}
+		// Extract recruiter custom claims (set by admin during approval)
+		if role, ok := token.Claims["role"].(string); ok {
+			c.Set("role", role)
+		}
+		if recruiterID, ok := token.Claims["recruiter_id"].(string); ok {
+			c.Set("recruiter_id", recruiterID)
+		}
 		c.Next()
 	}
 }
@@ -112,4 +119,103 @@ func SendPasswordResetEmail(email string) error {
 
 	log.Printf("[firebase] Password reset link generated for %s: %s", email, link)
 	return nil
+}
+
+// RecruiterRequired é o middleware que verifica se o utilizador autenticado é um recrutador.
+// Deve ser usado após AuthRequired().
+func RecruiterRequired() gin.HandlerFunc {
+	return func(c *gin.Context) {
+		role := c.GetString("role")
+		recruiterID := c.GetString("recruiter_id")
+
+		if role != "recruiter" || recruiterID == "" {
+			c.JSON(http.StatusForbidden, gin.H{"error": "Acesso restrito a recrutadores."})
+			c.Abort()
+			return
+		}
+
+		c.Next()
+	}
+}
+
+// CreateFirebaseUser creates a Firebase Auth user for a recruiter and returns the UID.
+// If the user already exists (same email), returns the existing UID.
+func CreateFirebaseUser(email, displayName string) (string, error) {
+	if firebaseAuth == nil {
+		return "", fmt.Errorf("firebase auth not initialized")
+	}
+
+	ctx := context.Background()
+
+	// Check if user already exists
+	userRecord, err := firebaseAuth.GetUserByEmail(ctx, email)
+	if err == nil {
+		log.Printf("[firebase] User already exists for %s (UID: %s)", email, userRecord.UID)
+		return userRecord.UID, nil
+	}
+
+	// Create new Firebase user
+	params := (&auth.UserToCreate{}).
+		Email(email).
+		DisplayName(displayName).
+		EmailVerified(true)
+
+	userRecord, err = firebaseAuth.CreateUser(ctx, params)
+	if err != nil {
+		return "", fmt.Errorf("erro ao criar utilizador Firebase: %w", err)
+	}
+
+	log.Printf("[firebase] Created user for recruiter %s (UID: %s)", email, userRecord.UID)
+	return userRecord.UID, nil
+}
+
+// SetRecruiterClaims sets custom claims on a Firebase user to identify them as a recruiter.
+func SetRecruiterClaims(uid, recruiterID string) error {
+	if firebaseAuth == nil {
+		return fmt.Errorf("firebase auth not initialized")
+	}
+
+	ctx := context.Background()
+
+	// Get existing claims to merge (avoid overwriting student claims if user is both)
+	userRecord, err := firebaseAuth.GetUser(ctx, uid)
+	if err != nil {
+		return fmt.Errorf("erro ao obter utilizador: %w", err)
+	}
+
+	claims := userRecord.CustomClaims
+	if claims == nil {
+		claims = make(map[string]interface{})
+	}
+	claims["role"] = "recruiter"
+	claims["recruiter_id"] = recruiterID
+
+	if err := firebaseAuth.SetCustomUserClaims(ctx, uid, claims); err != nil {
+		return fmt.Errorf("erro ao definir claims: %w", err)
+	}
+
+	log.Printf("[firebase] Set recruiter claims for UID=%s (recruiter_id=%s)", uid, recruiterID)
+	return nil
+}
+
+// GenerateSignInLink generates a Firebase email sign-in link for passwordless auth.
+func GenerateSignInLink(emailAddr, continueURL string) (string, error) {
+	if firebaseAuth == nil {
+		return "", fmt.Errorf("firebase auth not initialized")
+	}
+
+	ctx := context.Background()
+
+	settings := &auth.ActionCodeSettings{
+		URL:             continueURL,
+		HandleCodeInApp: true,
+	}
+
+	link, err := firebaseAuth.EmailSignInLink(ctx, emailAddr, settings)
+	if err != nil {
+		return "", fmt.Errorf("erro ao gerar link de sign-in: %w", err)
+	}
+
+	log.Printf("[firebase] Sign-in link generated for %s", emailAddr)
+	return link, nil
 }

@@ -396,3 +396,42 @@ type AuditLog struct {
 	UserAgent   string    `json:"user_agent"`
 	Timestamp   time.Time `gorm:"index;not null" json:"timestamp"`
 }
+
+// --------------------------------------------------
+// RECRUITER — Empresa/recrutador que publica vagas na plataforma.
+// Autenticação via Firebase Email Link (passwordless).
+// Fluxo: apply → pending → approved (admin) → Firebase user criado → acesso.
+// --------------------------------------------------
+type Recruiter struct {
+	ID                 string     `gorm:"type:uuid;primaryKey;default:gen_random_uuid()" json:"id"`
+	FirebaseUID        string     `gorm:"uniqueIndex:idx_recruiters_firebase_uid" json:"-"`
+	FullName           string     `gorm:"not null" json:"full_name"`
+	CompanyName        string     `gorm:"not null" json:"company_name"`
+	Email              string     `gorm:"uniqueIndex:idx_recruiters_email;not null" json:"email"`
+	CompanyURL         string     `gorm:"not null" json:"company_url"`
+	VacancyDescription string     `json:"vacancy_description"`
+	Status             string     `gorm:"type:varchar(20);not null;default:'pending_manual'" json:"status"` // pending_manual | pending_auto | approved | rejected
+	CreatedAt          time.Time  `json:"created_at"`
+	ApprovedAt         *time.Time `json:"approved_at,omitempty"`
+}
+
+// --------------------------------------------------
+// VACANCY — Vaga publicada por um recrutador.
+// Expira automaticamente após 30 dias (cron job diário).
+// --------------------------------------------------
+type Vacancy struct {
+	ID             string     `gorm:"type:uuid;primaryKey;default:gen_random_uuid()" json:"id"`
+	RecruiterID    string     `gorm:"type:uuid;not null;index" json:"recruiter_id"`
+	Title          string     `gorm:"not null" json:"title"`
+	Type           string     `gorm:"type:varchar(30);not null" json:"type"` // summer_internship | curricular_internship | junior_position
+	Tags           StringList `gorm:"type:jsonb;not null;default:'[]'" json:"tags"`
+	Description    string     `gorm:"not null" json:"description"`
+	ApplicationURL string     `gorm:"not null" json:"application_url"`
+	Deadline       *time.Time `json:"deadline,omitempty"`
+	Views          int        `gorm:"default:0" json:"views"`
+	Status         string     `gorm:"type:varchar(20);default:'active'" json:"status"` // active | expired | archived
+	PublishedAt    time.Time  `gorm:"default:NOW()" json:"published_at"`
+	ExpiresAt      time.Time  `json:"expires_at"`
+
+	Recruiter Recruiter `gorm:"foreignKey:RecruiterID" json:"recruiter,omitempty"`
+}
