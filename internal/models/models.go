@@ -404,7 +404,7 @@ type AuditLog struct {
 // --------------------------------------------------
 type Recruiter struct {
 	ID                 string     `gorm:"type:uuid;primaryKey;default:gen_random_uuid()" json:"id"`
-	FirebaseUID        string     `gorm:"uniqueIndex:idx_recruiters_firebase_uid" json:"-"`
+	FirebaseUID        *string    `gorm:"uniqueIndex:idx_recruiters_firebase_uid" json:"-"`
 	FullName           string     `gorm:"not null" json:"full_name"`
 	CompanyName        string     `gorm:"not null" json:"company_name"`
 	Email              string     `gorm:"uniqueIndex:idx_recruiters_email;not null" json:"email"`
