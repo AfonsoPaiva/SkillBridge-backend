@@ -13,6 +13,16 @@ import (
 	"github.com/paiva/SkillBridge/Backend/internal/jobs"
 	"github.com/paiva/SkillBridge/Backend/internal/middleware"
 	"github.com/paiva/SkillBridge/Backend/internal/models"
+	"github.com/paiva/SkillBridge/Backend/internal/storage"
+	
+	"bytes"
+	"fmt"
+	"image"
+	_ "image/jpeg"
+	_ "image/png"
+	"net/url"
+
+	"github.com/disintegration/imaging"
 )
 
 // blockedEmailDomains contains personal email domains that are not allowed for recruiter sign-up.
@@ -57,6 +67,48 @@ func createRecruiterToken(recruiterID string) (string, error) {
 // buildRecruiterAccessLink constructs the frontend URL for recruiter authentication.
 func buildRecruiterAccessLink(token string) string {
 	return config.AppConfig.FrontendURL + "/recruiter/auth?token=" + token
+}
+
+// fetchAndUploadClearbitLogo downloads a logo from Clearbit, resizes it, and uploads to GCS.
+func fetchAndUploadClearbitLogo(companyURL string, uid string) string {
+	if companyURL == "" {
+		return ""
+	}
+	parsedURL, err := url.Parse(companyURL)
+	if err != nil {
+		return ""
+	}
+	domain := strings.TrimPrefix(parsedURL.Hostname(), "www.")
+	if domain == "" {
+		return ""
+	}
+
+	resp, err := http.Get("https://logo.clearbit.com/" + domain)
+	if err != nil || resp.StatusCode != http.StatusOK {
+		return ""
+	}
+	defer resp.Body.Close()
+
+	src, _, err := image.Decode(resp.Body)
+	if err != nil {
+		return ""
+	}
+
+	resized := imaging.Fill(src, 400, 400, imaging.Center, imaging.Lanczos)
+	buf := new(bytes.Buffer)
+	if err := imaging.Encode(buf, resized, imaging.JPEG, imaging.JPEGQuality(85)); err != nil {
+		return ""
+	}
+
+	filename := fmt.Sprintf("%d_%s.jpg", time.Now().UnixMilli(), uid)
+	objectName := fmt.Sprintf("logos/%s", filename)
+
+	publicURL, err := storage.UploadFile(objectName, buf, "image/jpeg")
+	if err != nil {
+		log.Printf("[clearbit] Error uploading logo for %s: %v", domain, err)
+		return ""
+	}
+	return publicURL
 }
 
 // RecruiterApply handles the public recruiter application form submission.
@@ -138,6 +190,14 @@ func RecruiterApply(c *gin.Context) {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Erro ao processar pedido."})
 		return
 	}
+
+	// Auto-fetch logo and save it to the buckets asynchronously
+	go func(recID string, url string) {
+		logoURL := fetchAndUploadClearbitLogo(url, recID)
+		if logoURL != "" {
+			database.DB.Model(&models.Recruiter{}).Where("id = ?", recID).Update("logo_url", logoURL)
+		}
+	}(recruiter.ID, recruiter.CompanyURL)
 
 	log.Printf("[recruiter] Novo pedido: %s (%s) — status: %s", recruiter.CompanyName, recruiter.Email, status)
 
@@ -356,7 +416,16 @@ func UpdateRecruiterProfile(c *gin.Context) {
 
 	updates := make(map[string]interface{})
 	if input.LogoURL != nil {
-		updates["logo_url"] = *input.LogoURL
+		newLogoURL := *input.LogoURL
+		if recruiter.LogoURL != "" && recruiter.LogoURL != newLogoURL {
+			oldObjectName := extractGCSObjectName(recruiter.LogoURL)
+			if oldObjectName != "" {
+				if err := storage.DeleteFile(oldObjectName); err != nil {
+					log.Printf("Warning: Failed to delete old recruiter logo %s: %v", oldObjectName, err)
+				}
+			}
+		}
+		updates["logo_url"] = newLogoURL
 	}
 	if input.CompanyURL != nil {
 		updates["company_url"] = *input.CompanyURL
