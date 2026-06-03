@@ -63,6 +63,14 @@ func ScrapeVacancies(c *gin.Context) {
 	// Detect platform and scrape accordingly
 	var jobs []ScrapedJob
 
+	if !isWorkablePage(parsed) && !isBambooHRPage(parsed) {
+		if embedded := extractEmbeddedATS(careersURL); embedded != nil {
+			log.Printf("[scraper] Found embedded ATS URL: %s", embedded.String())
+			parsed = embedded
+			careersURL = embedded.String()
+		}
+	}
+
 	if isWorkablePage(parsed) {
 		jobs, err = scrapeWorkable(parsed)
 	} else if isBambooHRPage(parsed) {
@@ -112,7 +120,7 @@ func isWorkablePage(u *url.URL) bool {
 // detectWorkableByContent fetches a URL and checks if it's a Workable page.
 func detectWorkableByContent(pageURL string) bool {
 	client := &http.Client{Timeout: 10 * time.Second}
-	resp, err := client.Get(pageURL)
+	resp, err := httpGet(client, pageURL)
 	if err != nil {
 		return false
 	}
@@ -145,7 +153,7 @@ func extractWorkableSubdomain(u *url.URL) string {
 	// Custom domain: careers.criticalmanufacturing.com
 	// Try to find subdomain from the page meta tags
 	client := &http.Client{Timeout: 10 * time.Second}
-	resp, err := client.Get(u.String())
+	resp, err := httpGet(client, u.String())
 	if err != nil {
 		return ""
 	}
@@ -189,7 +197,7 @@ func scrapeWorkable(u *url.URL) ([]ScrapedJob, error) {
 	}
 
 	// Step 1: Get job listings from the llms-full.txt or by scraping the page HTML
-	jobIDs, err := getWorkableJobIDs(baseURL, u.String())
+	jobIDs, err := getWorkableJobIDs(baseURL, u.String(), subdomain)
 	if err != nil {
 		return nil, fmt.Errorf("failed to list jobs: %w", err)
 	}
@@ -217,11 +225,11 @@ func scrapeWorkable(u *url.URL) ([]ScrapedJob, error) {
 }
 
 // getWorkableJobIDs extracts job IDs from a Workable page.
-func getWorkableJobIDs(baseURL, pageURL string) ([]string, error) {
+func getWorkableJobIDs(baseURL, pageURL, subdomain string) ([]string, error) {
 	client := &http.Client{Timeout: 15 * time.Second}
 
 	// Try the main page HTML to extract job links
-	resp, err := client.Get(pageURL)
+	resp, err := httpGet(client, pageURL)
 	if err != nil {
 		return nil, err
 	}
@@ -248,7 +256,7 @@ func getWorkableJobIDs(baseURL, pageURL string) ([]string, error) {
 	// If no job IDs found in main page HTML (SPA), try llms-full.txt
 	if len(jobIDSet) == 0 {
 		llmsURL := baseURL + "/_/llms-full.txt"
-		resp2, err := client.Get(llmsURL)
+		resp2, err := httpGet(client, llmsURL)
 		if err == nil {
 			defer resp2.Body.Close()
 			if resp2.StatusCode == http.StatusOK {
@@ -267,8 +275,8 @@ func getWorkableJobIDs(baseURL, pageURL string) ([]string, error) {
 	// If still no IDs, try the sitemap or the careers page with different pattern
 	if len(jobIDSet) == 0 {
 		// Try fetching the workable jobs feed
-		feedURL := fmt.Sprintf("https://apply.workable.com/api/v1/widget/accounts/%s", extractSubdomainFromBase(baseURL))
-		resp3, err := client.Get(feedURL)
+		feedURL := fmt.Sprintf("https://apply.workable.com/api/v1/widget/accounts/%s", subdomain)
+		resp3, err := httpGet(client, feedURL)
 		if err == nil {
 			defer resp3.Body.Close()
 			body3, _ := io.ReadAll(io.LimitReader(resp3.Body, 500*1024))
@@ -292,30 +300,10 @@ func getWorkableJobIDs(baseURL, pageURL string) ([]string, error) {
 	return ids, nil
 }
 
-func extractSubdomainFromBase(baseURL string) string {
-	parsed, err := url.Parse(baseURL)
-	if err != nil {
-		return ""
-	}
-	parts := strings.Split(strings.Trim(parsed.Path, "/"), "/")
-	if len(parts) > 0 && parts[0] != "" {
-		return parts[0]
-	}
-	// For custom domains, extract from hostname
-	host := parsed.Hostname()
-	// careers.criticalmanufacturing.com → critical-manufacturing (approximate)
-	host = strings.TrimPrefix(host, "careers.")
-	host = strings.TrimPrefix(host, "jobs.")
-	parts2 := strings.Split(host, ".")
-	if len(parts2) > 0 {
-		return parts2[0]
-	}
-	return ""
-}
 
 // fetchWorkableJobMarkdown fetches and parses a single job from its Workable markdown endpoint.
 func fetchWorkableJobMarkdown(client *http.Client, mdURL string, jobID string, baseURL string) (*ScrapedJob, error) {
-	resp, err := client.Get(mdURL)
+	resp, err := httpGet(client, mdURL)
 	if err != nil {
 		return nil, err
 	}
@@ -615,7 +603,7 @@ func isBambooHRPage(u *url.URL) bool {
 func scrapeBambooHR(u *url.URL) ([]ScrapedJob, error) {
 	apiURL := fmt.Sprintf("https://%s/careers/list", u.Hostname())
 	client := &http.Client{Timeout: 15 * time.Second}
-	resp, err := client.Get(apiURL)
+	resp, err := httpGet(client, apiURL)
 	if err != nil {
 		return nil, err
 	}
@@ -696,7 +684,7 @@ func scrapeBambooHR(u *url.URL) ([]ScrapedJob, error) {
 // scrapeGenericHTML tries to scrape job listings from a generic HTML page.
 func scrapeGenericHTML(pageURL string) ([]ScrapedJob, error) {
 	client := &http.Client{Timeout: 15 * time.Second}
-	resp, err := client.Get(pageURL)
+	resp, err := httpGet(client, pageURL)
 	if err != nil {
 		return nil, err
 	}
@@ -954,3 +942,49 @@ func extractJobsFromLDJSON(data interface{}, pageURL string) []ScrapedJob {
 
 	return jobs
 }
+
+// httpGet makes an HTTP GET request with a standard browser User-Agent
+func httpGet(client *http.Client, targetURL string) (*http.Response, error) {
+	req, err := http.NewRequest("GET", targetURL, nil)
+	if err != nil {
+		return nil, err
+	}
+	req.Header.Set("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36")
+	req.Header.Set("Accept", "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8")
+	return client.Do(req)
+}
+
+// extractEmbeddedATS fetches the page and looks for explicit links to known ATS platforms.
+func extractEmbeddedATS(pageURL string) *url.URL {
+	client := &http.Client{Timeout: 15 * time.Second}
+	resp, err := httpGet(client, pageURL)
+	if err != nil {
+		return nil
+	}
+	defer resp.Body.Close()
+
+	body, err := io.ReadAll(io.LimitReader(resp.Body, 500*1024))
+	if err != nil {
+		return nil
+	}
+	content := string(body)
+
+	// Look for BambooHR links
+	reBamboo := regexp.MustCompile(`(?i)https?://([a-zA-Z0-9.-]+\.bamboohr\.com(?:/careers)?)`)
+	if match := reBamboo.FindStringSubmatch(content); len(match) > 1 {
+		if u, err := url.Parse("https://" + match[1]); err == nil {
+			return u
+		}
+	}
+
+	// Look for Workable links
+	reWorkable := regexp.MustCompile(`(?i)https?://(?:[a-zA-Z0-9.-]*workable\.com|apply\.workable\.com/[a-zA-Z0-9.-]+)`)
+	if match := reWorkable.FindString(content); match != "" {
+		if u, err := url.Parse(match); err == nil {
+			return u
+		}
+	}
+
+	return nil
+}
+
