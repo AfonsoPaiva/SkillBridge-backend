@@ -538,6 +538,19 @@ func AdminDeleteRecruiter(c *gin.Context) {
 	// Delete associated tokens
 	database.DB.Where("recruiter_id = ?", id).Delete(&models.RecruiterToken{})
 
+	// Delete recruiter logo from GCS if it exists
+	if recruiter.LogoURL != "" {
+		objectName := extractGCSObjectName(recruiter.LogoURL)
+		if objectName != "" {
+			if err := storage.DeleteFile(objectName); err != nil {
+				log.Printf("Warning: Failed to delete recruiter logo %s: %v", objectName, err)
+			}
+		}
+	}
+
+	// Delete associated vacancies
+	database.DB.Where("recruiter_id = ?", id).Delete(&models.Vacancy{})
+
 	// Delete recruiter from database
 	if err := database.DB.Delete(&recruiter).Error; err != nil {
 		log.Printf("[admin] Erro ao eliminar recrutador: %v", err)
