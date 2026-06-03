@@ -1,11 +1,13 @@
 package handlers
 
 import (
+	"encoding/json"
 	"fmt"
 	"io"
 	"log"
 	"net/http"
 	"net/url"
+	"path/filepath"
 	"regexp"
 	"strings"
 	"time"
@@ -63,6 +65,8 @@ func ScrapeVacancies(c *gin.Context) {
 
 	if isWorkablePage(parsed) {
 		jobs, err = scrapeWorkable(parsed)
+	} else if isBambooHRPage(parsed) {
+		jobs, err = scrapeBambooHR(parsed)
 	} else {
 		// For non-Workable pages, try generic HTML scraping
 		jobs, err = scrapeGenericHTML(careersURL)
@@ -601,6 +605,94 @@ func classifyVacancyType(titleLower, contentLower string) string {
 	return "junior_position"
 }
 
+// isBambooHRPage checks if a URL belongs to BambooHR.
+func isBambooHRPage(u *url.URL) bool {
+	host := strings.ToLower(u.Hostname())
+	return strings.Contains(host, "bamboohr.com") || strings.Contains(host, "bamboohr.co.uk")
+}
+
+// scrapeBambooHR fetches jobs from BambooHR API.
+func scrapeBambooHR(u *url.URL) ([]ScrapedJob, error) {
+	apiURL := fmt.Sprintf("https://%s/careers/list", u.Hostname())
+	client := &http.Client{Timeout: 15 * time.Second}
+	resp, err := client.Get(apiURL)
+	if err != nil {
+		return nil, err
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("bamboohr API returned status %d", resp.StatusCode)
+	}
+
+	var result struct {
+		Result []struct {
+			ID                    string `json:"id"`
+			JobOpeningName        string `json:"jobOpeningName"`
+			DepartmentLabel       string `json:"departmentLabel"`
+			EmploymentStatusLabel string `json:"employmentStatusLabel"`
+			Location              struct {
+				City  string `json:"city"`
+				State string `json:"state"`
+			} `json:"location"`
+		} `json:"result"`
+	}
+
+	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
+		return nil, err
+	}
+
+	var jobs []ScrapedJob
+	var specificJobID string
+	pathBase := filepath.Base(u.Path)
+	if regexp.MustCompile(`^\d+$`).MatchString(pathBase) {
+		specificJobID = pathBase
+	}
+
+	for _, j := range result.Result {
+		title := j.JobOpeningName
+
+		if specificJobID != "" && specificJobID != j.ID {
+			continue
+		}
+
+		titleLower := strings.ToLower(title)
+		isRelevant := false
+		for _, kw := range juniorKeywords {
+			if strings.Contains(titleLower, kw) {
+				isRelevant = true
+				break
+			}
+		}
+
+		if !isRelevant && specificJobID == "" {
+			continue
+		}
+
+		jobURL := fmt.Sprintf("https://%s/careers/%s", u.Hostname(), j.ID)
+		
+		region := j.Location.City
+		if j.Location.State != "" && j.Location.State != j.Location.City {
+			if region != "" {
+				region += ", "
+			}
+			region += j.Location.State
+		}
+
+		jobs = append(jobs, ScrapedJob{
+			Title:          title,
+			Type:           classifyVacancyType(titleLower, ""),
+			ApplicationURL: jobURL,
+			Description:    fmt.Sprintf("Department: %s", j.DepartmentLabel),
+			Region:         region,
+			WorkMode:       "hybrid",
+			EmploymentType: normalizeEmploymentType(j.EmploymentStatusLabel),
+		})
+	}
+
+	return jobs, nil
+}
+
 // scrapeGenericHTML tries to scrape job listings from a generic HTML page.
 func scrapeGenericHTML(pageURL string) ([]ScrapedJob, error) {
 	client := &http.Client{Timeout: 15 * time.Second}
@@ -616,49 +708,249 @@ func scrapeGenericHTML(pageURL string) ([]ScrapedJob, error) {
 	}
 
 	content := string(body)
-
-	// Try to find job listings by searching for common patterns
 	var jobs []ScrapedJob
+	seenURLs := make(map[string]bool)
 
-	// Look for <a> tags with job-related href patterns
-	reLinks := regexp.MustCompile(`<a[^>]+href="([^"]*(?:job|vaga|career|position|opening)[^"]*)"[^>]*>([^<]+)</a>`)
-	matches := reLinks.FindAllStringSubmatch(content, -1)
+	// 1. Try to find JobPosting JSON-LD schemas (Standard for Google Jobs, used by almost all ATS platforms)
+	reLDJSON := regexp.MustCompile(`(?i)<script\s+type=["']application/ld\+json["'][^>]*>([\s\S]*?)</script>`)
+	ldMatches := reLDJSON.FindAllStringSubmatch(content, -1)
 
-	for _, m := range matches {
-		if len(m) < 3 {
+	for _, m := range ldMatches {
+		jsonStr := strings.TrimSpace(m[1])
+		if jsonStr == "" {
 			continue
 		}
-		link := m[1]
-		title := strings.TrimSpace(m[2])
 
-		// Check if title matches our keywords
-		titleLower := strings.ToLower(title)
-		isRelevant := false
-		for _, kw := range juniorKeywords {
-			if strings.Contains(titleLower, kw) {
-				isRelevant = true
-				break
+		var data interface{}
+		if err := json.Unmarshal([]byte(jsonStr), &data); err != nil {
+			continue
+		}
+
+		extracted := extractJobsFromLDJSON(data, pageURL)
+		for _, j := range extracted {
+			if !seenURLs[j.ApplicationURL] {
+				seenURLs[j.ApplicationURL] = true
+				jobs = append(jobs, j)
+			}
+		}
+	}
+
+	// 2. Try to find job listings by searching for common patterns in <a> tags
+	if len(jobs) == 0 {
+		reLinks := regexp.MustCompile(`(?i)<a[^>]+href="([^"]+)"[^>]*>([^<]+)</a>`)
+		matches := reLinks.FindAllStringSubmatch(content, -1)
+
+		for _, m := range matches {
+			if len(m) < 3 {
+				continue
+			}
+			link := m[1]
+			title := strings.TrimSpace(m[2])
+
+			titleLower := strings.ToLower(title)
+			isRelevant := false
+			for _, kw := range juniorKeywords {
+				if strings.Contains(titleLower, kw) {
+					isRelevant = true
+					break
+				}
+			}
+
+			if !isRelevant {
+				continue
+			}
+
+			if !strings.HasPrefix(link, "http") {
+				base, _ := url.Parse(pageURL)
+				ref, _ := url.Parse(link)
+				link = base.ResolveReference(ref).String()
+			}
+
+			if !seenURLs[link] {
+				seenURLs[link] = true
+				jobs = append(jobs, ScrapedJob{
+					Title:          title,
+					Type:           classifyVacancyType(titleLower, ""),
+					Description:    "",
+					ApplicationURL: link,
+				})
+			}
+		}
+	}
+
+	// 3. If no valid links or LD-JSON were found (or user provided a direct job link), try page meta tags
+	if len(jobs) == 0 {
+		reMetaTitle := regexp.MustCompile(`(?i)<meta\s+(?:property|name)="og:title"\s+content="([^"]+)"`)
+		metaMatch := reMetaTitle.FindStringSubmatch(content)
+		
+		pageTitle := ""
+		if len(metaMatch) > 1 {
+			pageTitle = strings.TrimSpace(metaMatch[1])
+		} else {
+			reTitle := regexp.MustCompile(`(?i)<title>([^<]+)</title>`)
+			titleMatch := reTitle.FindStringSubmatch(content)
+			if len(titleMatch) > 1 {
+				pageTitle = strings.TrimSpace(titleMatch[1])
 			}
 		}
 
-		if !isRelevant {
-			continue
-		}
+		if pageTitle != "" {
+			titleLower := strings.ToLower(pageTitle)
+			isRelevant := false
+			for _, kw := range juniorKeywords {
+				if strings.Contains(titleLower, kw) {
+					isRelevant = true
+					break
+				}
+			}
 
-		// Resolve relative URLs
-		if !strings.HasPrefix(link, "http") {
-			base, _ := url.Parse(pageURL)
-			ref, _ := url.Parse(link)
-			link = base.ResolveReference(ref).String()
+			if isRelevant {
+				reMetaDesc := regexp.MustCompile(`(?i)<meta\s+(?:property|name)="og:description"\s+content="([^"]+)"`)
+				descMatch := reMetaDesc.FindStringSubmatch(content)
+				desc := ""
+				if len(descMatch) > 1 {
+					desc = strings.TrimSpace(descMatch[1])
+					if len(desc) > 500 {
+						desc = desc[:497] + "..."
+					}
+				}
+				
+				jobs = append(jobs, ScrapedJob{
+					Title:          pageTitle,
+					Type:           classifyVacancyType(titleLower, ""),
+					Description:    desc,
+					ApplicationURL: pageURL,
+				})
+			}
 		}
-
-		jobs = append(jobs, ScrapedJob{
-			Title:          title,
-			Type:           classifyVacancyType(titleLower, ""),
-			Description:    "",
-			ApplicationURL: link,
-		})
 	}
 
 	return jobs, nil
+}
+
+// stripHTML removes basic HTML tags from a string
+func stripHTML(content string) string {
+	re := regexp.MustCompile(`<[^>]*>`)
+	return re.ReplaceAllString(content, "")
+}
+
+// extractJobsFromLDJSON recursively searches for JobPosting schemas in decoded JSON-LD
+func extractJobsFromLDJSON(data interface{}, pageURL string) []ScrapedJob {
+	var jobs []ScrapedJob
+
+	var processObject func(map[string]interface{})
+	processObject = func(obj map[string]interface{}) {
+		typeVal := obj["@type"]
+		isJob := false
+		if tStr, ok := typeVal.(string); ok && strings.EqualFold(tStr, "JobPosting") {
+			isJob = true
+		} else if tArr, ok := typeVal.([]interface{}); ok {
+			for _, t := range tArr {
+				if tStr, ok := t.(string); ok && strings.EqualFold(tStr, "JobPosting") {
+					isJob = true
+					break
+				}
+			}
+		}
+
+		if isJob {
+			title, _ := obj["title"].(string)
+			desc, _ := obj["description"].(string)
+
+			// Extract region
+			region := ""
+			if loc, ok := obj["jobLocation"].(map[string]interface{}); ok {
+				if addr, ok := loc["address"].(map[string]interface{}); ok {
+					locality, _ := addr["addressLocality"].(string)
+					reg, _ := addr["addressRegion"].(string)
+					if locality != "" {
+						region = locality
+					}
+					if reg != "" && reg != locality {
+						if region != "" {
+							region += ", "
+						}
+						region += reg
+					}
+				}
+			} else if locArr, ok := obj["jobLocation"].([]interface{}); ok && len(locArr) > 0 {
+				if firstLoc, ok := locArr[0].(map[string]interface{}); ok {
+					if addr, ok := firstLoc["address"].(map[string]interface{}); ok {
+						locality, _ := addr["addressLocality"].(string)
+						reg, _ := addr["addressRegion"].(string)
+						if locality != "" {
+							region = locality
+						}
+						if reg != "" && reg != locality {
+							if region != "" {
+								region += ", "
+							}
+							region += reg
+						}
+					}
+				}
+			}
+
+			desc = stripHTML(desc)
+			if len(desc) > 500 {
+				desc = desc[:497] + "..."
+			}
+
+			empTypeStr := ""
+			if et, ok := obj["employmentType"].(string); ok {
+				empTypeStr = et
+			} else if etArr, ok := obj["employmentType"].([]interface{}); ok && len(etArr) > 0 {
+				if etStr, ok := etArr[0].(string); ok {
+					empTypeStr = etStr
+				}
+			}
+
+			titleLower := strings.ToLower(title)
+			isRelevant := false
+			for _, kw := range juniorKeywords {
+				if strings.Contains(titleLower, kw) {
+					isRelevant = true
+					break
+				}
+			}
+
+			if isRelevant {
+				jobs = append(jobs, ScrapedJob{
+					Title:          title,
+					Type:           classifyVacancyType(titleLower, ""),
+					Description:    desc,
+					ApplicationURL: pageURL,
+					Region:         region,
+					EmploymentType: normalizeEmploymentType(empTypeStr),
+					WorkMode:       "hybrid",
+				})
+			}
+			return
+		}
+
+		// Traverse further
+		for _, v := range obj {
+			if childObj, ok := v.(map[string]interface{}); ok {
+				processObject(childObj)
+			} else if childArr, ok := v.([]interface{}); ok {
+				for _, item := range childArr {
+					if itemObj, ok := item.(map[string]interface{}); ok {
+						processObject(itemObj)
+					}
+				}
+			}
+		}
+	}
+
+	if obj, ok := data.(map[string]interface{}); ok {
+		processObject(obj)
+	} else if arr, ok := data.([]interface{}); ok {
+		for _, item := range arr {
+			if obj, ok := item.(map[string]interface{}); ok {
+				processObject(obj)
+			}
+		}
+	}
+
+	return jobs
 }
