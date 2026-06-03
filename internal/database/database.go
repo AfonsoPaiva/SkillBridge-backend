@@ -80,6 +80,11 @@ func Connect() {
 	alterIfMissing("users", "totp_verified_at", "TIMESTAMP")
 	// Email verification status (OAuth accounts are auto-verified)
 	alterIfMissing("users", "email_verified", "BOOL NOT NULL DEFAULT FALSE")
+	
+	// Recruiter fields that were added recently
+	alterIfMissing("recruiters", "logo_url", "TEXT DEFAULT ''")
+	alterIfMissing("recruiters", "company_url", "TEXT DEFAULT ''")
+	alterIfMissing("recruiters", "vacancy_description", "TEXT DEFAULT ''")
 }
 
 type legacyProjectRoleSkillRow struct {
