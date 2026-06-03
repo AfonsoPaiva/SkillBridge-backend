@@ -83,7 +83,7 @@ func fetchAndUploadClearbitLogo(companyURL string, uid string) string {
 		return ""
 	}
 
-	resp, err := http.Get("https://logo.clearbit.com/" + domain)
+	resp, err := http.Get("https://api.companyenrich.com/logo/" + domain)
 	if err != nil || resp.StatusCode != http.StatusOK {
 		return ""
 	}
@@ -428,7 +428,24 @@ func UpdateRecruiterProfile(c *gin.Context) {
 		updates["logo_url"] = newLogoURL
 	}
 	if input.CompanyURL != nil {
-		updates["company_url"] = *input.CompanyURL
+		newCompanyURL := *input.CompanyURL
+		updates["company_url"] = newCompanyURL
+
+		// If URL changed and we aren't explicitly updating the logo to something else
+		if newCompanyURL != recruiter.CompanyURL && (input.LogoURL == nil || *input.LogoURL == recruiter.LogoURL) {
+			newLogoURL := fetchAndUploadClearbitLogo(newCompanyURL, recruiter.ID)
+			if newLogoURL != "" {
+				updates["logo_url"] = newLogoURL
+				if recruiter.LogoURL != "" && recruiter.LogoURL != newLogoURL {
+					oldObjectName := extractGCSObjectName(recruiter.LogoURL)
+					if oldObjectName != "" {
+						if err := storage.DeleteFile(oldObjectName); err != nil {
+							log.Printf("Warning: Failed to delete old recruiter logo %s: %v", oldObjectName, err)
+						}
+					}
+				}
+			}
+		}
 	}
 
 	if err := database.DB.Model(&recruiter).Updates(updates).Error; err != nil {
