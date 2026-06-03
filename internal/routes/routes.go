@@ -284,7 +284,6 @@ func Setup(r *gin.Engine) {
 	{
 		recruiter.GET("/profile", handlers.GetRecruiterProfile)
 		recruiter.PUT("/profile", handlers.UpdateRecruiterProfile)
-		recruiter.POST("/scrape-logo", handlers.ScrapeCompanyLogo)
 		recruiter.GET("/vacancies", handlers.ListMyVacancies)
 		recruiter.POST("/vacancies", handlers.CreateVacancy)
 		recruiter.PUT("/vacancies/:id", handlers.UpdateVacancy)

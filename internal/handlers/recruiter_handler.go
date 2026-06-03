@@ -367,39 +367,6 @@ func UpdateRecruiterProfile(c *gin.Context) {
 	c.JSON(http.StatusOK, recruiter)
 }
 
-// ScrapeCompanyLogo attempts to find a logo for a given website URL.
-// POST /api/recruiter/scrape-logo
-func ScrapeCompanyLogo(c *gin.Context) {
-	var input struct {
-		URL string `json:"url" binding:"required"`
-	}
-
-	if err := c.ShouldBindJSON(&input); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "URL em falta."})
-		return
-	}
-
-	if !strings.HasPrefix(input.URL, "http://") && !strings.HasPrefix(input.URL, "https://") {
-		input.URL = "https://" + input.URL
-	}
-
-	// Just use clearbit for an easy and reliable logo fetcher
-	domain := strings.ReplaceAll(input.URL, "https://", "")
-	domain = strings.ReplaceAll(domain, "http://", "")
-	domain = strings.Split(domain, "/")[0]
-	domain = strings.Split(domain, "?")[0]
-
-	logoURL := "https://logo.clearbit.com/" + domain
-
-	// Quick HEAD request to check if clearbit has it
-	resp, err := http.Head(logoURL)
-	if err != nil || resp.StatusCode != http.StatusOK {
-		c.JSON(http.StatusNotFound, gin.H{"error": "Logo não encontrado automaticamente."})
-		return
-	}
-
-	c.JSON(http.StatusOK, gin.H{"logo_url": logoURL})
-}
 
 // ── Admin Recruiter Management ──────────────────────────────
 
