@@ -272,7 +272,9 @@ func Setup(r *gin.Engine) {
 	// --------------------------------------------------
 	public.POST("/recruiters/apply", handlers.RecruiterApply)
 	public.POST("/recruiters/request-link", handlers.RecruiterRequestLink)
+	public.POST("/recruiters/verify-token", handlers.RecruiterVerifyToken)
 	public.GET("/vacancies", handlers.GetPublicVacancies)
+	public.GET("/vacancies/:id", handlers.GetPublicVacancy)
 
 	// --------------------------------------------------
 	// ROTAS DE RECRUTADORES (autenticadas — Firebase + role recruiter)
@@ -281,6 +283,8 @@ func Setup(r *gin.Engine) {
 	recruiter.Use(middleware.AuthRequired(), middleware.RecruiterRequired())
 	{
 		recruiter.GET("/profile", handlers.GetRecruiterProfile)
+		recruiter.PUT("/profile", handlers.UpdateRecruiterProfile)
+		recruiter.POST("/scrape-logo", handlers.ScrapeCompanyLogo)
 		recruiter.GET("/vacancies", handlers.ListMyVacancies)
 		recruiter.POST("/vacancies", handlers.CreateVacancy)
 		recruiter.PUT("/vacancies/:id", handlers.UpdateVacancy)

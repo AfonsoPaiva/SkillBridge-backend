@@ -213,6 +213,7 @@ func migrate() error {
 		// Recruiter onboarding & vacancies
 		&models.Recruiter{},
 		&models.Vacancy{},
+		&models.RecruiterToken{},
 	}
 	for _, t := range tables {
 		if !DB.Migrator().HasTable(t) {

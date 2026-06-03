@@ -234,3 +234,22 @@ func GetPublicVacancies(c *gin.Context) {
 		"count":     len(vacancies),
 	})
 }
+
+// GetPublicVacancy returns a single public vacancy by ID.
+// GET /api/vacancies/:id
+func GetPublicVacancy(c *gin.Context) {
+	vacancyID := c.Param("id")
+
+	var vacancy models.Vacancy
+	if err := database.DB.Preload("Recruiter").Where("id = ? AND status = ?", vacancyID, "active").First(&vacancy).Error; err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "Vaga não encontrada ou inativa."})
+		return
+	}
+
+	// Increment view count
+	database.DB.Model(&vacancy).UpdateColumn("views", vacancy.Views+1)
+
+	c.JSON(http.StatusOK, gin.H{
+		"vacancy": vacancy,
+	})
+}

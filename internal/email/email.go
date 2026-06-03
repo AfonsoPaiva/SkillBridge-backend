@@ -479,7 +479,7 @@ const recruiterApprovedTemplate = `<h2 style="margin:0 0 20px;color:#1a1a1a;font
 	O seu pedido de acesso ao SkillBridge como recrutador foi <strong>aprovado</strong>. Já pode aceder à plataforma e publicar vagas para estudantes e recém-licenciados.
 </p>
 <p style="margin:0 0 32px;color:#666;font-size:15px;line-height:1.6;">
-	Clique no botão abaixo para aceder à sua conta. Este link é válido por <strong>72 horas</strong>.
+	Clique no botão abaixo para aceder à sua conta. Este link é válido por <strong>72 horas</strong> e pode ser utilizado várias vezes durante esse período.
 </p>
 <table width="100%%" cellpadding="0" cellspacing="0">
 	<tr>
@@ -539,3 +539,35 @@ const recruiterReceivedTemplate = `<h2 style="margin:0 0 20px;color:#1a1a1a;font
 <p style="margin:32px 0 0;color:#666;font-size:14px;line-height:1.6;">
 	Obrigado pelo interesse no SkillBridge.
 </p>`
+
+// SendRecruiterReturning envia email com novo link de acesso para recrutadores que já têm conta aprovada
+func SendRecruiterReturning(name, toEmail, accessLink string) error {
+	subject := "Novo link de acesso — SkillBridge"
+	html := fmt.Sprintf(recruiterReturningTemplate, name, accessLink, accessLink, accessLink)
+	return send(getEmailFrom(), toEmail, subject, html)
+}
+
+const recruiterReturningTemplate = `<h2 style="margin:0 0 20px;color:#1a1a1a;font-size:24px;font-weight:600;">Novo Link de Acesso</h2>
+<p style="margin:0 0 16px;color:#333;font-size:16px;line-height:1.6;">
+	Olá <strong>%s</strong>,
+</p>
+<p style="margin:0 0 24px;color:#333;font-size:16px;line-height:1.6;">
+	Recebemos o seu pedido de acesso à conta de recrutador no SkillBridge. Clique no botão abaixo para aceder diretamente à sua conta.
+</p>
+<p style="margin:0 0 32px;color:#666;font-size:15px;line-height:1.6;">
+	Este link é válido por <strong>72 horas</strong> e pode ser utilizado várias vezes durante esse período.
+</p>
+<table width="100%%" cellpadding="0" cellspacing="0">
+	<tr>
+		<td align="center">
+			<a href="%s" style="display:inline-block;background:#68007a;color:#ffffff;padding:16px 40px;border-radius:6px;text-decoration:none;font-weight:600;font-size:16px;text-align:center;">
+				Aceder à Minha Conta
+			</a>
+		</td>
+	</tr>
+</table>
+<p style="margin:32px 0 0;color:#666;font-size:14px;line-height:1.6;">
+	Se o botão não funcionar, copie e cole este link no seu navegador:<br>
+	<a href="%s" style="color:#68007a;text-decoration:none;word-break:break-all;">%s</a>
+</p>`
+

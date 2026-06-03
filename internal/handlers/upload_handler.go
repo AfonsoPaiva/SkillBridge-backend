@@ -31,6 +31,8 @@ var imageTypes = map[string]imageType{
 	"avatar": {subDir: "avatars", width: 400, height: 400, fill: true, quality: 85},
 	// Project banner, 1280 × 720 (16:9), fit inside — no crop
 	"project": {subDir: "projects", width: 1280, height: 720, fill: false, quality: 82},
+	// Company logo, 400x400, high quality
+	"logo": {subDir: "logos", width: 400, height: 400, fill: true, quality: 85},
 }
 
 // UploadImage - Faz upload e redimensiona uma imagem, guardando-a no Google Cloud Storage.

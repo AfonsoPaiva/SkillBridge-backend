@@ -2,20 +2,20 @@
 package jobs
 
 import (
+	"crypto/rand"
+	"encoding/hex"
 	"log"
-	"net/url"
 	"time"
 
 	"github.com/paiva/SkillBridge/Backend/config"
 	"github.com/paiva/SkillBridge/Backend/internal/database"
 	"github.com/paiva/SkillBridge/Backend/internal/email"
-	"github.com/paiva/SkillBridge/Backend/internal/middleware"
 	"github.com/paiva/SkillBridge/Backend/internal/models"
 )
 
 // StartVacancyExpiryJob runs a daily check for expired vacancies.
 // Expired vacancies are marked as 'expired' and the recruiter receives a renewal email
-// with a Firebase sign-in link that redirects to the vacancy edit page.
+// with a secure access token that redirects to the vacancy edit page.
 func StartVacancyExpiryJob() {
 	ticker := time.NewTicker(24 * time.Hour)
 	log.Println("[jobs] Vacancy expiry job started (runs every 24h)")
@@ -57,16 +57,17 @@ func checkExpiredVacancies() {
 			continue
 		}
 
-		// Generate a new sign-in link for the recruiter with renew param
-		continueURL := config.AppConfig.FrontendURL + "/recruiter/auth?email=" +
-			url.QueryEscape(vacancy.Recruiter.Email) + "&renew=" + vacancy.ID
-
-		renewLink, err := middleware.GenerateSignInLink(vacancy.Recruiter.Email, continueURL)
+		// Generate a secure access token for the recruiter with renew param
+		token, err := CreateRecruiterToken(vacancy.RecruiterID)
 		if err != nil {
-			log.Printf("[jobs] Erro ao gerar link de renovação para vaga %s: %v", vacancy.ID, err)
+			log.Printf("[jobs] Erro ao gerar token de renovação para vaga %s: %v", vacancy.ID, err)
 			// Fallback: use frontend URL directly (recruiter will need to sign in manually)
-			renewLink = config.AppConfig.FrontendURL + "/recruiter/dashboard"
+			renewLink := config.AppConfig.FrontendURL + "/recruiter/dashboard"
+			email.SendVacancyExpired(vacancy.Recruiter.FullName, vacancy.Recruiter.Email, vacancy.Title, renewLink)
+			continue
 		}
+
+		renewLink := config.AppConfig.FrontendURL + "/recruiter/auth?token=" + token + "&renew=" + vacancy.ID
 
 		// Send expiry notification email
 		if err := email.SendVacancyExpired(
@@ -80,4 +81,31 @@ func checkExpiredVacancies() {
 
 		log.Printf("[jobs] Vaga expirada: %s (%s)", vacancy.Title, vacancy.ID)
 	}
+}
+
+// CreateRecruiterToken generates a new 72-hour access token for a recruiter.
+// Exported so it can be used by both the handler and background jobs.
+func CreateRecruiterToken(recruiterID string) (string, error) {
+	// Invalidate existing active tokens by setting them to expired
+	database.DB.Model(&models.RecruiterToken{}).
+		Where("recruiter_id = ? AND expires_at > ?", recruiterID, time.Now()).
+		Update("expires_at", time.Now())
+
+	bytes := make([]byte, 32)
+	if _, err := rand.Read(bytes); err != nil {
+		return "", err
+	}
+	token := hex.EncodeToString(bytes)
+
+	rt := models.RecruiterToken{
+		RecruiterID: recruiterID,
+		Token:       token,
+		ExpiresAt:   time.Now().Add(72 * time.Hour),
+	}
+
+	if err := database.DB.Create(&rt).Error; err != nil {
+		return "", err
+	}
+
+	return token, nil
 }

@@ -3,7 +3,6 @@ package handlers
 import (
 	"log"
 	"net/http"
-	"net/url"
 	"strings"
 	"time"
 
@@ -11,6 +10,7 @@ import (
 	"github.com/paiva/SkillBridge/Backend/config"
 	"github.com/paiva/SkillBridge/Backend/internal/database"
 	"github.com/paiva/SkillBridge/Backend/internal/email"
+	"github.com/paiva/SkillBridge/Backend/internal/jobs"
 	"github.com/paiva/SkillBridge/Backend/internal/middleware"
 	"github.com/paiva/SkillBridge/Backend/internal/models"
 )
@@ -49,6 +49,16 @@ func isPersonalEmail(emailAddr string) bool {
 	return blockedEmailDomains[domain]
 }
 
+// createRecruiterToken generates a new 72-hour access token for a recruiter.
+func createRecruiterToken(recruiterID string) (string, error) {
+	return jobs.CreateRecruiterToken(recruiterID)
+}
+
+// buildRecruiterAccessLink constructs the frontend URL for recruiter authentication.
+func buildRecruiterAccessLink(token string) string {
+	return config.AppConfig.FrontendURL + "/recruiter/auth?token=" + token
+}
+
 // RecruiterApply handles the public recruiter application form submission.
 // POST /api/recruiters/apply
 func RecruiterApply(c *gin.Context) {
@@ -84,6 +94,26 @@ func RecruiterApply(c *gin.Context) {
 	// Check if email already exists
 	var existing models.Recruiter
 	if err := database.DB.Where("email = ?", input.Email).First(&existing).Error; err == nil {
+		// Recruiter already exists — check status
+		if existing.Status == "approved" {
+			// Already approved: generate new access token and send returning-user email
+			go func() {
+				token, err := createRecruiterToken(existing.ID)
+				if err != nil {
+					log.Printf("[recruiter] Erro ao gerar token para recrutador existente %s: %v", existing.Email, err)
+					return
+				}
+				accessLink := buildRecruiterAccessLink(token)
+				if err := email.SendRecruiterReturning(existing.FullName, existing.Email, accessLink); err != nil {
+					log.Printf("[recruiter] Erro ao enviar email de acesso para %s: %v", existing.Email, err)
+				}
+			}()
+			c.JSON(http.StatusConflict, gin.H{
+				"error":   "Este email já está registado e aprovado.",
+				"message": "Enviámos um novo link de acesso para o seu email.",
+			})
+			return
+		}
 		c.JSON(http.StatusConflict, gin.H{"error": "Este email já está registado."})
 		return
 	}
@@ -154,24 +184,97 @@ func RecruiterRequestLink(c *gin.Context) {
 		return
 	}
 
-	// Generate new Firebase sign-in link
-	continueURL := config.AppConfig.FrontendURL + "/recruiter/auth?email=" + url.QueryEscape(recruiter.Email)
-	signInLink, err := middleware.GenerateSignInLink(recruiter.Email, continueURL)
+	// Generate new secure access token (72h)
+	token, err := createRecruiterToken(recruiter.ID)
 	if err != nil {
-		log.Printf("[recruiter] Erro ao gerar link de login para %s: %v", recruiter.Email, err)
+		log.Printf("[recruiter] Erro ao gerar token para %s: %v", recruiter.Email, err)
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Erro ao gerar link."})
 		return
 	}
 
-	// Send email
-	if err := email.SendRecruiterApproved(recruiter.FullName, recruiter.Email, signInLink); err != nil {
+	accessLink := buildRecruiterAccessLink(token)
+
+	// Send returning recruiter email (different from first-time approval)
+	if err := email.SendRecruiterReturning(recruiter.FullName, recruiter.Email, accessLink); err != nil {
 		log.Printf("[recruiter] Erro ao enviar link de login para %s: %v", recruiter.Email, err)
 	}
 
 	c.JSON(http.StatusOK, gin.H{"message": "Se o email estiver aprovado, receberás um link de acesso em breve."})
 }
 
-// approveRecruiter creates a Firebase user, sets recruiter claims, generates sign-in link, and sends approval email.
+// RecruiterVerifyToken validates a recruiter access token and returns a Firebase custom token.
+// POST /api/recruiters/verify-token
+func RecruiterVerifyToken(c *gin.Context) {
+	var input struct {
+		Token string `json:"token" binding:"required"`
+	}
+
+	if err := c.ShouldBindJSON(&input); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Token em falta."})
+		return
+	}
+
+	// Find the token
+	var rt models.RecruiterToken
+	if err := database.DB.Where("token = ?", input.Token).First(&rt).Error; err != nil {
+		log.Printf("[recruiter] Token inválido tentado")
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "Link inválido ou expirado. Solicite um novo acesso."})
+		return
+	}
+
+	// Check expiration
+	if time.Now().After(rt.ExpiresAt) {
+		log.Printf("[recruiter] Token expirado para recruiter_id=%s", rt.RecruiterID)
+		c.JSON(http.StatusUnauthorized, gin.H{
+			"error":   "Link expirado. Solicite um novo acesso.",
+			"expired": true,
+		})
+		return
+	}
+
+	// Get the recruiter
+	var recruiter models.Recruiter
+	if err := database.DB.Where("id = ?", rt.RecruiterID).First(&recruiter).Error; err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "Recrutador não encontrado."})
+		return
+	}
+
+	if recruiter.Status != "approved" {
+		c.JSON(http.StatusForbidden, gin.H{"error": "Conta não aprovada."})
+		return
+	}
+
+	// Check Firebase UID exists
+	if recruiter.FirebaseUID == nil || *recruiter.FirebaseUID == "" {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Conta Firebase não configurada. Contacte o suporte."})
+		return
+	}
+
+	// Generate Firebase custom token
+	customToken, err := middleware.GenerateCustomToken(*recruiter.FirebaseUID)
+	if err != nil {
+		log.Printf("[recruiter] Erro ao gerar custom token para %s: %v", recruiter.Email, err)
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Erro na autenticação."})
+		return
+	}
+
+	// Increment usage count
+	database.DB.Model(&rt).Update("used_count", rt.UsedCount+1)
+
+	log.Printf("[recruiter] Token verificado com sucesso para %s (uso #%d)", recruiter.Email, rt.UsedCount+1)
+
+	c.JSON(http.StatusOK, gin.H{
+		"custom_token": customToken,
+		"recruiter": gin.H{
+			"id":           recruiter.ID,
+			"full_name":    recruiter.FullName,
+			"company_name": recruiter.CompanyName,
+			"email":        recruiter.Email,
+		},
+	})
+}
+
+// approveRecruiter creates a Firebase user, sets recruiter claims, generates access token, and sends approval email.
 func approveRecruiter(recruiterID string) error {
 	var recruiter models.Recruiter
 	if err := database.DB.Where("id = ?", recruiterID).First(&recruiter).Error; err != nil {
@@ -189,12 +292,13 @@ func approveRecruiter(recruiterID string) error {
 		return err
 	}
 
-	// 3. Generate Firebase sign-in link
-	continueURL := config.AppConfig.FrontendURL + "/recruiter/auth?email=" + url.QueryEscape(recruiter.Email)
-	signInLink, err := middleware.GenerateSignInLink(recruiter.Email, continueURL)
+	// 3. Generate secure access token (72h)
+	token, err := createRecruiterToken(recruiter.ID)
 	if err != nil {
 		return err
 	}
+
+	accessLink := buildRecruiterAccessLink(token)
 
 	// 4. Update recruiter record
 	now := time.Now()
@@ -206,8 +310,8 @@ func approveRecruiter(recruiterID string) error {
 		return err
 	}
 
-	// 5. Send approval email
-	if err := email.SendRecruiterApproved(recruiter.FullName, recruiter.Email, signInLink); err != nil {
+	// 5. Send approval email with secure access link
+	if err := email.SendRecruiterApproved(recruiter.FullName, recruiter.Email, accessLink); err != nil {
 		log.Printf("[recruiter] Erro ao enviar email de aprovação para %s: %v", recruiter.Email, err)
 	}
 
@@ -227,6 +331,74 @@ func GetRecruiterProfile(c *gin.Context) {
 	}
 
 	c.JSON(http.StatusOK, recruiter)
+}
+
+// UpdateRecruiterProfile updates the authenticated recruiter's profile.
+// PUT /api/recruiter/profile
+func UpdateRecruiterProfile(c *gin.Context) {
+	recruiterID := c.GetString("recruiter_id")
+
+	var input struct {
+		LogoURL *string `json:"logo_url"`
+	}
+
+	if err := c.ShouldBindJSON(&input); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Dados inválidos."})
+		return
+	}
+
+	var recruiter models.Recruiter
+	if err := database.DB.Where("id = ?", recruiterID).First(&recruiter).Error; err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "Recrutador não encontrado."})
+		return
+	}
+
+	updates := make(map[string]interface{})
+	if input.LogoURL != nil {
+		updates["logo_url"] = *input.LogoURL
+	}
+
+	if err := database.DB.Model(&recruiter).Updates(updates).Error; err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Erro ao atualizar perfil."})
+		return
+	}
+
+	database.DB.Where("id = ?", recruiterID).First(&recruiter)
+	c.JSON(http.StatusOK, recruiter)
+}
+
+// ScrapeCompanyLogo attempts to find a logo for a given website URL.
+// POST /api/recruiter/scrape-logo
+func ScrapeCompanyLogo(c *gin.Context) {
+	var input struct {
+		URL string `json:"url" binding:"required"`
+	}
+
+	if err := c.ShouldBindJSON(&input); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "URL em falta."})
+		return
+	}
+
+	if !strings.HasPrefix(input.URL, "http://") && !strings.HasPrefix(input.URL, "https://") {
+		input.URL = "https://" + input.URL
+	}
+
+	// Just use clearbit for an easy and reliable logo fetcher
+	domain := strings.ReplaceAll(input.URL, "https://", "")
+	domain = strings.ReplaceAll(domain, "http://", "")
+	domain = strings.Split(domain, "/")[0]
+	domain = strings.Split(domain, "?")[0]
+
+	logoURL := "https://logo.clearbit.com/" + domain
+
+	// Quick HEAD request to check if clearbit has it
+	resp, err := http.Head(logoURL)
+	if err != nil || resp.StatusCode != http.StatusOK {
+		c.JSON(http.StatusNotFound, gin.H{"error": "Logo não encontrado automaticamente."})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{"logo_url": logoURL})
 }
 
 // ── Admin Recruiter Management ──────────────────────────────
@@ -323,6 +495,9 @@ func AdminDeleteRecruiter(c *gin.Context) {
 		}
 	}
 
+	// Delete associated tokens
+	database.DB.Where("recruiter_id = ?", id).Delete(&models.RecruiterToken{})
+
 	// Delete recruiter from database
 	if err := database.DB.Delete(&recruiter).Error; err != nil {
 		log.Printf("[admin] Erro ao eliminar recrutador: %v", err)
@@ -334,7 +509,7 @@ func AdminDeleteRecruiter(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"message": "Recrutador eliminado com sucesso."})
 }
 
-// AdminResendRecruiterEmail resends the approval email with a fresh sign-in link.
+// AdminResendRecruiterEmail resends the approval email with a fresh access link.
 // POST /api/admin/recruiters/:id/resend-email
 func AdminResendRecruiterEmail(c *gin.Context) {
 	id := c.Param("id")
@@ -350,17 +525,18 @@ func AdminResendRecruiterEmail(c *gin.Context) {
 		return
 	}
 
-	// Generate Firebase sign-in link
-	continueURL := config.AppConfig.FrontendURL + "/recruiter/auth?email=" + url.QueryEscape(recruiter.Email)
-	signInLink, err := middleware.GenerateSignInLink(recruiter.Email, continueURL)
+	// Generate new secure access token (72h)
+	token, err := createRecruiterToken(recruiter.ID)
 	if err != nil {
-		log.Printf("[admin] Erro ao gerar link para %s: %v", recruiter.Email, err)
+		log.Printf("[admin] Erro ao gerar token para %s: %v", recruiter.Email, err)
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Erro ao gerar novo link de acesso."})
 		return
 	}
 
+	accessLink := buildRecruiterAccessLink(token)
+
 	// Send approval email again
-	if err := email.SendRecruiterApproved(recruiter.FullName, recruiter.Email, signInLink); err != nil {
+	if err := email.SendRecruiterApproved(recruiter.FullName, recruiter.Email, accessLink); err != nil {
 		log.Printf("[admin] Erro ao reenviar email para %s: %v", recruiter.Email, err)
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Erro ao enviar o email."})
 		return

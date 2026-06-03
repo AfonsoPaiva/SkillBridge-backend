@@ -219,3 +219,22 @@ func GenerateSignInLink(emailAddr, continueURL string) (string, error) {
 	log.Printf("[firebase] Sign-in link generated for %s", emailAddr)
 	return link, nil
 }
+
+// GenerateCustomToken creates a Firebase custom token for a given UID.
+// This token can be used by the client with signInWithCustomToken().
+// Custom tokens expire after 1 hour, but the Firebase session persists.
+func GenerateCustomToken(uid string) (string, error) {
+	if firebaseAuth == nil {
+		return "", fmt.Errorf("firebase auth not initialized")
+	}
+
+	ctx := context.Background()
+
+	token, err := firebaseAuth.CustomToken(ctx, uid)
+	if err != nil {
+		return "", fmt.Errorf("erro ao gerar custom token: %w", err)
+	}
+
+	log.Printf("[firebase] Custom token generated for UID=%s", uid)
+	return token, nil
+}

@@ -409,6 +409,7 @@ type Recruiter struct {
 	CompanyName        string     `gorm:"not null" json:"company_name"`
 	Email              string     `gorm:"uniqueIndex:idx_recruiters_email;not null" json:"email"`
 	CompanyURL         string     `gorm:"not null" json:"company_url"`
+	LogoURL            string     `json:"logo_url"`
 	VacancyDescription string     `json:"vacancy_description"`
 	Status             string     `gorm:"type:varchar(20);not null;default:'pending_manual'" json:"status"` // pending_manual | pending_auto | approved | rejected
 	CreatedAt          time.Time  `json:"created_at"`
@@ -435,3 +436,20 @@ type Vacancy struct {
 
 	Recruiter Recruiter `gorm:"foreignKey:RecruiterID" json:"recruiter,omitempty"`
 }
+
+// --------------------------------------------------
+// RECRUITER_TOKEN — Token de acesso seguro para recrutadores.
+// Substitui os Firebase Email Sign-In Links (oobCode) que são de uso único.
+// Tokens são válidos por 72 horas e podem ser usados múltiplas vezes.
+// --------------------------------------------------
+type RecruiterToken struct {
+	ID          uint      `gorm:"primaryKey;autoIncrement" json:"id"`
+	RecruiterID string    `gorm:"type:uuid;not null;index" json:"recruiter_id"`
+	Token       string    `gorm:"type:varchar(64);uniqueIndex:idx_recruiter_token;not null" json:"-"`
+	ExpiresAt   time.Time `gorm:"not null" json:"expires_at"`
+	UsedCount   int       `gorm:"default:0" json:"used_count"`
+	CreatedAt   time.Time `json:"created_at"`
+
+	Recruiter Recruiter `gorm:"foreignKey:RecruiterID" json:"recruiter,omitempty"`
+}
+
