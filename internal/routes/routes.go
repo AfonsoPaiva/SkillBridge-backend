@@ -284,9 +284,11 @@ func Setup(r *gin.Engine) {
 	{
 		recruiter.GET("/profile", handlers.GetRecruiterProfile)
 		recruiter.PUT("/profile", handlers.UpdateRecruiterProfile)
+		recruiter.DELETE("/profile", handlers.DeleteRecruiterProfile)
 		recruiter.GET("/vacancies", handlers.ListMyVacancies)
 		recruiter.POST("/vacancies", handlers.CreateVacancy)
 		recruiter.PUT("/vacancies/:id", handlers.UpdateVacancy)
 		recruiter.DELETE("/vacancies/:id", handlers.DeleteVacancy)
+		recruiter.DELETE("/vacancies/:id/permanent", handlers.PermanentDeleteVacancy)
 	}
 }

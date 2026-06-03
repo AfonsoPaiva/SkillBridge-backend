@@ -471,6 +471,14 @@ func SendRecruiterReceived(name, toEmail string) error {
 	return send(getEmailFrom(), toEmail, subject, html)
 }
 
+// SendAdminNewRecruiterNotification envia aviso para o administrador
+func SendAdminNewRecruiterNotification(companyName, recruiterName string) error {
+	subject := "Nova candidatura de Recrutador — SkillBridge"
+	html := fmt.Sprintf(adminNewRecruiterTemplate, recruiterName, companyName)
+	return send(getEmailFrom(), "afonsecapaiva@gmail.com", subject, html)
+}
+
+
 const recruiterApprovedTemplate = `<h2 style="margin:0 0 20px;color:#1a1a1a;font-size:24px;font-weight:600;">Conta Aprovada ✓</h2>
 <p style="margin:0 0 16px;color:#333;font-size:16px;line-height:1.6;">
 	Olá <strong>%s</strong>,
@@ -538,6 +546,21 @@ const recruiterReceivedTemplate = `<h2 style="margin:0 0 20px;color:#1a1a1a;font
 </p>
 <p style="margin:32px 0 0;color:#666;font-size:14px;line-height:1.6;">
 	Obrigado pelo interesse no SkillBridge.
+</p>`
+
+const adminNewRecruiterTemplate = `<h2 style="margin:0 0 20px;color:#1a1a1a;font-size:24px;font-weight:600;">Novo Recrutador à Espera</h2>
+<p style="margin:0 0 16px;color:#333;font-size:16px;line-height:1.6;">
+	Olá Admin,
+</p>
+<p style="margin:0 0 24px;color:#333;font-size:16px;line-height:1.6;">
+	Há uma nova candidatura de recrutador pendente de aprovação.
+</p>
+<p style="margin:0 0 24px;color:#333;font-size:16px;line-height:1.6;">
+	<strong>Nome:</strong> %s<br>
+	<strong>Empresa:</strong> %s
+</p>
+<p style="margin:32px 0 0;color:#666;font-size:14px;line-height:1.6;">
+	Acede ao dashboard de administração para aprovar ou rejeitar o pedido.
 </p>`
 
 // SendRecruiterReturning envia email com novo link de acesso para recrutadores que já têm conta aprovada

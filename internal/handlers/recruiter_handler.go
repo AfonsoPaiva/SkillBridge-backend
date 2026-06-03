@@ -170,11 +170,8 @@ func RecruiterApply(c *gin.Context) {
 		return
 	}
 
-	// Determine auto or manual approval
+	// Todos os pedidos requerem agora aprovação manual
 	status := "pending_manual"
-	if !isPersonalEmail(input.Email) {
-		status = "pending_auto"
-	}
 
 	recruiter := models.Recruiter{
 		FullName:           strings.TrimSpace(input.FullName),
@@ -201,17 +198,11 @@ func RecruiterApply(c *gin.Context) {
 
 	log.Printf("[recruiter] Novo pedido: %s (%s) — status: %s", recruiter.CompanyName, recruiter.Email, status)
 
-	// Auto-approve corporate email domains immediately
-	if status == "pending_auto" {
-		go func() {
-			if err := approveRecruiter(recruiter.ID); err != nil {
-				log.Printf("[recruiter] Erro na aprovação automática de %s: %v", recruiter.Email, err)
-			}
-		}()
-	}
-
-	// Send confirmation email
+	// Enviar email de confirmação para o recrutador
 	go email.SendRecruiterReceived(recruiter.FullName, recruiter.Email)
+
+	// Enviar email de notificação para o administrador
+	go email.SendAdminNewRecruiterNotification(recruiter.CompanyName, recruiter.FullName)
 
 	c.JSON(http.StatusCreated, gin.H{
 		"message": "Pedido recebido! Vamos analisar e enviar-te um email em breve.",
@@ -457,6 +448,51 @@ func UpdateRecruiterProfile(c *gin.Context) {
 	c.JSON(http.StatusOK, recruiter)
 }
 
+
+// DeleteRecruiterProfile allows a recruiter to permanently delete their account.
+// DELETE /api/recruiter/profile
+func DeleteRecruiterProfile(c *gin.Context) {
+	recruiterID := c.GetString("recruiter_id")
+
+	var recruiter models.Recruiter
+	if err := database.DB.Where("id = ?", recruiterID).First(&recruiter).Error; err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "Recrutador não encontrado."})
+		return
+	}
+
+	// Delete Firebase user if possible
+	if recruiter.FirebaseUID != nil && *recruiter.FirebaseUID != "" {
+		if err := middleware.DeleteUser(*recruiter.FirebaseUID); err != nil {
+			log.Printf("[recruiter] Erro ao eliminar utilizador Firebase uid=%s do recrutador: %v", *recruiter.FirebaseUID, err)
+		}
+	}
+
+	// Delete associated tokens
+	database.DB.Where("recruiter_id = ?", recruiterID).Delete(&models.RecruiterToken{})
+
+	// Delete recruiter logo from GCS if it exists
+	if recruiter.LogoURL != "" {
+		objectName := extractGCSObjectName(recruiter.LogoURL)
+		if objectName != "" {
+			if err := storage.DeleteFile(objectName); err != nil {
+				log.Printf("Warning: Failed to delete recruiter logo %s: %v", objectName, err)
+			}
+		}
+	}
+
+	// Delete associated vacancies
+	database.DB.Where("recruiter_id = ?", recruiterID).Delete(&models.Vacancy{})
+
+	// Delete recruiter from database
+	if err := database.DB.Delete(&recruiter).Error; err != nil {
+		log.Printf("[recruiter] Erro ao eliminar conta do recrutador: %v", err)
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Erro ao eliminar conta."})
+		return
+	}
+
+	log.Printf("[recruiter] Conta eliminada por iniciativa do recrutador: ID=%s", recruiterID)
+	c.JSON(http.StatusOK, gin.H{"message": "Conta eliminada com sucesso."})
+}
 
 // ── Admin Recruiter Management ──────────────────────────────
 

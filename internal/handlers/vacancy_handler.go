@@ -206,6 +206,22 @@ func DeleteVacancy(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"message": "Vaga arquivada."})
 }
 
+// PermanentDeleteVacancy permanently deletes a vacancy.
+// DELETE /api/recruiter/vacancies/:id/permanent
+func PermanentDeleteVacancy(c *gin.Context) {
+	recruiterID := c.GetString("recruiter_id")
+	vacancyID := c.Param("id")
+
+	result := database.DB.Where("id = ? AND recruiter_id = ?", vacancyID, recruiterID).Delete(&models.Vacancy{})
+
+	if result.RowsAffected == 0 {
+		c.JSON(http.StatusNotFound, gin.H{"error": "Vaga não encontrada."})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{"message": "Vaga eliminada permanentemente."})
+}
+
 // GetPublicVacancies returns all active vacancies (public endpoint for students).
 // GET /api/vacancies
 func GetPublicVacancies(c *gin.Context) {
