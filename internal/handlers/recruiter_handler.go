@@ -339,7 +339,8 @@ func UpdateRecruiterProfile(c *gin.Context) {
 	recruiterID := c.GetString("recruiter_id")
 
 	var input struct {
-		LogoURL *string `json:"logo_url"`
+		LogoURL    *string `json:"logo_url"`
+		CompanyURL *string `json:"company_url"`
 	}
 
 	if err := c.ShouldBindJSON(&input); err != nil {
@@ -356,6 +357,9 @@ func UpdateRecruiterProfile(c *gin.Context) {
 	updates := make(map[string]interface{})
 	if input.LogoURL != nil {
 		updates["logo_url"] = *input.LogoURL
+	}
+	if input.CompanyURL != nil {
+		updates["company_url"] = *input.CompanyURL
 	}
 
 	if err := database.DB.Model(&recruiter).Updates(updates).Error; err != nil {
