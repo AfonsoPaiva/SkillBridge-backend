@@ -85,6 +85,11 @@ func Connect() {
 	alterIfMissing("recruiters", "logo_url", "TEXT DEFAULT ''")
 	alterIfMissing("recruiters", "company_url", "TEXT DEFAULT ''")
 	alterIfMissing("recruiters", "vacancy_description", "TEXT DEFAULT ''")
+
+	// Vacancy enrichment fields
+	alterIfMissing("vacancies", "region", "VARCHAR(100) DEFAULT ''")
+	alterIfMissing("vacancies", "work_mode", "VARCHAR(20) DEFAULT ''")
+	alterIfMissing("vacancies", "employment_type", "VARCHAR(20) DEFAULT ''")
 }
 
 type legacyProjectRoleSkillRow struct {

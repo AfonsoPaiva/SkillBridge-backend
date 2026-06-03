@@ -40,6 +40,9 @@ func CreateVacancy(c *gin.Context) {
 		Tags           []string `json:"tags" binding:"required,min=1"`
 		Description    string   `json:"description" binding:"required"`
 		ApplicationURL string   `json:"application_url" binding:"required"`
+		Region         string   `json:"region"`
+		WorkMode       string   `json:"work_mode"`
+		EmploymentType string   `json:"employment_type"`
 		Deadline       *string  `json:"deadline"`
 	}
 
@@ -84,6 +87,9 @@ func CreateVacancy(c *gin.Context) {
 		Tags:           models.StringList(input.Tags),
 		Description:    input.Description,
 		ApplicationURL: input.ApplicationURL,
+		Region:         input.Region,
+		WorkMode:       input.WorkMode,
+		EmploymentType: input.EmploymentType,
 		Deadline:       deadline,
 		Status:         "active",
 		PublishedAt:    now,
@@ -118,6 +124,9 @@ func UpdateVacancy(c *gin.Context) {
 		Tags           []string `json:"tags"`
 		Description    *string  `json:"description"`
 		ApplicationURL *string  `json:"application_url"`
+		Region         *string  `json:"region"`
+		WorkMode       *string  `json:"work_mode"`
+		EmploymentType *string  `json:"employment_type"`
 		Deadline       *string  `json:"deadline"`
 		Status         *string  `json:"status"`
 	}
@@ -152,6 +161,15 @@ func UpdateVacancy(c *gin.Context) {
 	}
 	if input.ApplicationURL != nil {
 		updates["application_url"] = *input.ApplicationURL
+	}
+	if input.Region != nil {
+		updates["region"] = *input.Region
+	}
+	if input.WorkMode != nil {
+		updates["work_mode"] = *input.WorkMode
+	}
+	if input.EmploymentType != nil {
+		updates["employment_type"] = *input.EmploymentType
 	}
 	if input.Deadline != nil {
 		if *input.Deadline == "" {

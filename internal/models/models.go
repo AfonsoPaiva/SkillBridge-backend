@@ -428,6 +428,9 @@ type Vacancy struct {
 	Tags           StringList `gorm:"type:jsonb;not null;default:'[]'" json:"tags"`
 	Description    string     `gorm:"not null" json:"description"`
 	ApplicationURL string     `gorm:"not null" json:"application_url"`
+	Region         string     `gorm:"type:varchar(100);default:''" json:"region"`          // e.g. "Porto, Portugal"
+	WorkMode       string     `gorm:"type:varchar(20);default:''" json:"work_mode"`        // hybrid | remote | onsite
+	EmploymentType string     `gorm:"type:varchar(20);default:''" json:"employment_type"`  // full_time | part_time
 	Deadline       *time.Time `json:"deadline,omitempty"`
 	Views          int        `gorm:"default:0" json:"views"`
 	Status         string     `gorm:"type:varchar(20);default:'active'" json:"status"` // active | expired | archived
