@@ -37,7 +37,7 @@ func CreateVacancy(c *gin.Context) {
 	var input struct {
 		Title          string   `json:"title" binding:"required"`
 		Type           string   `json:"type" binding:"required"`
-		Tags           []string `json:"tags" binding:"required,min=1"`
+		Tags           []string `json:"tags"`
 		Description    string   `json:"description" binding:"required"`
 		ApplicationURL string   `json:"application_url" binding:"required"`
 		Region         string   `json:"region"`

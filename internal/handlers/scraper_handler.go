@@ -63,7 +63,7 @@ func ScrapeVacancies(c *gin.Context) {
 	// Detect platform and scrape accordingly
 	var jobs []ScrapedJob
 
-	if !isWorkablePage(parsed) && !isBambooHRPage(parsed) {
+	if !isWorkablePage(parsed) && !isBambooHRPage(parsed) && !isLinkedInPage(parsed) && !isIndeedPage(parsed) {
 		if embedded := extractEmbeddedATS(careersURL); embedded != nil {
 			log.Printf("[scraper] Found embedded ATS URL: %s", embedded.String())
 			parsed = embedded
@@ -71,7 +71,11 @@ func ScrapeVacancies(c *gin.Context) {
 		}
 	}
 
-	if isWorkablePage(parsed) {
+	if isLinkedInPage(parsed) {
+		jobs, err = scrapeLinkedIn(careersURL)
+	} else if isIndeedPage(parsed) {
+		jobs, err = scrapeIndeed(careersURL)
+	} else if isWorkablePage(parsed) {
 		jobs, err = scrapeWorkable(parsed)
 	} else if isBambooHRPage(parsed) {
 		jobs, err = scrapeBambooHR(parsed)
@@ -678,6 +682,119 @@ func scrapeBambooHR(u *url.URL) ([]ScrapedJob, error) {
 		})
 	}
 
+	return jobs, nil
+}
+
+// isLinkedInPage checks if a URL belongs to LinkedIn.
+func isLinkedInPage(u *url.URL) bool {
+	host := strings.ToLower(u.Hostname())
+	return strings.Contains(host, "linkedin.com")
+}
+
+// scrapeLinkedIn attempts to scrape a LinkedIn job posting.
+func scrapeLinkedIn(pageURL string) ([]ScrapedJob, error) {
+	client := &http.Client{Timeout: 15 * time.Second}
+	req, _ := http.NewRequest("GET", pageURL, nil)
+	req.Header.Set("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36")
+	req.Header.Set("Accept-Language", "en-US,en;q=0.9")
+	resp, err := client.Do(req)
+	if err != nil {
+		return nil, err
+	}
+	defer resp.Body.Close()
+
+	body, err := io.ReadAll(io.LimitReader(resp.Body, 1024*1024))
+	if err != nil {
+		return nil, err
+	}
+	content := string(body)
+
+	var jobs []ScrapedJob
+	reTitle := regexp.MustCompile(`(?i)<meta\s+(?:property|name)="og:title"\s+content="([^"]+)"`)
+	titleMatch := reTitle.FindStringSubmatch(content)
+	
+	title := ""
+	if len(titleMatch) > 1 {
+		title = titleMatch[1]
+		if idx := strings.Index(title, " at "); idx != -1 {
+			title = title[:idx]
+		}
+	} else {
+		// Fallback to generic
+		return scrapeGenericHTML(pageURL)
+	}
+
+	reDesc := regexp.MustCompile(`(?i)<meta\s+(?:property|name)="og:description"\s+content="([^"]+)"`)
+	descMatch := reDesc.FindStringSubmatch(content)
+	desc := ""
+	if len(descMatch) > 1 {
+		desc = descMatch[1]
+	}
+
+	titleLower := strings.ToLower(title)
+	jobs = append(jobs, ScrapedJob{
+		Title:          title,
+		Type:           classifyVacancyType(titleLower, strings.ToLower(desc)),
+		Description:    desc,
+		ApplicationURL: pageURL,
+	})
+	
+	return jobs, nil
+}
+
+// isIndeedPage checks if a URL belongs to Indeed.
+func isIndeedPage(u *url.URL) bool {
+	host := strings.ToLower(u.Hostname())
+	return strings.Contains(host, "indeed.com") || strings.Contains(host, "indeed.pt")
+}
+
+// scrapeIndeed attempts to scrape an Indeed job posting.
+func scrapeIndeed(pageURL string) ([]ScrapedJob, error) {
+	client := &http.Client{Timeout: 15 * time.Second}
+	req, _ := http.NewRequest("GET", pageURL, nil)
+	req.Header.Set("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36")
+	req.Header.Set("Accept-Language", "en-US,en;q=0.9")
+	resp, err := client.Do(req)
+	if err != nil {
+		return nil, err
+	}
+	defer resp.Body.Close()
+
+	body, err := io.ReadAll(io.LimitReader(resp.Body, 1024*1024))
+	if err != nil {
+		return nil, err
+	}
+	content := string(body)
+
+	var jobs []ScrapedJob
+	reTitle := regexp.MustCompile(`(?i)<meta\s+(?:property|name)="og:title"\s+content="([^"]+)"`)
+	titleMatch := reTitle.FindStringSubmatch(content)
+	
+	title := ""
+	if len(titleMatch) > 1 {
+		title = titleMatch[1]
+		if idx := strings.Index(title, " - "); idx != -1 {
+			title = title[:idx]
+		}
+	} else {
+		return scrapeGenericHTML(pageURL)
+	}
+
+	reDesc := regexp.MustCompile(`(?i)<meta\s+(?:property|name)="og:description"\s+content="([^"]+)"`)
+	descMatch := reDesc.FindStringSubmatch(content)
+	desc := ""
+	if len(descMatch) > 1 {
+		desc = descMatch[1]
+	}
+
+	titleLower := strings.ToLower(title)
+	jobs = append(jobs, ScrapedJob{
+		Title:          title,
+		Type:           classifyVacancyType(titleLower, strings.ToLower(desc)),
+		Description:    desc,
+		ApplicationURL: pageURL,
+	})
+	
 	return jobs, nil
 }
 
