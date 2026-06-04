@@ -62,11 +62,7 @@ func CreateVacancy(c *gin.Context) {
 		return
 	}
 
-	// Validate description length
-	if len(input.Description) > 500 {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Descrição não pode exceder 500 caracteres."})
-		return
-	}
+
 
 	// Parse optional deadline
 	var deadline *time.Time
@@ -153,10 +149,7 @@ func UpdateVacancy(c *gin.Context) {
 		updates["tags"] = models.StringList(input.Tags)
 	}
 	if input.Description != nil {
-		if len(*input.Description) > 500 {
-			c.JSON(http.StatusBadRequest, gin.H{"error": "Descrição não pode exceder 500 caracteres."})
-			return
-		}
+
 		updates["description"] = *input.Description
 	}
 	if input.ApplicationURL != nil {
