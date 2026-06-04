@@ -53,9 +53,10 @@ func CreateVacancy(c *gin.Context) {
 
 	// Validate type
 	validTypes := map[string]bool{
-		"summer_internship":    true,
-		"curricular_internship": true,
-		"junior_position":      true,
+		"summer_internship":          true,
+		"curricular_internship":      true,
+		"extracurricular_internship": true,
+		"junior_position":            true,
 	}
 	if !validTypes[input.Type] {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "Tipo de vaga inválido."})
@@ -138,7 +139,12 @@ func UpdateVacancy(c *gin.Context) {
 		updates["title"] = *input.Title
 	}
 	if input.Type != nil {
-		validTypes := map[string]bool{"summer_internship": true, "curricular_internship": true, "junior_position": true}
+		validTypes := map[string]bool{
+			"summer_internship":          true,
+			"curricular_internship":      true,
+			"extracurricular_internship": true,
+			"junior_position":            true,
+		}
 		if !validTypes[*input.Type] {
 			c.JSON(http.StatusBadRequest, gin.H{"error": "Tipo de vaga inválido."})
 			return

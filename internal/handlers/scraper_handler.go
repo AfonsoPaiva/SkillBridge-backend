@@ -570,8 +570,13 @@ func classifyVacancyType(titleLower, contentLower string) string {
 	if strings.Contains(titleLower, "intern") || strings.Contains(titleLower, "estágio") ||
 		strings.Contains(titleLower, "estagio") || strings.Contains(titleLower, "trainee") ||
 		strings.Contains(titleLower, "estagiário") || strings.Contains(titleLower, "estágiário") {
+		
+		if strings.Contains(contentLower, "extracurricular") || strings.Contains(titleLower, "extracurricular") {
+			return "extracurricular_internship"
+		}
+
 		// Check if it's curricular
-		if strings.Contains(contentLower, "curricular") {
+		if strings.Contains(contentLower, "curricular") || strings.Contains(titleLower, "curricular") {
 			return "curricular_internship"
 		}
 		return "summer_internship"
