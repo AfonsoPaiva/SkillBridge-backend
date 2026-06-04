@@ -449,11 +449,8 @@ func parseWorkableMarkdown(content string, jobID string, baseURL string) *Scrape
 		}
 	}
 
-	// Build description (truncate to 500 chars)
+	// Build description
 	description = extractDescription(content)
-	if len(description) > 500 {
-		description = description[:497] + "..."
-	}
 
 	// Determine vacancy type based on keywords
 	vacancyType := classifyVacancyType(titleLower, contentLower)
