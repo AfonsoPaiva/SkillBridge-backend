@@ -682,6 +682,8 @@ func scrapeBambooHR(u *url.URL) ([]ScrapedJob, error) {
 }
 
 // scrapeGenericHTML tries to scrape job listings from a generic HTML page.
+// It first attempts to detect SPA-based job portals and call their APIs directly,
+// then falls back to static HTML parsing.
 func scrapeGenericHTML(pageURL string) ([]ScrapedJob, error) {
 	client := &http.Client{Timeout: 15 * time.Second}
 	resp, err := httpGet(client, pageURL)
@@ -696,6 +698,15 @@ func scrapeGenericHTML(pageURL string) ([]ScrapedJob, error) {
 	}
 
 	content := string(body)
+	parsed, _ := url.Parse(pageURL)
+	baseOrigin := fmt.Sprintf("%s://%s", parsed.Scheme, parsed.Host)
+
+	// 0. Try SPA job search APIs (ESA/Lidl, Greenhouse, Lever, SmartRecruiters)
+	if jobs, err := trySPAJobAPIs(client, content, baseOrigin, pageURL); err == nil && len(jobs) > 0 {
+		log.Printf("[scraper] SPA API returned %d jobs from %s", len(jobs), pageURL)
+		return jobs, nil
+	}
+
 	var jobs []ScrapedJob
 	seenURLs := make(map[string]bool)
 
@@ -811,6 +822,341 @@ func scrapeGenericHTML(pageURL string) ([]ScrapedJob, error) {
 				})
 			}
 		}
+	}
+
+	return jobs, nil
+}
+
+// trySPAJobAPIs detects SPA-based job portals by analyzing the page HTML
+// and calls their internal APIs to get structured job data.
+func trySPAJobAPIs(client *http.Client, html string, baseOrigin string, pageURL string) ([]ScrapedJob, error) {
+	htmlLower := strings.ToLower(html)
+
+	// Detect ESA platform (Lidl, Kaufland, Schwarz group) - uses search_api/jobsearch
+	if strings.Contains(htmlLower, "js_tjobsearch") ||
+		strings.Contains(htmlLower, "search_api/jobsearch") ||
+		strings.Contains(htmlLower, "jobsearchconfig") ||
+		(strings.Contains(htmlLower, "react-container") && strings.Contains(htmlLower, "jobresult")) {
+		log.Printf("[scraper] Detected ESA/Lidl-type SPA portal at %s", pageURL)
+		return scrapeESAJobAPI(client, baseOrigin, pageURL)
+	}
+
+	// Detect Greenhouse embed - uses boards-api.greenhouse.io
+	reGH := regexp.MustCompile(`(?i)boards-api\.greenhouse\.io/v1/boards/([a-zA-Z0-9_-]+)`)
+	if ghMatch := reGH.FindStringSubmatch(html); len(ghMatch) > 1 {
+		log.Printf("[scraper] Detected Greenhouse board: %s", ghMatch[1])
+		return scrapeGreenhouseAPI(client, ghMatch[1], pageURL)
+	}
+	// Also check for Greenhouse iframe embed
+	reGHEmbed := regexp.MustCompile(`(?i)grnh\.se/|greenhouse\.io/embed/job_board`)
+	if reGHEmbed.MatchString(html) {
+		reBoard := regexp.MustCompile(`(?i)boards\.greenhouse\.io/([a-zA-Z0-9_-]+)`)
+		if boardMatch := reBoard.FindStringSubmatch(html); len(boardMatch) > 1 {
+			return scrapeGreenhouseAPI(client, boardMatch[1], pageURL)
+		}
+	}
+
+	// Detect Lever - uses jobs.lever.co
+	reLever := regexp.MustCompile(`(?i)jobs\.lever\.co/([a-zA-Z0-9_-]+)`)
+	if leverMatch := reLever.FindStringSubmatch(html); len(leverMatch) > 1 {
+		log.Printf("[scraper] Detected Lever company: %s", leverMatch[1])
+		return scrapeLeverAPI(client, leverMatch[1], pageURL)
+	}
+
+	// Detect SmartRecruiters - uses jobs.smartrecruiters.com
+	reSR := regexp.MustCompile(`(?i)jobs\.smartrecruiters\.com/([a-zA-Z0-9_-]+)`)
+	if srMatch := reSR.FindStringSubmatch(html); len(srMatch) > 1 {
+		log.Printf("[scraper] Detected SmartRecruiters company: %s", srMatch[1])
+		return scrapeSmartRecruitersAPI(client, srMatch[1], pageURL)
+	}
+
+	return nil, fmt.Errorf("no SPA API detected")
+}
+
+// scrapeESAJobAPI scrapes jobs from the ESA platform (Lidl, Kaufland, etc.)
+// by calling the search_api/jobsearch endpoint with pagination.
+func scrapeESAJobAPI(client *http.Client, baseOrigin string, pageURL string) ([]ScrapedJob, error) {
+	const maxPages = 15
+	const resultsPerPage = 50
+
+	var allJobs []ScrapedJob
+
+	for page := 1; page <= maxPages; page++ {
+		apiURL := fmt.Sprintf("%s/search_api/jobsearch?type=job&filter=[]&resultsPerPage=%d&page=%d", baseOrigin, resultsPerPage, page)
+		log.Printf("[scraper] ESA API page %d: %s", page, apiURL)
+
+		req, err := http.NewRequest("GET", apiURL, nil)
+		if err != nil {
+			return allJobs, err
+		}
+		req.Header.Set("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36")
+		req.Header.Set("Accept", "application/json, text/plain, */*")
+		req.Header.Set("Referer", pageURL)
+
+		resp, err := client.Do(req)
+		if err != nil {
+			if len(allJobs) > 0 {
+				return allJobs, nil
+			}
+			return nil, err
+		}
+		defer resp.Body.Close()
+
+		if resp.StatusCode != http.StatusOK {
+			if len(allJobs) > 0 {
+				return allJobs, nil
+			}
+			return nil, fmt.Errorf("ESA API returned status %d", resp.StatusCode)
+		}
+
+		respBody, err := io.ReadAll(io.LimitReader(resp.Body, 2*1024*1024))
+		if err != nil {
+			return allJobs, err
+		}
+
+		var apiResp struct {
+			Result struct {
+				Hits []struct {
+					Title              string `json:"title"`
+					ContractType       string `json:"contractType"`
+					EntryLevel         string `json:"entryLevel"`
+					EmploymentAreaTitle string `json:"employmentAreaTitle"`
+					JobID              int    `json:"jobId"`
+					URL                string `json:"url"`
+					Reference          string `json:"reference"`
+					SalaryValue        string `json:"salaryValue"`
+					RecruitingURL      string `json:"recruitingUrl"`
+					DescResp           string `json:"descResponsibilities"`
+					Location           struct {
+						Title   string `json:"title"`
+						City    string `json:"city"`
+						Address string `json:"address"`
+						Country string `json:"country"`
+					} `json:"location"`
+				} `json:"hits"`
+				Count     int `json:"count"`
+				PageCount int `json:"pageCount"`
+			} `json:"result"`
+		}
+
+		if err := json.Unmarshal(respBody, &apiResp); err != nil {
+			if len(allJobs) > 0 {
+				return allJobs, nil
+			}
+			return nil, fmt.Errorf("failed to parse ESA API response: %w", err)
+		}
+
+		for _, hit := range apiResp.Result.Hits {
+			// Build application URL
+			appURL := hit.RecruitingURL
+			if appURL == "" && hit.URL != "" {
+				appURL = baseOrigin + hit.URL
+			}
+			if appURL == "" {
+				appURL = pageURL
+			}
+
+			// Build region from location
+			region := hit.Location.City
+			if hit.Location.Country != "" && hit.Location.Country != hit.Location.City {
+				if region != "" {
+					region += ", "
+				}
+				region += hit.Location.Country
+			}
+
+			// Extract short description from HTML description
+			desc := stripHTML(hit.DescResp)
+			desc = strings.TrimSpace(desc)
+			if len(desc) > 500 {
+				desc = desc[:497] + "..."
+			}
+
+			titleLower := strings.ToLower(hit.Title)
+			contentLower := strings.ToLower(hit.Title + " " + hit.EntryLevel + " " + desc)
+			vacancyType := classifyVacancyType(titleLower, contentLower)
+
+			allJobs = append(allJobs, ScrapedJob{
+				Title:          hit.Title,
+				Type:           vacancyType,
+				Description:    desc,
+				ApplicationURL: appURL,
+				Region:         region,
+				WorkMode:       "",
+				EmploymentType: normalizeEmploymentType(hit.ContractType),
+			})
+		}
+
+		// Stop if we've fetched all pages
+		if page >= apiResp.Result.PageCount || len(apiResp.Result.Hits) == 0 {
+			break
+		}
+	}
+
+	log.Printf("[scraper] ESA API total: %d jobs extracted", len(allJobs))
+	return allJobs, nil
+}
+
+// scrapeGreenhouseAPI scrapes jobs from a Greenhouse board via their public API.
+func scrapeGreenhouseAPI(client *http.Client, boardToken string, pageURL string) ([]ScrapedJob, error) {
+	apiURL := fmt.Sprintf("https://boards-api.greenhouse.io/v1/boards/%s/jobs?content=true", boardToken)
+	resp, err := httpGet(client, apiURL)
+	if err != nil {
+		return nil, err
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("Greenhouse API returned status %d", resp.StatusCode)
+	}
+
+	var result struct {
+		Jobs []struct {
+			Title    string `json:"title"`
+			AbsURL   string `json:"absolute_url"`
+			Content  string `json:"content"`
+			Location struct {
+				Name string `json:"name"`
+			} `json:"location"`
+		} `json:"jobs"`
+	}
+
+	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
+		return nil, err
+	}
+
+	var jobs []ScrapedJob
+	for _, j := range result.Jobs {
+		titleLower := strings.ToLower(j.Title)
+		desc := stripHTML(j.Content)
+		if len(desc) > 500 {
+			desc = desc[:497] + "..."
+		}
+		contentLower := strings.ToLower(j.Title + " " + desc)
+
+		appURL := j.AbsURL
+		if appURL == "" {
+			appURL = pageURL
+		}
+
+		jobs = append(jobs, ScrapedJob{
+			Title:          j.Title,
+			Type:           classifyVacancyType(titleLower, contentLower),
+			Description:    desc,
+			ApplicationURL: appURL,
+			Region:         j.Location.Name,
+		})
+	}
+
+	return jobs, nil
+}
+
+// scrapeLeverAPI scrapes jobs from Lever's public API.
+func scrapeLeverAPI(client *http.Client, company string, pageURL string) ([]ScrapedJob, error) {
+	apiURL := fmt.Sprintf("https://api.lever.co/v0/postings/%s?mode=json", company)
+	resp, err := httpGet(client, apiURL)
+	if err != nil {
+		return nil, err
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("Lever API returned status %d", resp.StatusCode)
+	}
+
+	var postings []struct {
+		Text        string `json:"text"`
+		HostedURL   string `json:"hostedUrl"`
+		ApplyURL    string `json:"applyUrl"`
+		Description string `json:"descriptionPlain"`
+		Categories  struct {
+			Location   string `json:"location"`
+			Commitment string `json:"commitment"`
+		} `json:"categories"`
+	}
+
+	if err := json.NewDecoder(resp.Body).Decode(&postings); err != nil {
+		return nil, err
+	}
+
+	var jobs []ScrapedJob
+	for _, p := range postings {
+		titleLower := strings.ToLower(p.Text)
+		desc := p.Description
+		if len(desc) > 500 {
+			desc = desc[:497] + "..."
+		}
+
+		appURL := p.HostedURL
+		if appURL == "" {
+			appURL = p.ApplyURL
+		}
+		if appURL == "" {
+			appURL = pageURL
+		}
+
+		jobs = append(jobs, ScrapedJob{
+			Title:          p.Text,
+			Type:           classifyVacancyType(titleLower, strings.ToLower(desc)),
+			Description:    desc,
+			ApplicationURL: appURL,
+			Region:         p.Categories.Location,
+			EmploymentType: normalizeEmploymentType(p.Categories.Commitment),
+		})
+	}
+
+	return jobs, nil
+}
+
+// scrapeSmartRecruitersAPI scrapes jobs from SmartRecruiters public API.
+func scrapeSmartRecruitersAPI(client *http.Client, company string, pageURL string) ([]ScrapedJob, error) {
+	apiURL := fmt.Sprintf("https://api.smartrecruiters.com/v1/companies/%s/postings", company)
+	resp, err := httpGet(client, apiURL)
+	if err != nil {
+		return nil, err
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("SmartRecruiters API returned status %d", resp.StatusCode)
+	}
+
+	var result struct {
+		Content []struct {
+			Name string `json:"name"`
+			Ref  string `json:"ref"`
+			URL  struct {
+				API string `json:"api"`
+			} `json:"url,omitempty"`
+			Location struct {
+				City    string `json:"city"`
+				Country string `json:"country"`
+			} `json:"location"`
+		} `json:"content"`
+	}
+
+	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
+		return nil, err
+	}
+
+	var jobs []ScrapedJob
+	for _, p := range result.Content {
+		titleLower := strings.ToLower(p.Name)
+		region := p.Location.City
+		if p.Location.Country != "" {
+			if region != "" {
+				region += ", "
+			}
+			region += p.Location.Country
+		}
+		appURL := fmt.Sprintf("https://jobs.smartrecruiters.com/%s/%s", company, p.Ref)
+
+		jobs = append(jobs, ScrapedJob{
+			Title:          p.Name,
+			Type:           classifyVacancyType(titleLower, ""),
+			ApplicationURL: appURL,
+			Region:         region,
+		})
 	}
 
 	return jobs, nil
