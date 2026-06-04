@@ -432,21 +432,8 @@ func parseWorkableMarkdown(content string, jobID string, baseURL string) *Scrape
 	}
 
 	// Check if it's in Portugal
-	regionLower := strings.ToLower(region)
-	if region != "" && !strings.Contains(regionLower, "portugal") &&
-		!strings.Contains(regionLower, "porto") &&
-		!strings.Contains(regionLower, "lisboa") &&
-		!strings.Contains(regionLower, "lisbon") &&
-		!strings.Contains(regionLower, "maia") &&
-		!strings.Contains(regionLower, "braga") &&
-		!strings.Contains(regionLower, "coimbra") &&
-		!strings.Contains(regionLower, "aveiro") &&
-		!strings.Contains(regionLower, "faro") &&
-		!strings.Contains(regionLower, "funchal") {
-		// Also check if region is empty (might be remote)
-		if region != "" {
-			return nil // Not in Portugal
-		}
+	if !isPortugalLocation(region) {
+		return nil
 	}
 
 	// Build description
@@ -594,6 +581,32 @@ func classifyVacancyType(titleLower, contentLower string) string {
 	return "junior_position"
 }
 
+// isPortugalLocation determines if a region string is likely in Portugal.
+func isPortugalLocation(region string) bool {
+	if region == "" {
+		return true // Allow unspecified/remote
+	}
+	regionLower := strings.ToLower(region)
+	if strings.Contains(regionLower, "portugal") ||
+		strings.Contains(regionLower, ", pt") ||
+		strings.Contains(regionLower, " pt") ||
+		strings.Contains(regionLower, "porto") ||
+		strings.Contains(regionLower, "lisboa") ||
+		strings.Contains(regionLower, "lisbon") ||
+		strings.Contains(regionLower, "maia") ||
+		strings.Contains(regionLower, "braga") ||
+		strings.Contains(regionLower, "coimbra") ||
+		strings.Contains(regionLower, "aveiro") ||
+		strings.Contains(regionLower, "faro") ||
+		strings.Contains(regionLower, "funchal") ||
+		strings.Contains(regionLower, "leiria") ||
+		strings.Contains(regionLower, "setúbal") ||
+		strings.Contains(regionLower, "setubal") {
+		return true
+	}
+	return false
+}
+
 // isBambooHRPage checks if a URL belongs to BambooHR.
 func isBambooHRPage(u *url.URL) bool {
 	host := strings.ToLower(u.Hostname())
@@ -666,6 +679,10 @@ func scrapeBambooHR(u *url.URL) ([]ScrapedJob, error) {
 				region += ", "
 			}
 			region += j.Location.State
+		}
+
+		if !isPortugalLocation(region) {
+			continue
 		}
 
 		jobs = append(jobs, ScrapedJob{
@@ -1123,6 +1140,10 @@ func scrapeESAJobAPI(client *http.Client, baseOrigin string, pageURL string) ([]
 			contentLower := strings.ToLower(hit.Title + " " + hit.EntryLevel + " " + desc)
 			vacancyType := classifyVacancyType(titleLower, contentLower)
 
+			if !isPortugalLocation(region) {
+				continue
+			}
+
 			allJobs = append(allJobs, ScrapedJob{
 				Title:          hit.Title,
 				Type:           vacancyType,
@@ -1186,6 +1207,10 @@ func scrapeGreenhouseAPI(client *http.Client, boardToken string, pageURL string)
 			appURL = pageURL
 		}
 
+		if !isPortugalLocation(j.Location.Name) {
+			continue
+		}
+
 		jobs = append(jobs, ScrapedJob{
 			Title:          j.Title,
 			Type:           classifyVacancyType(titleLower, contentLower),
@@ -1240,6 +1265,10 @@ func scrapeLeverAPI(client *http.Client, company string, pageURL string) ([]Scra
 		}
 		if appURL == "" {
 			appURL = pageURL
+		}
+
+		if !isPortugalLocation(p.Categories.Location) {
+			continue
 		}
 
 		jobs = append(jobs, ScrapedJob{
@@ -1297,6 +1326,10 @@ func scrapeSmartRecruitersAPI(client *http.Client, company string, pageURL strin
 			region += p.Location.Country
 		}
 		appURL := fmt.Sprintf("https://jobs.smartrecruiters.com/%s/%s", company, p.Ref)
+
+		if !isPortugalLocation(region) {
+			continue
+		}
 
 		jobs = append(jobs, ScrapedJob{
 			Title:          p.Name,
@@ -1396,6 +1429,9 @@ func extractJobsFromLDJSON(data interface{}, pageURL string) []ScrapedJob {
 			}
 
 			if isRelevant {
+				if !isPortugalLocation(region) {
+					return
+				}
 				jobs = append(jobs, ScrapedJob{
 					Title:          title,
 					Type:           classifyVacancyType(titleLower, ""),
