@@ -984,6 +984,39 @@ func trySPAJobAPIs(client *http.Client, html string, baseOrigin string, pageURL 
 		return scrapeSmartRecruitersAPI(client, srMatch[1], pageURL)
 	}
 
+	// Hardcoded exceptions for masked SmartRecruiters platforms
+	smartRecruitersExceptions := map[string]string{
+		"jobs.bosch.com":      "BoschGroup",
+		"careers.ikea.com":    "IKEA",
+		"jobs.kantar.com":     "Kantar",
+		"careers.visa.com":    "Visa",
+		"jobs.jysk.com":       "JYSK",
+		"careers.ubisoft.com": "Ubisoft2",
+		"careers.biogen.com":  "Biogen",
+	}
+
+	for domain, company := range smartRecruitersExceptions {
+		if strings.Contains(pageURL, domain) {
+			log.Printf("[scraper] Detected masked SmartRecruiters for %s", company)
+			return scrapeSmartRecruitersAPI(client, company, pageURL)
+		}
+	}
+
+	// Hardcoded exceptions for masked Greenhouse platforms
+	greenhouseExceptions := map[string]string{
+		"talkdesk.com":    "talkdesk",
+		"feedzai.com":     "feedzai",
+		"swordhealth.com": "swordhealth",
+		"cloudflare.com":  "cloudflare",
+	}
+
+	for domain, boardToken := range greenhouseExceptions {
+		if strings.Contains(pageURL, domain) {
+			log.Printf("[scraper] Detected masked Greenhouse for %s", boardToken)
+			return scrapeGreenhouseAPI(client, boardToken, pageURL)
+		}
+	}
+
 	return nil, fmt.Errorf("no SPA API detected")
 }
 
