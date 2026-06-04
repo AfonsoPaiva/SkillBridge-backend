@@ -607,6 +607,23 @@ func isPortugalLocation(region string) bool {
 	return false
 }
 
+// isJobRelevant checks if a job title or description indicates an entry-level position.
+func isJobRelevant(titleLower, contentLower string) bool {
+	for _, kw := range juniorKeywords {
+		if strings.Contains(titleLower, kw) {
+			return true
+		}
+	}
+	if contentLower != "" {
+		for _, kw := range juniorKeywords {
+			if strings.Contains(contentLower, kw) {
+				return true
+			}
+		}
+	}
+	return false
+}
+
 // isBambooHRPage checks if a URL belongs to BambooHR.
 func isBambooHRPage(u *url.URL) bool {
 	host := strings.ToLower(u.Hostname())
@@ -1144,6 +1161,10 @@ func scrapeESAJobAPI(client *http.Client, baseOrigin string, pageURL string) ([]
 				continue
 			}
 
+			if !isJobRelevant(titleLower, contentLower) {
+				continue
+			}
+
 			allJobs = append(allJobs, ScrapedJob{
 				Title:          hit.Title,
 				Type:           vacancyType,
@@ -1211,6 +1232,10 @@ func scrapeGreenhouseAPI(client *http.Client, boardToken string, pageURL string)
 			continue
 		}
 
+		if !isJobRelevant(titleLower, contentLower) {
+			continue
+		}
+
 		jobs = append(jobs, ScrapedJob{
 			Title:          j.Title,
 			Type:           classifyVacancyType(titleLower, contentLower),
@@ -1268,6 +1293,10 @@ func scrapeLeverAPI(client *http.Client, company string, pageURL string) ([]Scra
 		}
 
 		if !isPortugalLocation(p.Categories.Location) {
+			continue
+		}
+
+		if !isJobRelevant(titleLower, strings.ToLower(desc)) {
 			continue
 		}
 
@@ -1346,6 +1375,10 @@ func scrapeSmartRecruitersAPI(client *http.Client, company string, pageURL strin
 			appURL := fmt.Sprintf("https://jobs.smartrecruiters.com/%s/%s", company, p.Ref)
 
 			if !isPortugalLocation(region) {
+				continue
+			}
+
+			if !isJobRelevant(titleLower, "") {
 				continue
 			}
 
