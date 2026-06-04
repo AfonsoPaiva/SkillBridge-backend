@@ -1286,60 +1286,84 @@ func scrapeLeverAPI(client *http.Client, company string, pageURL string) ([]Scra
 
 // scrapeSmartRecruitersAPI scrapes jobs from SmartRecruiters public API.
 func scrapeSmartRecruitersAPI(client *http.Client, company string, pageURL string) ([]ScrapedJob, error) {
-	apiURL := fmt.Sprintf("https://api.smartrecruiters.com/v1/companies/%s/postings", company)
-	resp, err := httpGet(client, apiURL)
-	if err != nil {
-		return nil, err
-	}
-	defer resp.Body.Close()
+	var allJobs []ScrapedJob
+	offset := 0
+	limit := 100
 
-	if resp.StatusCode != http.StatusOK {
-		return nil, fmt.Errorf("SmartRecruiters API returned status %d", resp.StatusCode)
-	}
-
-	var result struct {
-		Content []struct {
-			Name string `json:"name"`
-			Ref  string `json:"ref"`
-			URL  struct {
-				API string `json:"api"`
-			} `json:"url,omitempty"`
-			Location struct {
-				City    string `json:"city"`
-				Country string `json:"country"`
-			} `json:"location"`
-		} `json:"content"`
-	}
-
-	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
-		return nil, err
-	}
-
-	var jobs []ScrapedJob
-	for _, p := range result.Content {
-		titleLower := strings.ToLower(p.Name)
-		region := p.Location.City
-		if p.Location.Country != "" {
-			if region != "" {
-				region += ", "
+	for {
+		// Use country=pt to filter on the server-side, reducing global API calls
+		apiURL := fmt.Sprintf("https://api.smartrecruiters.com/v1/companies/%s/postings?country=pt&limit=%d&offset=%d", company, limit, offset)
+		resp, err := httpGet(client, apiURL)
+		if err != nil {
+			if len(allJobs) > 0 {
+				return allJobs, nil
 			}
-			region += p.Location.Country
-		}
-		appURL := fmt.Sprintf("https://jobs.smartrecruiters.com/%s/%s", company, p.Ref)
-
-		if !isPortugalLocation(region) {
-			continue
+			return nil, err
 		}
 
-		jobs = append(jobs, ScrapedJob{
-			Title:          p.Name,
-			Type:           classifyVacancyType(titleLower, ""),
-			ApplicationURL: appURL,
-			Region:         region,
-		})
+		if resp.StatusCode != http.StatusOK {
+			resp.Body.Close()
+			if len(allJobs) > 0 {
+				return allJobs, nil
+			}
+			return nil, fmt.Errorf("SmartRecruiters API returned status %d", resp.StatusCode)
+		}
+
+		var result struct {
+			Content []struct {
+				Name string `json:"name"`
+				Ref  string `json:"ref"`
+				URL  struct {
+					API string `json:"api"`
+				} `json:"url,omitempty"`
+				Location struct {
+					City    string `json:"city"`
+					Country string `json:"country"`
+				} `json:"location"`
+			} `json:"content"`
+			TotalFound int `json:"totalFound"`
+		}
+
+		err = json.NewDecoder(resp.Body).Decode(&result)
+		resp.Body.Close()
+		
+		if err != nil {
+			if len(allJobs) > 0 {
+				return allJobs, nil
+			}
+			return nil, err
+		}
+
+		for _, p := range result.Content {
+			titleLower := strings.ToLower(p.Name)
+			region := p.Location.City
+			if p.Location.Country != "" {
+				if region != "" {
+					region += ", "
+				}
+				region += p.Location.Country
+			}
+			appURL := fmt.Sprintf("https://jobs.smartrecruiters.com/%s/%s", company, p.Ref)
+
+			if !isPortugalLocation(region) {
+				continue
+			}
+
+			allJobs = append(allJobs, ScrapedJob{
+				Title:          p.Name,
+				Type:           classifyVacancyType(titleLower, ""),
+				ApplicationURL: appURL,
+				Region:         region,
+			})
+		}
+
+		offset += limit
+		if offset >= result.TotalFound || len(result.Content) == 0 {
+			break
+		}
 	}
 
-	return jobs, nil
+	return allJobs, nil
 }
 
 // stripHTML removes basic HTML tags from a string
