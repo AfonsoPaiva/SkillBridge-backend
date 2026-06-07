@@ -1091,9 +1091,14 @@ func AdminBulkUpdateVacancies(c *gin.Context) {
 			v.Tags = extractSkillsFromText(v.Description)
 		}
 
+		// Ensure ExpiresAt is set
+		if v.ExpiresAt.IsZero() {
+			v.ExpiresAt = time.Now().AddDate(0, 1, 0)
+		}
+
 		if v.ID == "" {
 			// CREATE (new vacancy)
-			if v.Status == "" {
+			if v.Status == "" || v.Status == "expired" {
 				v.Status = "active"
 			}
 			if err := database.DB.Create(v).Error; err == nil {
