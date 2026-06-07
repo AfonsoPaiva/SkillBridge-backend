@@ -14,15 +14,8 @@ import (
 	"github.com/paiva/SkillBridge/Backend/internal/middleware"
 	"github.com/paiva/SkillBridge/Backend/internal/models"
 	"github.com/paiva/SkillBridge/Backend/internal/storage"
-	
-	"bytes"
-	"fmt"
-	"image"
-	_ "image/jpeg"
-	_ "image/png"
-	"net/url"
 
-	"github.com/disintegration/imaging"
+	"net/url"
 )
 
 // blockedEmailDomains contains personal email domains that are not allowed for recruiter sign-up.
@@ -69,7 +62,7 @@ func buildRecruiterAccessLink(token string) string {
 	return config.AppConfig.FrontendURL + "/recruiter/auth?token=" + token
 }
 
-// fetchAndUploadClearbitLogo downloads a logo from Clearbit, resizes it, and uploads to GCS.
+// fetchAndUploadClearbitLogo fetches a company logo. We use Google Favicons as it's free and reliable.
 func fetchAndUploadClearbitLogo(companyURL string, uid string) string {
 	if companyURL == "" {
 		return ""
@@ -83,32 +76,7 @@ func fetchAndUploadClearbitLogo(companyURL string, uid string) string {
 		return ""
 	}
 
-	resp, err := http.Get("https://api.companyenrich.com/logo/" + domain)
-	if err != nil || resp.StatusCode != http.StatusOK {
-		return ""
-	}
-	defer resp.Body.Close()
-
-	src, _, err := image.Decode(resp.Body)
-	if err != nil {
-		return ""
-	}
-
-	resized := imaging.Fill(src, 400, 400, imaging.Center, imaging.Lanczos)
-	buf := new(bytes.Buffer)
-	if err := imaging.Encode(buf, resized, imaging.JPEG, imaging.JPEGQuality(85)); err != nil {
-		return ""
-	}
-
-	filename := fmt.Sprintf("%d_%s.jpg", time.Now().UnixMilli(), uid)
-	objectName := fmt.Sprintf("logos/%s", filename)
-
-	publicURL, err := storage.UploadFile(objectName, buf, "image/jpeg")
-	if err != nil {
-		log.Printf("[clearbit] Error uploading logo for %s: %v", domain, err)
-		return ""
-	}
-	return publicURL
+	return "https://icon.horse/icon/" + domain
 }
 
 // RecruiterApply handles the public recruiter application form submission.
@@ -467,7 +435,6 @@ func UpdateRecruiterProfile(c *gin.Context) {
 	database.DB.Where("id = ?", recruiterID).First(&recruiter)
 	c.JSON(http.StatusOK, recruiter)
 }
-
 
 // DeleteRecruiterProfile allows a recruiter to permanently delete their account.
 // DELETE /api/recruiter/profile
