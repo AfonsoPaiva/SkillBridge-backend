@@ -1073,8 +1073,8 @@ func AdminBulkUpdateVacancies(c *gin.Context) {
 	for i := range vacancies {
 		v := &vacancies[i]
 
-		// If RecruiterID is empty but CompanyName is provided, resolve it
-		if v.RecruiterID == "" && v.CompanyName != "" {
+		// If CompanyName is provided, resolve it and OVERRIDE any provided RecruiterID
+		if v.CompanyName != "" {
 			resolvedID := resolveRecruiterByCompanyName(v.CompanyName)
 			if resolvedID != "" {
 				v.RecruiterID = resolvedID
