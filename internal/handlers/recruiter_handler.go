@@ -173,19 +173,39 @@ func RecruiterApply(c *gin.Context) {
 	// Todos os pedidos requerem agora aprovação manual
 	status := "pending_manual"
 
-	recruiter := models.Recruiter{
-		FullName:           strings.TrimSpace(input.FullName),
-		CompanyName:        strings.TrimSpace(input.CompanyName),
-		Email:              input.Email,
-		CompanyURL:         input.CompanyURL,
-		VacancyDescription: strings.TrimSpace(input.VacancyDescription),
-		Status:             status,
-	}
+	var recruiter models.Recruiter
+	// Check if a dummy recruiter exists for this company
+	var dummy models.Recruiter
+	errDummy := database.DB.Where("LOWER(company_name) = ? AND email LIKE '%@dummy.skillbridge.pt'", strings.ToLower(strings.TrimSpace(input.CompanyName))).First(&dummy).Error
 
-	if err := database.DB.Create(&recruiter).Error; err != nil {
-		log.Printf("[recruiter] Erro ao criar recrutador: %v", err)
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Erro ao processar pedido."})
-		return
+	if errDummy == nil {
+		dummy.FullName = strings.TrimSpace(input.FullName)
+		dummy.Email = input.Email
+		dummy.CompanyURL = input.CompanyURL
+		dummy.VacancyDescription = strings.TrimSpace(input.VacancyDescription)
+		dummy.Status = status
+
+		if err := database.DB.Save(&dummy).Error; err != nil {
+			log.Printf("[recruiter] Erro ao atualizar recrutador dummy: %v", err)
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "Erro ao processar pedido."})
+			return
+		}
+		recruiter = dummy
+	} else {
+		recruiter = models.Recruiter{
+			FullName:           strings.TrimSpace(input.FullName),
+			CompanyName:        strings.TrimSpace(input.CompanyName),
+			Email:              input.Email,
+			CompanyURL:         input.CompanyURL,
+			VacancyDescription: strings.TrimSpace(input.VacancyDescription),
+			Status:             status,
+		}
+
+		if err := database.DB.Create(&recruiter).Error; err != nil {
+			log.Printf("[recruiter] Erro ao criar recrutador: %v", err)
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "Erro ao processar pedido."})
+			return
+		}
 	}
 
 	// Auto-fetch logo and save it to the buckets asynchronously

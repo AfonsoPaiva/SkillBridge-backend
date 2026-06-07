@@ -865,3 +865,225 @@ func AdminGetUniversityStats(c *gin.Context) {
 
 	c.JSON(http.StatusOK, result)
 }
+
+// ── Admin Vacancy Management ──────────────────────────────
+
+// AdminListVacancies lists all vacancies.
+// GET /api/admin/vacancies
+func AdminListVacancies(c *gin.Context) {
+	var vacancies []models.Vacancy
+	if err := database.DB.Preload("Recruiter").Order("published_at DESC").Find(&vacancies).Error; err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Erro ao listar vagas."})
+		return
+	}
+	c.JSON(http.StatusOK, vacancies)
+}
+
+// AdminCreateVacancy creates a vacancy manually.
+// POST /api/admin/vacancies
+func AdminCreateVacancy(c *gin.Context) {
+	var input struct {
+		CompanyName    string   `json:"company_name"`
+		CompanyURL     string   `json:"company_url"`
+		LogoURL        string   `json:"logo_url"`
+		RecruiterID    string   `json:"recruiter_id"`
+		Title          string   `json:"title" binding:"required"`
+		Type           string   `json:"type" binding:"required"`
+		Tags           []string `json:"tags"`
+		Description    string   `json:"description" binding:"required"`
+		ApplicationURL string   `json:"application_url" binding:"required"`
+		Region         string   `json:"region"`
+		WorkMode       string   `json:"work_mode"`
+		EmploymentType string   `json:"employment_type"`
+		ExpiresAt      *time.Time `json:"expires_at"`
+	}
+
+	if err := c.ShouldBindJSON(&input); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Dados inválidos."})
+		return
+	}
+
+	var recruiter models.Recruiter
+	if input.RecruiterID != "" {
+		if err := database.DB.Where("id = ?", input.RecruiterID).First(&recruiter).Error; err != nil {
+			c.JSON(http.StatusNotFound, gin.H{"error": "Recrutador não encontrado."})
+			return
+		}
+	} else if input.CompanyName != "" {
+		err := database.DB.Where("LOWER(company_name) = ?", strings.ToLower(strings.TrimSpace(input.CompanyName))).First(&recruiter).Error
+		if err != nil {
+			recruiter = models.Recruiter{
+				FullName:           "Admin Imported",
+				CompanyName:        strings.TrimSpace(input.CompanyName),
+				Email:              fmt.Sprintf("dummy_%d@dummy.skillbridge.pt", time.Now().UnixNano()),
+				CompanyURL:         input.CompanyURL,
+				LogoURL:            input.LogoURL,
+				Status:             "approved",
+			}
+			if err := database.DB.Create(&recruiter).Error; err != nil {
+				c.JSON(http.StatusInternalServerError, gin.H{"error": "Erro ao criar empresa dummy."})
+				return
+			}
+		}
+	} else {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Forneça RecruiterID ou CompanyName."})
+		return
+	}
+
+	expiresAt := time.Now().AddDate(0, 1, 0)
+	if input.ExpiresAt != nil {
+		expiresAt = *input.ExpiresAt
+	}
+
+	vacancy := models.Vacancy{
+		RecruiterID:    recruiter.ID,
+		Title:          input.Title,
+		Type:           input.Type,
+		Tags:           input.Tags,
+		Description:    input.Description,
+		ApplicationURL: input.ApplicationURL,
+		Region:         input.Region,
+		WorkMode:       input.WorkMode,
+		EmploymentType: input.EmploymentType,
+		ExpiresAt:      expiresAt,
+		Status:         "active",
+		PublishedAt:    time.Now(),
+	}
+
+	if err := database.DB.Create(&vacancy).Error; err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Erro ao criar vaga."})
+		return
+	}
+
+	c.JSON(http.StatusCreated, gin.H{"message": "Vaga criada.", "vacancy": vacancy})
+}
+
+// AdminUpdateVacancy updates a vacancy.
+// PUT /api/admin/vacancies/:id
+func AdminUpdateVacancy(c *gin.Context) {
+	var vacancy models.Vacancy
+	if err := database.DB.First(&vacancy, "id = ?", c.Param("id")).Error; err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "Vaga não encontrada."})
+		return
+	}
+
+	var input struct {
+		Title          string   `json:"title"`
+		Type           string   `json:"type"`
+		Tags           []string `json:"tags"`
+		Description    string   `json:"description"`
+		ApplicationURL string   `json:"application_url"`
+		Region         string   `json:"region"`
+		WorkMode       string   `json:"work_mode"`
+		EmploymentType string   `json:"employment_type"`
+		Status         string   `json:"status"`
+	}
+
+	if err := c.ShouldBindJSON(&input); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Dados inválidos."})
+		return
+	}
+
+	updates := map[string]interface{}{}
+	if input.Title != "" { updates["title"] = input.Title }
+	if input.Type != "" { updates["type"] = input.Type }
+	if input.Tags != nil { updates["tags"] = models.StringList(input.Tags) }
+	if input.Description != "" { updates["description"] = input.Description }
+	if input.ApplicationURL != "" { updates["application_url"] = input.ApplicationURL }
+	if input.Region != "" { updates["region"] = input.Region }
+	if input.WorkMode != "" { updates["work_mode"] = input.WorkMode }
+	if input.EmploymentType != "" { updates["employment_type"] = input.EmploymentType }
+	if input.Status != "" { updates["status"] = input.Status }
+
+	if len(updates) > 0 {
+		database.DB.Model(&vacancy).Updates(updates)
+	}
+
+	c.JSON(http.StatusOK, gin.H{"message": "Vaga atualizada."})
+}
+
+// AdminDeleteVacancy deletes a vacancy.
+// DELETE /api/admin/vacancies/:id
+func AdminDeleteVacancy(c *gin.Context) {
+	var vacancy models.Vacancy
+	if err := database.DB.First(&vacancy, "id = ?", c.Param("id")).Error; err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "Vaga não encontrada."})
+		return
+	}
+
+	if err := database.DB.Delete(&vacancy).Error; err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Erro ao eliminar vaga."})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{"message": "Vaga eliminada."})
+}
+
+// AdminImportVacanciesFromJSON imports multiple vacancies.
+// POST /api/admin/vacancies/import
+func AdminImportVacanciesFromJSON(c *gin.Context) {
+	var vacancies []struct {
+		CompanyName    string   `json:"company_name" binding:"required"`
+		CompanyURL     string   `json:"company_url"`
+		LogoURL        string   `json:"logo_url"`
+		Title          string   `json:"title" binding:"required"`
+		Type           string   `json:"type" binding:"required"`
+		Tags           []string `json:"tags"`
+		Description    string   `json:"description" binding:"required"`
+		ApplicationURL string   `json:"application_url" binding:"required"`
+		Region         string   `json:"region"`
+		WorkMode       string   `json:"work_mode"`
+		EmploymentType string   `json:"employment_type"`
+		ExpiresAt      *time.Time `json:"expires_at"`
+	}
+
+	if err := c.ShouldBindJSON(&vacancies); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Formato JSON inválido."})
+		return
+	}
+
+	var addedCount int
+	for _, v := range vacancies {
+		var recruiter models.Recruiter
+		err := database.DB.Where("LOWER(company_name) = ?", strings.ToLower(strings.TrimSpace(v.CompanyName))).First(&recruiter).Error
+		if err != nil {
+			recruiter = models.Recruiter{
+				FullName:           "Admin Imported",
+				CompanyName:        strings.TrimSpace(v.CompanyName),
+				Email:              fmt.Sprintf("dummy_%d@dummy.skillbridge.pt", time.Now().UnixNano()),
+				CompanyURL:         v.CompanyURL,
+				LogoURL:            v.LogoURL,
+				Status:             "approved",
+			}
+			if err := database.DB.Create(&recruiter).Error; err != nil {
+				continue
+			}
+		}
+
+		expiresAt := time.Now().AddDate(0, 1, 0)
+		if v.ExpiresAt != nil {
+			expiresAt = *v.ExpiresAt
+		}
+
+		vacancy := models.Vacancy{
+			RecruiterID:    recruiter.ID,
+			Title:          v.Title,
+			Type:           v.Type,
+			Tags:           v.Tags,
+			Description:    v.Description,
+			ApplicationURL: v.ApplicationURL,
+			Region:         v.Region,
+			WorkMode:       v.WorkMode,
+			EmploymentType: v.EmploymentType,
+			ExpiresAt:      expiresAt,
+			Status:         "active",
+			PublishedAt:    time.Now(),
+		}
+
+		if err := database.DB.Create(&vacancy).Error; err == nil {
+			addedCount++
+		}
+	}
+
+	c.JSON(http.StatusOK, gin.H{"message": fmt.Sprintf("%d vagas importadas com sucesso.", addedCount), "count": addedCount})
+}

@@ -364,6 +364,7 @@
     <a onclick="showPage('projects')" data-page="projects">Projects</a>
     <a onclick="showPage('reviews')"  data-page="reviews">Reviews</a>
     <a onclick="showPage('recruiters')" data-page="recruiters">Recruiters</a>
+    <a onclick="showPage('vacancies')" data-page="vacancies">Vacancies</a>
     <a onclick="showPage('email')"    data-page="email">Email Marketing</a>
     <a onclick="showPage('security')" data-page="security">Security (TOTP)</a>
     <a onclick="signOut()" style="margin-top:auto;color:#ef4444">Sign out</a>
@@ -492,6 +493,23 @@
       </div>
     </div>
 
+    <!-- VACANCIES -->
+    <div id="page-vacancies" class="page">
+      <h2 class="page-title">Vacancies</h2>
+      <div class="toolbar" style="margin-bottom:20px;">
+        <button class="btn btn-primary" onclick="showCreateVacancyModal()">+ Add Vacancy</button>
+        <button class="btn btn-primary" onclick="document.getElementById('import-json-file').click()">Import JSON</button>
+        <input type="file" id="import-json-file" style="display:none" accept=".json" onchange="importVacancies(this)">
+        <button class="btn btn-ghost" onclick="loadVacancies()">Refresh</button>
+      </div>
+      <div class="card">
+        <table>
+          <thead><tr><th>ID</th><th>Company</th><th>Title</th><th>Type</th><th>Published</th><th>Status</th><th></th></tr></thead>
+          <tbody id="vacancies-body"><tr><td colspan="7" class="loading">Loading...</td></tr></tbody>
+        </table>
+      </div>
+    </div>
+
     <!-- EMAIL MARKETING -->
     <div id="page-email" class="page">
       <h2 class="page-title">Email Marketing</h2>
@@ -541,6 +559,33 @@
 </div>
 
 <div id="toast"></div>
+
+<!-- VACANCY FORM MODAL -->
+<div id="vacancy-form-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.35);z-index:200;align-items:center;justify-content:center;">
+  <div class="card" style="width:500px; max-height: 90vh; overflow-y:auto; padding:24px;">
+    <h3>Vacancy</h3>
+    <div style="margin-top:10px;">
+      <input type="hidden" id="vac-id">
+      <label class="field-label">Company Name</label>
+      <input id="vac-company" class="field-input" style="margin-bottom:10px;">
+      <label class="field-label">Company URL</label>
+      <input id="vac-company-url" class="field-input" style="margin-bottom:10px;">
+      <label class="field-label">Title</label>
+      <input id="vac-title" class="field-input" style="margin-bottom:10px;">
+      <label class="field-label">Type (e.g. junior_position)</label>
+      <input id="vac-type" class="field-input" style="margin-bottom:10px;">
+      <label class="field-label">Description</label>
+      <textarea id="vac-desc" class="field-input" style="margin-bottom:10px;" rows="4"></textarea>
+      <label class="field-label">Application URL</label>
+      <input id="vac-app-url" class="field-input" style="margin-bottom:10px;">
+      
+      <div style="display:flex;gap:10px;margin-top:10px;">
+        <button class="btn btn-primary" onclick="saveVacancy()">Save</button>
+        <button class="btn btn-ghost" onclick="document.getElementById('vacancy-form-modal').style.display='none'">Cancel</button>
+      </div>
+    </div>
+  </div>
+</div>
 
 <!-- DETAIL DRAWER -->
 <div id="detail-overlay" onclick="closeDetail(event)">
@@ -751,6 +796,7 @@
     if (name === "projects")  loadProjects();
     if (name === "reviews")   loadReviews();
     if (name === "recruiters") loadRecruiters();
+    if (name === "vacancies") loadVacancies();
     if (name === "overview")  { loadOverview(); loadUniversityStats(); }
     if (name === "security")  loadSecurityPage();
     if (name === "email")     loadEmailRecipients();
@@ -1392,6 +1438,108 @@
       if (e.key === 'Enter') verifyTOTPSetup();
     });
   });
+
+  // ── VACANCIES ─────────────────────────────────────────────
+  async function loadVacancies() {
+    const tbody = document.getElementById("vacancies-body");
+    tbody.innerHTML = '<tr><td colspan="7" class="loading">Loading...</td></tr>';
+    try {
+      const vacancies = await api("GET", "/admin/vacancies");
+      if (!vacancies || !vacancies.length) {
+        tbody.innerHTML = '<tr><td colspan="7" class="empty">No vacancies found</td></tr>';
+        return;
+      }
+      tbody.innerHTML = vacancies.map(function(v) {
+        var comp = v.recruiter ? v.recruiter.company_name : 'Unknown';
+        var actions = '<button class="btn btn-ghost" onclick="editVacancy(\'' + v.id + '\')">Edit</button>' +
+                      '<button class="btn btn-danger" style="margin-left:4px" onclick="deleteVacancy(\'' + v.id + '\')">Delete</button>';
+        return '<tr>' +
+          '<td><span style="font-family:monospace;color:#64748b">' + v.id.substring(0,8) + '...</span></td>' +
+          '<td style="font-weight:500">' + escHtml(comp) + '</td>' +
+          '<td>' + escHtml(v.title) + '</td>' +
+          '<td><span class="badge badge-pending">' + escHtml(v.type) + '</span></td>' +
+          '<td>' + fmt(v.published_at) + '</td>' +
+          '<td>' + escHtml(v.status) + '</td>' +
+          '<td style="text-align:right">' + actions + '</td>' +
+          '</tr>';
+      }).join('');
+    } catch(e) {
+      tbody.innerHTML = '<tr><td colspan="7" style="color:red;padding:20px;text-align:center">' + e.message + '</td></tr>';
+    }
+  }
+
+  function showCreateVacancyModal() {
+    document.getElementById("vac-id").value = "";
+    document.getElementById("vac-company").value = "";
+    document.getElementById("vac-company-url").value = "";
+    document.getElementById("vac-title").value = "";
+    document.getElementById("vac-type").value = "junior_position";
+    document.getElementById("vac-desc").value = "";
+    document.getElementById("vac-app-url").value = "";
+    document.getElementById("vacancy-form-modal").style.display = "flex";
+  }
+
+  async function editVacancy(id) {
+    try {
+      const vacancies = await api("GET", "/admin/vacancies");
+      const v = vacancies.find(x => x.id === id);
+      if(!v) return;
+      document.getElementById("vac-id").value = v.id;
+      document.getElementById("vac-company").value = v.recruiter ? v.recruiter.company_name : "";
+      document.getElementById("vac-company-url").value = ""; // We don't have this explicitly in vacancy
+      document.getElementById("vac-title").value = v.title;
+      document.getElementById("vac-type").value = v.type;
+      document.getElementById("vac-desc").value = v.description;
+      document.getElementById("vac-app-url").value = v.application_url;
+      document.getElementById("vacancy-form-modal").style.display = "flex";
+    } catch(e) { toast(e.message, true); }
+  }
+
+  async function saveVacancy() {
+    const id = document.getElementById("vac-id").value;
+    const payload = {
+      company_name: document.getElementById("vac-company").value,
+      company_url: document.getElementById("vac-company-url").value,
+      title: document.getElementById("vac-title").value,
+      type: document.getElementById("vac-type").value,
+      description: document.getElementById("vac-desc").value,
+      application_url: document.getElementById("vac-app-url").value
+    };
+    try {
+      if(id) {
+        await api("PUT", "/admin/vacancies/" + id, payload);
+      } else {
+        await api("POST", "/admin/vacancies", payload);
+      }
+      document.getElementById("vacancy-form-modal").style.display = "none";
+      toast("Vacancy saved");
+      loadVacancies();
+    } catch(e) { toast(e.message, true); }
+  }
+
+  async function deleteVacancy(id) {
+    if(!confirm("Are you sure?")) return;
+    try {
+      await api("DELETE", "/admin/vacancies/" + id);
+      toast("Vacancy deleted");
+      loadVacancies();
+    } catch(e) { toast(e.message, true); }
+  }
+
+  async function importVacancies(input) {
+    const file = input.files[0];
+    if(!file) return;
+    try {
+      const text = await file.text();
+      const json = JSON.parse(text);
+      const res = await api("POST", "/admin/vacancies/import", json);
+      toast(res.message);
+      loadVacancies();
+    } catch(e) {
+      toast("Error importing JSON: " + e.message, true);
+    }
+    input.value = "";
+  }
 
   // ── EMAIL MARKETING ──────────────────────────────────────────────────────
   var _emailUsers = [];  // full list (from /admin/users)

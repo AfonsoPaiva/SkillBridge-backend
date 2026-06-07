@@ -265,6 +265,12 @@ func Setup(r *gin.Engine) {
 		admin.POST("/recruiters/:id/reject", handlers.AdminRejectRecruiter)
 		admin.DELETE("/recruiters/:id", handlers.AdminDeleteRecruiter)
 		admin.POST("/recruiters/:id/resend-email", handlers.AdminResendRecruiterEmail)
+		// Vacancy management
+		admin.GET("/vacancies", handlers.AdminListVacancies)
+		admin.POST("/vacancies", handlers.AdminCreateVacancy)
+		admin.PUT("/vacancies/:id", handlers.AdminUpdateVacancy)
+		admin.DELETE("/vacancies/:id", handlers.AdminDeleteVacancy)
+		admin.POST("/vacancies/import", handlers.AdminImportVacanciesFromJSON)
 	}
 
 	// --------------------------------------------------
