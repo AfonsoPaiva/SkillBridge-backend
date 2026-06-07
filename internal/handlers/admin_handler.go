@@ -1027,3 +1027,27 @@ func AdminRunScraper(c *gin.Context) {
 	go scraper.RunScraper()
 	c.JSON(http.StatusOK, gin.H{"message": "Scraper iniciado com sucesso. As vagas começarão a aparecer nos próximos minutos."})
 }
+
+// AdminBulkUpdateVacancies allows bulk editing vacancies via JSON
+// PUT /api/admin/vacancies/bulk
+func AdminBulkUpdateVacancies(c *gin.Context) {
+	var vacancies []models.Vacancy
+	if err := c.ShouldBindJSON(&vacancies); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Formato JSON inválido."})
+		return
+	}
+
+	var updated int
+	for _, v := range vacancies {
+		if v.ID == "" {
+			continue // skip creating new ones, only update
+		}
+		
+		// we just update existing
+		if err := database.DB.Model(&models.Vacancy{}).Where("id = ?", v.ID).Updates(v).Error; err == nil {
+			updated++
+		}
+	}
+
+	c.JSON(http.StatusOK, gin.H{"message": fmt.Sprintf("%d vagas atualizadas com sucesso via Bulk JSON.", updated)})
+}

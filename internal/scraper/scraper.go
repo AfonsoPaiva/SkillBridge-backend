@@ -24,9 +24,30 @@ var juniorKeywords = []string{
 func RunScraper() {
 	log.Println("Starting job scraper...")
 
-	greenhouseCompanies := []string{"cloudflare", "feedzai", "remote", "outsystems", "talkdesk"}
-	leverCompanies := []string{"swordhealth", "unbabel", "rows"}
-	workableCompanies := []string{"criticalmanufacturing", "barkyn", "nutrium", "aptoide", "codacy"}
+	// Expanded list of Tech Companies operating in Portugal
+	greenhouseCompanies := []string{
+		"cloudflare", "feedzai", "remote", "outsystems", "talkdesk", 
+		"blip", "farfetch", "olx", "mindera", "datadog", "revolut",
+		"dashlane", "pipedrive", "tripadvisor", "kantar", "swappie",
+		"definedcrowd", "gympass", "tripactions", "marqeta",
+		// Non-tech / generic massive companies
+		"sonae", "jeronimomartins", "edp", "galp", "fidelidade", "brisa", 
+		"luzsaude", "lusíadas", "navigatore", "altice", "vodafone", "meo",
+		"cgd", "millenniumbcp", "novobanco", "ctt", "tapairportugal",
+		"decathlon", "leroymerlin", "ikea", "lidl", "aldi", "auchan",
+		"kpmg", "deloitte", "ey", "pwc", "accenture", "capgemini",
+	}
+	leverCompanies := []string{
+		"swordhealth", "unbabel", "rows", "casafari", "kencko", 
+		"jscrambler", "bizay", "knokcare", "lovys", "sensei",
+		"nos", "worten", "pingodoce", "continente", "cuf",
+	}
+	workableCompanies := []string{
+		"criticalmanufacturing", "barkyn", "nutrium", "aptoide", "codacy",
+		"coverflex", "infraspeak", "zaask", "studentfinance", "tonicapp",
+		"ufit", "prozis", "celfocus", "worten", "nos",
+		"motaengil", "ren", "sporttv", "cgd", "bpi", "santander",
+	}
 
 	for _, company := range greenhouseCompanies {
 		scrapeGreenhouse(company)
@@ -58,7 +79,7 @@ func classifyVacancyType(titleLower, contentLower string) string {
 		if strings.Contains(contentLower, "curricular") || strings.Contains(titleLower, "curricular") {
 			return "curricular_internship"
 		}
-		return "summer_internship"
+		return "extracurricular_internship"
 	}
 	return "junior_position"
 }
@@ -87,9 +108,8 @@ func isPortugalLocation(region string) bool {
 
 func isJobRelevant(title, desc string) bool {
 	titleLower := strings.ToLower(title)
-	descLower := strings.ToLower(desc)
 	for _, kw := range juniorKeywords {
-		if strings.Contains(titleLower, kw) || strings.Contains(descLower, kw) {
+		if strings.Contains(titleLower, kw) {
 			return true
 		}
 	}
