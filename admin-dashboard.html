@@ -498,8 +498,6 @@
       <h2 class="page-title">Vacancies</h2>
       <div class="toolbar" style="margin-bottom:20px;">
         <button class="btn btn-primary" onclick="showCreateVacancyModal()">+ Add Vacancy</button>
-        <button class="btn btn-primary" onclick="document.getElementById('import-json-file').click()">Import JSON</button>
-        <input type="file" id="import-json-file" style="display:none" accept=".json" onchange="importVacancies(this)">
         <button class="btn btn-ghost" onclick="loadVacancies()">Refresh</button>
       </div>
       <div class="card">
@@ -1526,20 +1524,6 @@
     } catch(e) { toast(e.message, true); }
   }
 
-  async function importVacancies(input) {
-    const file = input.files[0];
-    if(!file) return;
-    try {
-      const text = await file.text();
-      const json = JSON.parse(text);
-      const res = await api("POST", "/admin/vacancies/import", json);
-      toast(res.message);
-      loadVacancies();
-    } catch(e) {
-      toast("Error importing JSON: " + e.message, true);
-    }
-    input.value = "";
-  }
 
   // ── EMAIL MARKETING ──────────────────────────────────────────────────────
   var _emailUsers = [];  // full list (from /admin/users)
