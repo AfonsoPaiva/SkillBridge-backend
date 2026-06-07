@@ -18,7 +18,6 @@ import (
 	"github.com/paiva/SkillBridge/Backend/internal/email"
 	"github.com/paiva/SkillBridge/Backend/internal/middleware"
 	"github.com/paiva/SkillBridge/Backend/internal/models"
-	"github.com/paiva/SkillBridge/Backend/internal/scraper"
 	"github.com/paiva/SkillBridge/Backend/internal/storage"
 )
 
@@ -1020,15 +1019,23 @@ func AdminDeleteVacancy(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"message": "Vaga eliminada."})
 }
 
-// AdminRunScraper triggers the automated vacancy scraper
-// POST /api/admin/run-scraper
-func AdminRunScraper(c *gin.Context) {
-	// Execute scraper in background
-	go scraper.RunScraper()
-	c.JSON(http.StatusOK, gin.H{"message": "Scraper iniciado com sucesso. As vagas começarão a aparecer nos próximos minutos."})
+// extractSkillsFromText parses a description and finds any matching valid skills
+func extractSkillsFromText(text string) []string {
+	if text == "" {
+		return []string{}
+	}
+	textLower := strings.ToLower(text)
+	var found []string
+	for _, skill := range config.Skills {
+		// we check if the lowercase skill exists in the lowercase text
+		if strings.Contains(textLower, strings.ToLower(skill)) {
+			found = append(found, skill)
+		}
+	}
+	return found
 }
 
-// AdminBulkUpdateVacancies allows bulk editing vacancies via JSON
+// AdminBulkUpdateVacancies allows bulk editing/creating vacancies via JSON
 // PUT /api/admin/vacancies/bulk
 func AdminBulkUpdateVacancies(c *gin.Context) {
 	var vacancies []models.Vacancy
@@ -1037,17 +1044,41 @@ func AdminBulkUpdateVacancies(c *gin.Context) {
 		return
 	}
 
-	var updated int
-	for _, v := range vacancies {
-		if v.ID == "" {
-			continue // skip creating new ones, only update
+	var updated, created int
+	for i := range vacancies {
+		v := &vacancies[i]
+
+		// Auto-extract skills if missing
+		if len(v.Tags) == 0 && v.Description != "" {
+			v.Tags = extractSkillsFromText(v.Description)
 		}
-		
-		// we just update existing
-		if err := database.DB.Model(&models.Vacancy{}).Where("id = ?", v.ID).Updates(v).Error; err == nil {
-			updated++
+
+		if v.ID == "" {
+			// CREATE (new vacancy)
+			if v.Status == "" {
+				v.Status = "active"
+			}
+			if err := database.DB.Create(v).Error; err == nil {
+				created++
+			}
+		} else {
+			// UPDATE
+			var existing models.Vacancy
+			if err := database.DB.Where("id = ?", v.ID).First(&existing).Error; err == nil {
+				if err := database.DB.Model(&existing).Updates(v).Error; err == nil {
+					updated++
+				}
+			} else {
+				// ID provided but not found, so we create it with that ID
+				if v.Status == "" {
+					v.Status = "active"
+				}
+				if err := database.DB.Create(v).Error; err == nil {
+					created++
+				}
+			}
 		}
 	}
 
-	c.JSON(http.StatusOK, gin.H{"message": fmt.Sprintf("%d vagas atualizadas com sucesso via Bulk JSON.", updated)})
+	c.JSON(http.StatusOK, gin.H{"message": fmt.Sprintf("%d criadas, %d atualizadas com sucesso via Bulk JSON.", created, updated)})
 }

@@ -270,7 +270,6 @@ func Setup(r *gin.Engine) {
 		admin.POST("/vacancies", handlers.AdminCreateVacancy)
 		admin.PUT("/vacancies/:id", handlers.AdminUpdateVacancy)
 		admin.DELETE("/vacancies/:id", handlers.AdminDeleteVacancy)
-		admin.POST("/run-scraper", handlers.AdminRunScraper)
 		admin.PUT("/vacancies/bulk", handlers.AdminBulkUpdateVacancies)
 	}
 
