@@ -18,6 +18,7 @@ import (
 	"github.com/paiva/SkillBridge/Backend/internal/email"
 	"github.com/paiva/SkillBridge/Backend/internal/middleware"
 	"github.com/paiva/SkillBridge/Backend/internal/models"
+	"github.com/paiva/SkillBridge/Backend/internal/scraper"
 	"github.com/paiva/SkillBridge/Backend/internal/storage"
 )
 
@@ -1019,3 +1020,10 @@ func AdminDeleteVacancy(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"message": "Vaga eliminada."})
 }
 
+// AdminRunScraper triggers the automated vacancy scraper
+// POST /api/admin/run-scraper
+func AdminRunScraper(c *gin.Context) {
+	// Execute scraper in background
+	go scraper.RunScraper()
+	c.JSON(http.StatusOK, gin.H{"message": "Scraper iniciado com sucesso. As vagas começarão a aparecer nos próximos minutos."})
+}

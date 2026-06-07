@@ -498,6 +498,7 @@
       <h2 class="page-title">Vacancies</h2>
       <div class="toolbar" style="margin-bottom:20px;">
         <button class="btn btn-primary" onclick="showCreateVacancyModal()">+ Add Vacancy</button>
+        <button class="btn btn-primary" onclick="runScraper()" style="background-color: #f59e0b; border-color: #f59e0b; color: white;">Run Scraper</button>
         <button class="btn btn-ghost" onclick="loadVacancies()">Refresh</button>
       </div>
       <div class="card">
@@ -1522,6 +1523,16 @@
       toast("Vacancy deleted");
       loadVacancies();
     } catch(e) { toast(e.message, true); }
+  }
+
+  async function runScraper() {
+    try {
+      toast("A iniciar scraper em background...", false);
+      const res = await api("POST", "/admin/run-scraper");
+      toast(res.message);
+    } catch(e) {
+      toast("Erro: " + e.message, true);
+    }
   }
 
 

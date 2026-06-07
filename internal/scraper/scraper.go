@@ -1,16 +1,14 @@
-package main
+package scraper
 
 import (
 	"encoding/json"
 	"fmt"
-
 	"log"
 	"net/http"
 	"regexp"
 	"strings"
 	"time"
 
-	"github.com/paiva/SkillBridge/Backend/config"
 	"github.com/paiva/SkillBridge/Backend/internal/database"
 	"github.com/paiva/SkillBridge/Backend/internal/models"
 )
@@ -22,10 +20,8 @@ var juniorKeywords = []string{
 	"trainee", "graduate", "entry level", "entry-level",
 }
 
-func main() {
-	config.Load()
-	database.Connect()
-
+// RunScraper executes the scraping process for all configured job boards
+func RunScraper() {
 	log.Println("Starting job scraper...")
 
 	greenhouseCompanies := []string{"cloudflare", "feedzai", "remote", "outsystems", "talkdesk"}
@@ -182,7 +178,6 @@ func scrapeGreenhouse(company string) {
 
 	recruiterID := getOrCreateRecruiter(strings.Title(company), company+".com")
 	for _, job := range data.Jobs {
-		// Very basic HTML to text for description
 		desc := stripHTML(job.Content)
 		saveVacancy(recruiterID, job.Title, desc, job.AbsoluteURL, job.Location.Name, "hybrid", "full_time")
 	}
@@ -205,7 +200,7 @@ func scrapeLever(company string) {
 			Location   string `json:"location"`
 			Commitment string `json:"commitment"`
 		} `json:"categories"`
-		WorkplaceType string `json:"workplaceType"` // e.g. "hybrid"
+		WorkplaceType string `json:"workplaceType"`
 	}
 
 	if err := json.NewDecoder(resp.Body).Decode(&data); err != nil {
@@ -237,12 +232,12 @@ func scrapeWorkable(company string) {
 
 	var data struct {
 		Jobs []struct {
-			Title       string `json:"title"`
-			URL         string `json:"url"`
-			Description string `json:"description"`
-			City        string `json:"city"`
-			Country     string `json:"country"`
-			Telecommuting bool `json:"telecommuting"`
+			Title         string `json:"title"`
+			URL           string `json:"url"`
+			Description   string `json:"description"`
+			City          string `json:"city"`
+			Country       string `json:"country"`
+			Telecommuting bool   `json:"telecommuting"`
 		} `json:"jobs"`
 	}
 
