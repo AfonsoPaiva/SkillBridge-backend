@@ -176,7 +176,7 @@ func RecruiterApply(c *gin.Context) {
 	var recruiter models.Recruiter
 	// Check if a dummy recruiter exists for this company
 	var dummy models.Recruiter
-	errDummy := database.DB.Where("LOWER(company_name) = ? AND email LIKE '%@dummy.skillbridge.pt'", strings.ToLower(strings.TrimSpace(input.CompanyName))).First(&dummy).Error
+	errDummy := database.DB.Where("LOWER(company_name) = ? AND (email LIKE '%@dummy.skillbridge.pt' OR email LIKE '%@auto-scraped.com')", strings.ToLower(strings.TrimSpace(input.CompanyName))).First(&dummy).Error
 
 	if errDummy == nil {
 		dummy.FullName = strings.TrimSpace(input.FullName)
