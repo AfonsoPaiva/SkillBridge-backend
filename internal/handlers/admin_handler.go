@@ -1035,6 +1035,31 @@ func extractSkillsFromText(text string) []string {
 	return found
 }
 
+// resolveRecruiterByCompanyName finds a recruiter by name or creates a dummy one
+func resolveRecruiterByCompanyName(companyName string) string {
+	if companyName == "" {
+		return ""
+	}
+	var rec models.Recruiter
+	if err := database.DB.Where("LOWER(company_name) = LOWER(?)", companyName).First(&rec).Error; err == nil {
+		return rec.ID
+	}
+	
+	// Create dummy recruiter
+	domainSafe := strings.ToLower(strings.ReplaceAll(companyName, " ", ""))
+	rec = models.Recruiter{
+		FullName:    "Admin Auto-Scraper",
+		CompanyName: companyName,
+		Email:       domainSafe + "@auto-scraped.com",
+		Status:      "approved",
+		LogoURL:     "https://www.google.com/s2/favicons?domain=" + domainSafe + ".com&sz=128",
+	}
+	if err := database.DB.Create(&rec).Error; err == nil {
+		return rec.ID
+	}
+	return ""
+}
+
 // AdminBulkUpdateVacancies allows bulk editing/creating vacancies via JSON
 // PUT /api/admin/vacancies/bulk
 func AdminBulkUpdateVacancies(c *gin.Context) {
@@ -1047,6 +1072,19 @@ func AdminBulkUpdateVacancies(c *gin.Context) {
 	var updated, created int
 	for i := range vacancies {
 		v := &vacancies[i]
+
+		// If RecruiterID is empty but CompanyName is provided, resolve it
+		if v.RecruiterID == "" && v.CompanyName != "" {
+			resolvedID := resolveRecruiterByCompanyName(v.CompanyName)
+			if resolvedID != "" {
+				v.RecruiterID = resolvedID
+			}
+		}
+
+		// Fallback check: we must have a RecruiterID at this point, or it will fail foreign key constraint
+		if v.RecruiterID == "" {
+			continue // skip invalid vacancies silently or we could log it
+		}
 
 		// Auto-extract skills if missing
 		if len(v.Tags) == 0 && v.Description != "" {

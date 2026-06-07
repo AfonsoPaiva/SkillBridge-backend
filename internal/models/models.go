@@ -438,6 +438,9 @@ type Vacancy struct {
 	ExpiresAt      time.Time  `json:"expires_at"`
 
 	Recruiter Recruiter `gorm:"foreignKey:RecruiterID" json:"recruiter,omitempty"`
+	
+	// Transient field for Bulk JSON imports
+	CompanyName string `gorm:"-" json:"company_name,omitempty"`
 }
 
 // --------------------------------------------------
