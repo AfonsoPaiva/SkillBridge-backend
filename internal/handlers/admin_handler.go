@@ -1052,7 +1052,7 @@ func resolveRecruiterByCompanyName(companyName string) string {
 		CompanyName: companyName,
 		Email:       domainSafe + "@auto-scraped.com",
 		Status:      "approved",
-		LogoURL:     "https://www.google.com/s2/favicons?domain=" + domainSafe + ".com&sz=128",
+		LogoURL:     "https://icon.horse/icon/" + domainSafe + ".com",
 	}
 	if err := database.DB.Create(&rec).Error; err == nil {
 		return rec.ID

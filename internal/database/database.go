@@ -3,6 +3,7 @@ package database
 import (
 	"fmt"
 	"log"
+	"net/url"
 	"strings"
 
 	"github.com/paiva/SkillBridge/Backend/config"
@@ -90,6 +91,34 @@ func Connect() {
 	alterIfMissing("vacancies", "region", "VARCHAR(100) DEFAULT ''")
 	alterIfMissing("vacancies", "work_mode", "VARCHAR(20) DEFAULT ''")
 	alterIfMissing("vacancies", "employment_type", "VARCHAR(20) DEFAULT ''")
+
+	migrateFaviconToIconHorse()
+}
+
+func migrateFaviconToIconHorse() {
+	var recruiters []models.Recruiter
+	if err := DB.Where("logo_url LIKE ? OR logo_url LIKE ?", "https://www.google.com/s2/favicons%", "https://ui-avatars.com%").Find(&recruiters).Error; err != nil {
+		log.Printf("[migrate] Error finding recruiters with google/ui-avatars favicon: %v", err)
+		return
+	}
+	
+	for _, rec := range recruiters {
+		domainSafe := strings.ToLower(strings.ReplaceAll(rec.CompanyName, " ", "")) + ".com"
+		if rec.CompanyURL != "" {
+			if parsedURL, err := url.Parse(rec.CompanyURL); err == nil {
+				domain := strings.TrimPrefix(parsedURL.Hostname(), "www.")
+				if domain != "" {
+					domainSafe = domain
+				}
+			}
+		}
+		newLogoURL := "https://icon.horse/icon/" + domainSafe
+		if err := DB.Model(&rec).Update("logo_url", newLogoURL).Error; err != nil {
+			log.Printf("[migrate] Error updating logo URL for recruiter %s: %v", rec.ID, err)
+		} else {
+			log.Printf("[migrate] Updated logo URL for recruiter %s to icon.horse", rec.ID)
+		}
+	}
 }
 
 type legacyProjectRoleSkillRow struct {

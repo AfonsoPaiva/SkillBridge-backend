@@ -62,7 +62,7 @@ func buildRecruiterAccessLink(token string) string {
 	return config.AppConfig.FrontendURL + "/recruiter/auth?token=" + token
 }
 
-// fetchAndUploadClearbitLogo fetches a company logo. We use Google Favicons as it's free and reliable.
+// fetchAndUploadClearbitLogo fetches a company logo. We use icon.horse as it's free and reliable.
 func fetchAndUploadClearbitLogo(companyURL string, uid string) string {
 	if companyURL == "" {
 		return ""
