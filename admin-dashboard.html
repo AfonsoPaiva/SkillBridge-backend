@@ -364,7 +364,6 @@
     <a onclick="showPage('projects')" data-page="projects">Projects</a>
     <a onclick="showPage('reviews')"  data-page="reviews">Reviews</a>
     <a onclick="showPage('recruiters')" data-page="recruiters">Recruiters</a>
-    <a onclick="showPage('vacancies')" data-page="vacancies">Vacancies</a>
     <a onclick="showPage('email')"    data-page="email">Email Marketing</a>
     <a onclick="showPage('security')" data-page="security">Security (TOTP)</a>
     <a onclick="signOut()" style="margin-top:auto;color:#ef4444">Sign out</a>
@@ -495,35 +494,7 @@
       </div>
     </div>
 
-    <!-- VACANCIES -->
-    <div id="page-vacancies" class="page">
-      <h2 class="page-title">Vacancies</h2>
-      <div class="toolbar" style="margin-bottom:20px;">
-        <button class="btn btn-primary" onclick="showCreateVacancyModal()">+ Add Vacancy</button>
-        <button class="btn btn-primary" onclick="toggleBulkJsonSection()" style="background-color: #10b981; border-color: #10b981; color: white;">Bulk JSON Edit</button>
-        <button class="btn btn-ghost" onclick="loadVacancies()">Refresh</button>
-      </div>
 
-      <!-- BULK JSON SECTION -->
-      <div id="bulk-json-section" class="card" style="display:none; margin-bottom: 20px; padding: 20px;">
-        <h3 style="font-size: 16px; margin-bottom: 10px;">Bulk JSON Edit Vacancies</h3>
-        <p style="font-size: 14px; color: #64748b; margin-bottom: 15px;">
-          Here is the JSON representation of all vacancies. You can edit this JSON array directly to mass-update existing vacancies. Click "Save Bulk Updates" to push the changes via API. Do not modify the IDs.
-        </p>
-        <textarea id="bulk-json-textarea" style="width: 100%; height: 400px; font-family: monospace; padding: 10px; background: #1e1e1e; color: #d4d4d4; border: 1px solid #e2e8f0; border-radius: 6px; margin-bottom: 15px;"></textarea>
-        <div style="display: flex; justify-content: flex-end; gap: 10px;">
-          <button class="btn btn-ghost" onclick="toggleBulkJsonSection()">Cancel</button>
-          <button class="btn btn-primary" onclick="saveBulkJson()">Save Bulk Updates</button>
-        </div>
-      </div>
-
-      <div class="card">
-        <table>
-          <thead><tr><th>ID</th><th>Company</th><th>Title</th><th>Type</th><th>Published</th><th>Status</th><th></th></tr></thead>
-          <tbody id="vacancies-body"><tr><td colspan="7" class="loading">Loading...</td></tr></tbody>
-        </table>
-      </div>
-    </div>
 
     <!-- EMAIL MARKETING -->
     <div id="page-email" class="page">
@@ -811,7 +782,6 @@
     if (name === "projects")  loadProjects();
     if (name === "reviews")   loadReviews();
     if (name === "recruiters") loadRecruiters();
-    if (name === "vacancies") loadVacancies();
     if (name === "overview")  { loadOverview(); loadUniversityStats(); }
     if (name === "security")  loadSecurityPage();
     if (name === "email")     loadEmailRecipients();
@@ -1453,138 +1423,6 @@
       if (e.key === 'Enter') verifyTOTPSetup();
     });
   });
-
-  // ── VACANCIES ─────────────────────────────────────────────
-  var _vacancies = [];
-
-  async function loadVacancies() {
-    const tbody = document.getElementById("vacancies-body");
-    tbody.innerHTML = '<tr><td colspan="7" class="loading">Loading...</td></tr>';
-    try {
-      const vacancies = await api("GET", "/admin/vacancies");
-      _vacancies = vacancies || [];
-      if (!vacancies || !vacancies.length) {
-        tbody.innerHTML = '<tr><td colspan="7" class="empty">No vacancies found</td></tr>';
-        return;
-      }
-      tbody.innerHTML = vacancies.map(function(v) {
-        var comp = v.recruiter ? v.recruiter.company_name : 'Unknown';
-        var actions = '<button class="btn btn-ghost" onclick="editVacancy(\'' + v.id + '\')">Edit</button>' +
-                      '<button class="btn btn-danger" style="margin-left:4px" onclick="deleteVacancy(\'' + v.id + '\')">Delete</button>';
-        return '<tr>' +
-          '<td><span style="font-family:monospace;color:#64748b">' + v.id.substring(0,8) + '...</span></td>' +
-          '<td style="font-weight:500">' + escHtml(comp) + '</td>' +
-          '<td>' + escHtml(v.title) + '</td>' +
-          '<td><span class="badge badge-pending">' + escHtml(v.type) + '</span></td>' +
-          '<td>' + fmt(v.published_at) + '</td>' +
-          '<td>' + escHtml(v.status) + '</td>' +
-          '<td style="text-align:right">' + actions + '</td>' +
-          '</tr>';
-      }).join('');
-    } catch(e) {
-      tbody.innerHTML = '<tr><td colspan="7" style="color:red;padding:20px;text-align:center">' + e.message + '</td></tr>';
-    }
-  }
-
-  function showCreateVacancyModal() {
-    document.getElementById("vac-id").value = "";
-    document.getElementById("vac-company").value = "";
-    document.getElementById("vac-company-url").value = "";
-    document.getElementById("vac-title").value = "";
-    document.getElementById("vac-type").value = "junior_position";
-    document.getElementById("vac-desc").value = "";
-    document.getElementById("vac-app-url").value = "";
-    document.getElementById("vacancy-form-modal").style.display = "flex";
-  }
-
-  async function editVacancy(id) {
-    try {
-      const vacancies = await api("GET", "/admin/vacancies");
-      const v = vacancies.find(x => x.id === id);
-      if(!v) return;
-      document.getElementById("vac-id").value = v.id;
-      document.getElementById("vac-company").value = v.recruiter ? v.recruiter.company_name : "";
-      document.getElementById("vac-company-url").value = ""; // We don't have this explicitly in vacancy
-      document.getElementById("vac-title").value = v.title;
-      document.getElementById("vac-type").value = v.type;
-      document.getElementById("vac-desc").value = v.description;
-      document.getElementById("vac-app-url").value = v.application_url;
-      document.getElementById("vacancy-form-modal").style.display = "flex";
-    } catch(e) { toast(e.message, true); }
-  }
-
-  async function saveVacancy() {
-    const id = document.getElementById("vac-id").value;
-    const payload = {
-      company_name: document.getElementById("vac-company").value,
-      company_url: document.getElementById("vac-company-url").value,
-      title: document.getElementById("vac-title").value,
-      type: document.getElementById("vac-type").value,
-      description: document.getElementById("vac-desc").value,
-      application_url: document.getElementById("vac-app-url").value
-    };
-    try {
-      if(id) {
-        await api("PUT", "/admin/vacancies/" + id, payload);
-      } else {
-        await api("POST", "/admin/vacancies", payload);
-      }
-      document.getElementById("vacancy-form-modal").style.display = "none";
-      toast("Vacancy saved");
-      loadVacancies();
-    } catch(e) { toast(e.message, true); }
-  }
-
-  function toggleBulkJsonSection() {
-    const section = document.getElementById("bulk-json-section");
-    if (section.style.display === "none") {
-      if(!_vacancies || _vacancies.length === 0) {
-        document.getElementById("bulk-json-textarea").value = "[]";
-      } else {
-        const cleanVacancies = _vacancies.map(v => {
-          const copy = {...v};
-          return copy;
-        });
-        document.getElementById("bulk-json-textarea").value = JSON.stringify(cleanVacancies, null, 4);
-      }
-      section.style.display = "block";
-    } else {
-      section.style.display = "none";
-    }
-  }
-
-  async function saveBulkJson() {
-    const jsonStr = document.getElementById("bulk-json-textarea").value;
-    let payload = [];
-    try {
-      payload = JSON.parse(jsonStr);
-      if(!Array.isArray(payload)) throw new Error("JSON must be an array of vacancies.");
-    } catch(e) {
-      toast("Invalid JSON format: " + e.message, true);
-      return;
-    }
-    
-    try {
-      toast("Saving bulk updates...", false);
-      const res = await api("PUT", "/admin/vacancies/bulk", payload);
-      toast(res.message || "Bulk update successful");
-      // Do not hide the input section, just refresh the table
-      loadVacancies();
-    } catch(e) {
-      toast("Bulk Update Failed: " + e.message, true);
-    }
-  }
-
-  async function deleteVacancy(id) {
-    if(!confirm("Are you sure?")) return;
-    try {
-      await api("DELETE", "/admin/vacancies/" + id);
-      toast("Vacancy deleted");
-      loadVacancies();
-    } catch(e) { toast(e.message, true); }
-  }
-
-
 
 
   // ── EMAIL MARKETING ──────────────────────────────────────────────────────

@@ -3,6 +3,7 @@ package handlers
 import (
 	"log"
 	"net/http"
+	"strings"
 	"time"
 
 	"github.com/gin-gonic/gin"
@@ -242,29 +243,41 @@ func PermanentDeleteVacancy(c *gin.Context) {
 // GetPublicVacancies returns all active vacancies (public endpoint for students).
 // GET /api/vacancies
 func GetPublicVacancies(c *gin.Context) {
-	var vacancies []models.Vacancy
-	query := database.DB.Preload("Recruiter").
-		Where("status = ?", "active").
-		Order("published_at DESC")
+	loadVacanciesIfNeeded()
 
-	// Optional tag filter
-	if tag := c.Query("tag"); tag != "" {
-		query = query.Where("tags @> ?", `["`+tag+`"]`)
-	}
+	var result []models.Vacancy
+	tagFilter := c.Query("tag")
+	typeFilter := c.Query("type")
 
-	// Optional type filter
-	if vType := c.Query("type"); vType != "" {
-		query = query.Where("type = ?", vType)
-	}
+	vacanciesMutex.RLock()
+	defer vacanciesMutex.RUnlock()
 
-	if err := query.Find(&vacancies).Error; err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Erro ao listar vagas."})
-		return
+	for _, v := range cachedVacancies {
+		// Filter by tag
+		if tagFilter != "" {
+			tagMatch := false
+			for _, t := range v.Tags {
+				if strings.EqualFold(t, tagFilter) {
+					tagMatch = true
+					break
+				}
+			}
+			if !tagMatch {
+				continue
+			}
+		}
+
+		// Filter by type
+		if typeFilter != "" && v.Type != typeFilter {
+			continue
+		}
+
+		result = append(result, v)
 	}
 
 	c.JSON(http.StatusOK, gin.H{
-		"vacancies": vacancies,
-		"count":     len(vacancies),
+		"vacancies": result,
+		"count":     len(result),
 	})
 }
 
@@ -273,16 +286,18 @@ func GetPublicVacancies(c *gin.Context) {
 func GetPublicVacancy(c *gin.Context) {
 	vacancyID := c.Param("id")
 
-	var vacancy models.Vacancy
-	if err := database.DB.Preload("Recruiter").Where("id = ? AND status = ?", vacancyID, "active").First(&vacancy).Error; err != nil {
-		c.JSON(http.StatusNotFound, gin.H{"error": "Vaga não encontrada ou inativa."})
-		return
+	loadVacanciesIfNeeded()
+	vacanciesMutex.RLock()
+	defer vacanciesMutex.RUnlock()
+
+	for _, v := range cachedVacancies {
+		if v.ID == vacancyID {
+			c.JSON(http.StatusOK, gin.H{
+				"vacancy": v,
+			})
+			return
+		}
 	}
 
-	// Increment view count
-	database.DB.Model(&vacancy).UpdateColumn("views", vacancy.Views+1)
-
-	c.JSON(http.StatusOK, gin.H{
-		"vacancy": vacancy,
-	})
+	c.JSON(http.StatusNotFound, gin.H{"error": "Vaga não encontrada."})
 }
