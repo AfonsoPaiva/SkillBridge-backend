@@ -216,6 +216,9 @@ func Setup(r *gin.Engine) {
 		public.POST("/donations/embedded-checkout", handlers.CreateEmbeddedCheckoutSession)
 		public.POST("/donations/webhook", handlers.StripeWebhook)
 		public.GET("/donations/stats", handlers.GetDonationStats)
+
+		// Proxy de Imagens
+		public.GET("/proxy/image", handlers.ProxyImage)
 	}
 
 	// --------------------------------------------------
