@@ -62,7 +62,7 @@ func buildRecruiterAccessLink(token string) string {
 	return config.AppConfig.FrontendURL + "/recruiter/auth?token=" + token
 }
 
-// fetchAndUploadClearbitLogo fetches a company logo. We use icon.horse as it's free and reliable.
+// fetchAndUploadClearbitLogo fetches a company logo. We use duckduckgo icons as it's free and reliable.
 func fetchAndUploadClearbitLogo(companyURL string, uid string) string {
 	if companyURL == "" {
 		return ""
@@ -76,7 +76,7 @@ func fetchAndUploadClearbitLogo(companyURL string, uid string) string {
 		return ""
 	}
 
-	return "https://icon.horse/icon/" + domain
+	return "https://icons.duckduckgo.com/ip3/" + domain + ".ico"
 }
 
 // RecruiterApply handles the public recruiter application form submission.

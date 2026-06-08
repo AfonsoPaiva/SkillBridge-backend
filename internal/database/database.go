@@ -112,7 +112,7 @@ func migrateFaviconToIconHorse() {
 				}
 			}
 		}
-		newLogoURL := "https://icon.horse/icon/" + domainSafe
+		newLogoURL := "https://icons.duckduckgo.com/ip3/" + domainSafe + ".ico"
 		if err := DB.Model(&rec).Update("logo_url", newLogoURL).Error; err != nil {
 			log.Printf("[migrate] Error updating logo URL for recruiter %s: %v", rec.ID, err)
 		} else {
