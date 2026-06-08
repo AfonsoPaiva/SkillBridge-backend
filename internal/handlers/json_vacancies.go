@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
+	"strings"
 	"sync"
 	"time"
 
@@ -61,7 +62,10 @@ func loadVacanciesIfNeeded() {
 			PublishedAt:    now,
 			ExpiresAt:      now.AddDate(1, 0, 0),
 			RecruiterID:    "json-recruiter",
-			Recruiter:      models.Recruiter{CompanyName: jv.CompanyName},
+			Recruiter: models.Recruiter{
+				CompanyName: jv.CompanyName,
+				LogoURL:     "https://icon.horse/icon/" + strings.ToLower(strings.ReplaceAll(jv.CompanyName, " ", "")) + ".com",
+			},
 			Region:         jv.Region,
 			WorkMode:       jv.WorkMode,
 			EmploymentType: jv.EmploymentType,
