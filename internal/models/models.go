@@ -409,6 +409,7 @@ type Recruiter struct {
 	CompanyName        string     `gorm:"not null" json:"company_name"`
 	Email              string     `gorm:"uniqueIndex:idx_recruiters_email;not null" json:"email"`
 	CompanyURL         string     `gorm:"not null" json:"company_url"`
+	CompanyProfileURL  string     `json:"company_profile_url"`
 	LogoURL            string     `json:"logo_url"`
 	VacancyDescription string     `json:"vacancy_description"`
 	Status             string     `gorm:"type:varchar(20);not null;default:'pending_manual'" json:"status"` // pending_manual | pending_auto | approved | rejected

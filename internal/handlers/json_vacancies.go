@@ -19,8 +19,9 @@ var (
 
 type JsonVacancy struct {
 	CompanyName    string   `json:"company_name"`
-	CompanyUrl     string   `json:"company_url"`
-	Title          string   `json:"title"`
+	CompanyUrl        string   `json:"company_url"`
+	CompanyProfileUrl string   `json:"company_profile_url"`
+	Title             string   `json:"title"`
 	Type           string   `json:"type"`
 	Tags           []string `json:"tags"`
 	Description    string   `json:"description"`
@@ -86,7 +87,9 @@ func loadVacanciesIfNeeded() {
 			ExpiresAt:      pubDate.AddDate(1, 0, 0),
 			RecruiterID:    "json-recruiter",
 			Recruiter: models.Recruiter{
-				CompanyName: jv.CompanyName,
+				CompanyName:       jv.CompanyName,
+				CompanyURL:        jv.CompanyUrl,
+				CompanyProfileURL: jv.CompanyProfileUrl,
 				LogoURL:     func() string {
 					if jv.LogoUrl != "" {
 						return jv.LogoUrl
@@ -102,7 +105,7 @@ func loadVacanciesIfNeeded() {
 							domain = domain[:idx]
 						}
 					}
-					return "https://icons.duckduckgo.com/ip3/" + domain + ".ico"
+					return "https://t1.gstatic.com/faviconV2?client=SOCIAL&type=FAVICON&fallback_opts=TYPE,SIZE,URL&url=http://" + domain + "&size=128"
 				}(),
 			},
 			Region:         jv.Region,
