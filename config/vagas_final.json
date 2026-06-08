@@ -1,6 +1,7 @@
 [
   {
     "company_name": "Secil",
+    "company_url": "https://www.secil.pt",
     "title": "Summer Rise 2026",
     "type": "summer_internship",
     "tags": [
@@ -24,6 +25,7 @@
   },
   {
     "company_name": "Fundação Calouste Gulbenkian",
+    "company_url": "https://gulbenkian.pt",
     "title": "Programa de Estágios Verão Gulbenkian 2026",
     "type": "summer_internship",
     "tags": [
@@ -53,6 +55,7 @@
   },
   {
     "company_name": "Norauto",
+    "company_url": "https://www.norauto.pt",
     "title": "aposta nos talentos do futuro com Programas de Estágios e Reforços de Verão 2026",
     "type": "summer_internship",
     "tags": [
@@ -75,6 +78,7 @@
   },
   {
     "company_name": "CUF",
+    "company_url": "https://www.cuf.pt",
     "title": "Verão@ – Lisboa / Porto",
     "type": "summer_internship",
     "tags": [
@@ -94,6 +98,7 @@
   },
   {
     "company_name": "TAP Air Portugal",
+    "company_url": "https://www.tapairportugal.com",
     "title": "Coordenador de Segurança no Trabalho & Ergonomia",
     "type": "curricular_internship",
     "tags": [
@@ -129,6 +134,7 @@
   },
   {
     "company_name": "Centro Científico e Cultural de Macau",
+    "company_url": "https://www.cccm.pt",
     "title": "Técnico Superior | Mobilidade Interna",
     "type": "curricular_internship",
     "tags": [
@@ -153,6 +159,7 @@
   },
   {
     "company_name": "Makro",
+    "company_url": "https://www.makro.pt",
     "title": "Metro / Potentials Trainee Programme",
     "type": "curricular_internship",
     "tags": [
@@ -179,6 +186,7 @@
   },
   {
     "company_name": "NAV Portugal",
+    "company_url": "https://www.nav.pt",
     "title": "Técnico/a Superior de Gestão Financeira Júnior",
     "type": "curricular_internship",
     "tags": [
@@ -203,6 +211,7 @@
   },
   {
     "company_name": "Casa Pia de Lisboa",
+    "company_url": "https://www.casapia.pt",
     "title": "Técnico Superior (7 vagas) | Procedimento Concursal Comum",
     "type": "curricular_internship",
     "tags": [
@@ -224,6 +233,7 @@
   },
   {
     "company_name": "Federação Portuguesa de Atletismo",
+    "company_url": "https://fpatletismo.pt",
     "title": "Área de Competições",
     "type": "curricular_internship",
     "tags": [
@@ -245,6 +255,7 @@
   },
   {
     "company_name": "Infraestruturas de Portugal",
+    "company_url": "https://www.infraestruturasdeportugal.pt",
     "title": "Gestão de Armazéns – Entroncamento, Santarém",
     "type": "extracurricular_internship",
     "tags": [
@@ -264,6 +275,7 @@
   },
   {
     "company_name": "TAP Air Portugal",
+    "company_url": "https://www.tapairportugal.com",
     "title": "First Flight",
     "type": "extracurricular_internship",
     "tags": [
@@ -286,6 +298,7 @@
   },
   {
     "company_name": "Fundação Calouste Gulbenkian",
+    "company_url": "https://gulbenkian.pt",
     "title": "Estágio em Gestão de Eventos",
     "type": "extracurricular_internship",
     "tags": [
@@ -311,6 +324,7 @@
   },
   {
     "company_name": "Fundação Calouste Gulbenkian",
+    "company_url": "https://gulbenkian.pt",
     "title": "Estágio na área de Divulgação",
     "type": "extracurricular_internship",
     "tags": [
@@ -341,6 +355,7 @@
   },
   {
     "company_name": "RTP",
+    "company_url": "https://www.rtp.pt",
     "title": "Redes Sociais e Multimédia",
     "type": "extracurricular_internship",
     "tags": [
@@ -367,6 +382,7 @@
   },
   {
     "company_name": "RTP",
+    "company_url": "https://www.rtp.pt",
     "title": "Técnico de Relações Públicas",
     "type": "extracurricular_internship",
     "tags": [
@@ -392,6 +408,7 @@
   },
   {
     "company_name": "Hitachi",
+    "company_url": "https://www.hitachi.com",
     "title": "Hitachi Rail",
     "type": "extracurricular_internship",
     "tags": [
@@ -417,6 +434,7 @@
   },
   {
     "company_name": "CTT",
+    "company_url": "https://www.ctt.pt",
     "title": "Programa de Trainees 2026/2027",
     "type": "extracurricular_internship",
     "tags": [
@@ -444,6 +462,7 @@
   },
   {
     "company_name": "Banco Santander",
+    "company_url": "https://www.santander.pt",
     "title": "Future Talent",
     "type": "extracurricular_internship",
     "tags": [
@@ -468,6 +487,7 @@
   },
   {
     "company_name": "BDO",
+    "company_url": "https://www.bdo.pt",
     "title": "Trainees",
     "type": "extracurricular_internship",
     "tags": [
@@ -494,6 +514,7 @@
   },
   {
     "company_name": "OGMA",
+    "company_url": "https://www.ogma.pt",
     "title": "Programa de Trainees TON 2026",
     "type": "extracurricular_internship",
     "tags": [
@@ -516,6 +537,7 @@
   },
   {
     "company_name": "Fundação Calouste Gulbenkian",
+    "company_url": "https://gulbenkian.pt",
     "title": "Estágio em Gestão de Riscos",
     "type": "extracurricular_internship",
     "tags": [
@@ -543,6 +565,7 @@
   },
   {
     "company_name": "Beiersdorf",
+    "company_url": "https://www.beiersdorf.com",
     "title": "Revenue & Category Management Intern",
     "type": "extracurricular_internship",
     "tags": [
@@ -572,6 +595,7 @@
   },
   {
     "company_name": "Ageas",
+    "company_url": "https://www.ageas.pt",
     "title": "Programa de Trainees Be",
     "type": "extracurricular_internship",
     "tags": [
@@ -594,6 +618,7 @@
   },
   {
     "company_name": "AMT - Autoridade da Mobilidade e dos Transportes",
+    "company_url": "https://www.amt-autoridade.pt",
     "title": "Estágios Profissionais (5 vagas)",
     "type": "extracurricular_internship",
     "tags": [
@@ -622,6 +647,7 @@
   },
   {
     "company_name": "CIMPOR",
+    "company_url": "https://www.cimpor.pt",
     "title": "CIMPOR NextGen 2.0",
     "type": "extracurricular_internship",
     "tags": [
@@ -642,6 +668,7 @@
   },
   {
     "company_name": "Pandora",
+    "company_url": "https://www.pandoragroup.com",
     "title": "PR & Influence Trainee Portugal (20H/semana)",
     "type": "extracurricular_internship",
     "tags": [
@@ -665,6 +692,7 @@
   },
   {
     "company_name": "REN - Redes Energéticas Nacionais",
+    "company_url": "https://www.ren.pt",
     "title": "Programa Trainees REN 2026/2027 – Lisboa / Porto",
     "type": "extracurricular_internship",
     "tags": [
@@ -691,6 +719,7 @@
   },
   {
     "company_name": "Sporting Clube de Portugal",
+    "company_url": "https://www.sporting.pt",
     "title": "Marca Corporativa",
     "type": "extracurricular_internship",
     "tags": [
@@ -715,6 +744,7 @@
   },
   {
     "company_name": "EDP",
+    "company_url": "https://www.edp.pt",
     "title": "Professional Internship 2026",
     "type": "extracurricular_internship",
     "tags": [
@@ -740,6 +770,7 @@
   },
   {
     "company_name": "ALDI",
+    "company_url": "https://www.aldi.pt",
     "title": "Trainee Construction & Energy – Carnaxide, Lisboa",
     "type": "extracurricular_internship",
     "tags": [

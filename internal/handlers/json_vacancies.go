@@ -19,6 +19,7 @@ var (
 
 type JsonVacancy struct {
 	CompanyName    string   `json:"company_name"`
+	CompanyUrl     string   `json:"company_url"`
 	Title          string   `json:"title"`
 	Type           string   `json:"type"`
 	Tags           []string `json:"tags"`
@@ -28,6 +29,7 @@ type JsonVacancy struct {
 	WorkMode       string   `json:"work_mode"`
 	EmploymentType string   `json:"employment_type"`
 	PublishedAt    string   `json:"published_at"`
+	LogoUrl        string   `json:"logo_url"`
 }
 
 func loadVacanciesIfNeeded() {
@@ -85,7 +87,23 @@ func loadVacanciesIfNeeded() {
 			RecruiterID:    "json-recruiter",
 			Recruiter: models.Recruiter{
 				CompanyName: jv.CompanyName,
-				LogoURL:     "https://icon.horse/icon/" + strings.ToLower(strings.ReplaceAll(jv.CompanyName, " ", "")) + ".com",
+				LogoURL:     func() string {
+					if jv.LogoUrl != "" {
+						return jv.LogoUrl
+					}
+					domain := jv.CompanyUrl
+					if domain == "" {
+						domain = strings.ToLower(strings.ReplaceAll(jv.CompanyName, " ", "")) + ".com"
+					} else {
+						domain = strings.TrimPrefix(domain, "http://")
+						domain = strings.TrimPrefix(domain, "https://")
+						domain = strings.TrimPrefix(domain, "www.")
+						if idx := strings.Index(domain, "/"); idx != -1 {
+							domain = domain[:idx]
+						}
+					}
+					return "https://icon.horse/icon/" + domain
+				}(),
 			},
 			Region:         jv.Region,
 			WorkMode:       jv.WorkMode,
