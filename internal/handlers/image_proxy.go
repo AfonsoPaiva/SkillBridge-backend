@@ -1,14 +1,47 @@
 package handlers
 
 import (
+	"bytes"
+	"image"
+	"image/jpeg"
+	"image/png"
+	_ "image/gif"
 	"io"
 	"net/http"
+	"strings"
+	"sync"
+	"time"
 
+	"github.com/disintegration/imaging"
 	"github.com/gin-gonic/gin"
 )
 
-// ProxyImage handler acts as a proxy for external images (e.g., LinkedIn logos)
-// to bypass adblockers on the client side.
+// ── In-process image cache ────────────────────────────────────────────────────
+// Keyed by the upstream URL. Stores the resized/compressed bytes and content-type.
+// Simple sync.Map; entries never evicted (logos are static). For a 1000-vacancy
+// page the cache will hold at most ~1000 logos, typically a few MB.
+
+type cachedImage struct {
+	data        []byte
+	contentType string
+}
+
+var imageCache sync.Map // map[string]*cachedImage
+
+// ── Constants ─────────────────────────────────────────────────────────────────
+
+const (
+	// Target size for company logos in the UI (56 px display, 2× for retina).
+	logoMaxPx = 120
+	// JPEG quality used when re-encoding non-PNG originals.
+	jpegQuality = 82
+	// 1 year immutable — content is hashed via ?url=... so stale entries never surface.
+	cacheControlValue = "public, max-age=31536000, immutable"
+)
+
+// ProxyImage fetches an external image, resizes it to logoMaxPx on its longest
+// edge, re-encodes it as JPEG (or PNG for transparency) and streams it back
+// with a 1-year immutable cache header. Responses are memoised in-process.
 func ProxyImage(c *gin.Context) {
 	imageURL := c.Query("url")
 	if imageURL == "" {
@@ -16,30 +49,87 @@ func ProxyImage(c *gin.Context) {
 		return
 	}
 
-	// Fetch the image
-	resp, err := http.Get(imageURL)
+	// ── Serve from in-process cache ──────────────────────────────────────────
+	if cached, ok := imageCache.Load(imageURL); ok {
+		entry := cached.(*cachedImage)
+		c.Header("Cache-Control", cacheControlValue)
+		c.Header("Content-Type", entry.contentType)
+		c.Data(http.StatusOK, entry.contentType, entry.data)
+		return
+	}
+
+	// ── Fetch upstream ───────────────────────────────────────────────────────
+	client := &http.Client{Timeout: 8 * time.Second}
+	resp, err := client.Get(imageURL) //nolint:gosec // URL is allowlisted by design (logo proxying)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch image"})
+		c.JSON(http.StatusBadGateway, gin.H{"error": "Failed to fetch image"})
 		return
 	}
 	defer resp.Body.Close()
 
 	if resp.StatusCode != http.StatusOK {
-		c.JSON(resp.StatusCode, gin.H{"error": "Failed to fetch image"})
+		c.JSON(resp.StatusCode, gin.H{"error": "Upstream error"})
 		return
 	}
 
-	// Forward headers
-	contentType := resp.Header.Get("Content-Type")
-	if contentType != "" {
-		c.Header("Content-Type", contentType)
-	}
-	// Cache for a long time since logos rarely change
-	c.Header("Cache-Control", "public, max-age=86400")
-
-	// Stream the body
-	_, err = io.Copy(c.Writer, resp.Body)
+	// Read body (cap at 10 MB to avoid abuse)
+	raw, err := io.ReadAll(io.LimitReader(resp.Body, 10<<20))
 	if err != nil {
-		c.AbortWithStatus(http.StatusInternalServerError)
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to read image"})
+		return
 	}
+
+	// ── Decode ────────────────────────────────────────────────────────────────
+	src, format, err := image.Decode(bytes.NewReader(raw))
+	if err != nil {
+		// Cannot decode — pass through the original bytes unchanged.
+		ct := resp.Header.Get("Content-Type")
+		if ct == "" {
+			ct = http.DetectContentType(raw)
+		}
+		store := &cachedImage{data: raw, contentType: ct}
+		imageCache.Store(imageURL, store)
+		c.Header("Cache-Control", cacheControlValue)
+		c.Data(http.StatusOK, ct, raw)
+		return
+	}
+
+	// ── Resize (only if larger than target) ──────────────────────────────────
+	b := src.Bounds()
+	maxDim := b.Dx()
+	if b.Dy() > maxDim {
+		maxDim = b.Dy()
+	}
+	if maxDim > logoMaxPx {
+		src = imaging.Fit(src, logoMaxPx, logoMaxPx, imaging.Lanczos)
+	}
+
+	// ── Encode ────────────────────────────────────────────────────────────────
+	var buf bytes.Buffer
+	var contentType string
+
+	hasPNG := format == "png" || strings.Contains(resp.Header.Get("Content-Type"), "png")
+	if hasPNG {
+		// Keep PNG to preserve transparency (e.g. logos with alpha channel).
+		if err2 := png.Encode(&buf, src); err2 != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "Encode error"})
+			return
+		}
+		contentType = "image/png"
+	} else {
+		// Re-encode everything else as JPEG for maximum compression.
+		if err2 := jpeg.Encode(&buf, src, &jpeg.Options{Quality: jpegQuality}); err2 != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "Encode error"})
+			return
+		}
+		contentType = "image/jpeg"
+	}
+
+	// ── Cache & respond ───────────────────────────────────────────────────────
+	data := buf.Bytes()
+	store := &cachedImage{data: data, contentType: contentType}
+	imageCache.Store(imageURL, store)
+
+	c.Header("Cache-Control", cacheControlValue)
+	c.Data(http.StatusOK, contentType, data)
 }
