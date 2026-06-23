@@ -12,6 +12,11 @@ import (
 )
 
 func Setup(r *gin.Engine) {
+	// --------------------------------------------------
+	// GLOBAL RATE LIMIT — 300 req/min per IP (DDoS safety net)
+	// Applied before everything else, including static assets.
+	// --------------------------------------------------
+	r.Use(middleware.GlobalRateLimit())
 
 	// Health check endpoint (no authentication required)
 	r.GET("/health", handlers.HealthCheck)
@@ -191,11 +196,11 @@ func Setup(r *gin.Engine) {
 		public.GET("/users/:id/followers", handlers.GetFollowers)
 		public.GET("/users/:id/following", handlers.GetFollowing)
 		public.GET("/users/:id/follow/counts", handlers.GetFollowCounts)
-		// Mot-de-passe (público — não requer token)
-		public.POST("/users/password-reset", handlers.RequestPasswordReset)
+		// Mot-de-passe (público — não requer token) — rate-limited (10 req/min)
+		public.POST("/users/password-reset", middleware.AuthFlowRateLimit(), handlers.RequestPasswordReset)
 
-		// Projetos
-		public.GET("/projects", handlers.GetProjects)
+		// Projetos — list is rate-limited (60 req/min)
+		public.GET("/projects", middleware.HeavyReadRateLimit(), handlers.GetProjects)
 		public.GET("/projects/:id", handlers.GetProjectByID)
 		public.GET("/projects/:id/members", handlers.GetProjectMembers)
 
@@ -207,8 +212,8 @@ func Setup(r *gin.Engine) {
 		public.GET("/universities/search", handlers.SearchUniversities)
 		public.GET("/universities/courses", handlers.ListCoursesByUniversity)
 
-		// Guest onboarding sessions (anónimo)
-		public.POST("/guest/session", handlers.CreateGuestSession)
+		// Guest onboarding sessions (anónimo) — write limited (20 req/min)
+		public.POST("/guest/session", middleware.SensitiveWriteRateLimit(), handlers.CreateGuestSession)
 		public.GET("/guest/session/:token", handlers.GetGuestSession)
 		public.GET("/guest/stats", handlers.GetPlatformStats)
 
@@ -217,8 +222,8 @@ func Setup(r *gin.Engine) {
 		public.POST("/donations/webhook", handlers.StripeWebhook)
 		public.GET("/donations/stats", handlers.GetDonationStats)
 
-		// Proxy de Imagens
-		public.GET("/proxy/image", handlers.ProxyImage)
+		// Proxy de Imagens — rate-limited to 120 req/min (cache-miss path)
+		public.GET("/proxy/image", middleware.ProxyImageRateLimit(), handlers.ProxyImage)
 	}
 
 	// --------------------------------------------------
@@ -274,10 +279,12 @@ func Setup(r *gin.Engine) {
 	// --------------------------------------------------
 	// ROTAS DE RECRUTADORES (públicas)
 	// --------------------------------------------------
-	public.POST("/recruiters/apply", handlers.RecruiterApply)
-	public.POST("/recruiters/request-link", handlers.RecruiterRequestLink)
-	public.POST("/recruiters/verify-token", handlers.RecruiterVerifyToken)
-	public.GET("/vacancies", handlers.GetPublicVacancies)
+	// Recruiter public write endpoints — rate-limited
+	public.POST("/recruiters/apply", middleware.SensitiveWriteRateLimit(), handlers.RecruiterApply)
+	public.POST("/recruiters/request-link", middleware.AuthFlowRateLimit(), handlers.RecruiterRequestLink)
+	public.POST("/recruiters/verify-token", middleware.AuthFlowRateLimit(), handlers.RecruiterVerifyToken)
+	// Vacancies list — heavy DB read, rate-limited (60 req/min)
+	public.GET("/vacancies", middleware.HeavyReadRateLimit(), handlers.GetPublicVacancies)
 	public.GET("/vacancies/:id", handlers.GetPublicVacancy)
 
 	// --------------------------------------------------
