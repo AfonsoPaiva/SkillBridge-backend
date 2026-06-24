@@ -2,6 +2,7 @@ package middleware
 
 import (
 	"net/http"
+	"strings"
 	"sync"
 	"time"
 
@@ -131,21 +132,34 @@ var (
 // Gin middleware factories
 // ---------------------------------------------------------------------------
 
-// clientIP resolves the real client IP, respecting X-Forwarded-For / X-Real-IP.
+// clientIP resolves the real client IP in a way that resists XFF spoofing.
+//
+// When running behind a single trusted reverse proxy (Cloud Run / Google LB),
+// the proxy appends the real client IP as the LAST entry in X-Forwarded-For.
+// An attacker can prepend fake IPs to the header, but cannot forge the
+// rightmost entry (which is added by the infrastructure, not the client).
+//
+// Strategy:
+//  1. Use X-Real-IP when present (set exclusively by the ingress proxy).
+//  2. Otherwise take the LAST entry of X-Forwarded-For (proxy-appended).
+//  3. Fall back to Gin's c.ClientIP() for direct connections.
 func clientIP(c *gin.Context) string {
-	if xff := c.GetHeader("X-Forwarded-For"); xff != "" {
-		// X-Forwarded-For may contain a chain: "clientIP, proxy1, proxy2"
-		// The leftmost IP is the original client.
-		for i, ch := range xff {
-			if ch == ',' {
-				return xff[:i]
-			}
-		}
-		return xff
-	}
+	// X-Real-IP is set by the trusted proxy and cannot be spoofed by clients.
 	if xri := c.GetHeader("X-Real-IP"); xri != "" {
-		return xri
+		return strings.TrimSpace(xri)
 	}
+
+	// Use the rightmost (last) entry of X-Forwarded-For — appended by the
+	// trusted ingress, not forged by the client.
+	if xff := c.GetHeader("X-Forwarded-For"); xff != "" {
+		parts := strings.Split(xff, ",")
+		// The rightmost IP is the one our trusted proxy saw as the source.
+		ip := strings.TrimSpace(parts[len(parts)-1])
+		if ip != "" {
+			return ip
+		}
+	}
+
 	return c.ClientIP()
 }
 

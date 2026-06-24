@@ -121,6 +121,9 @@ type Config struct {
 	// Rate limiting
 	TOTPMaxAttempts     int // Máximo de tentativas TOTP por período
 	TOTPRateLimitWindow int // Janela de tempo em segundos para rate limit
+	// reCAPTCHA
+	RecaptchaSecretKey string // Google reCAPTCHA v3 secret key (server-side)
+	RecaptchaSiteKey   string // Google reCAPTCHA v3 site key (used in logs/docs only)
 }
 
 var AppConfig Config
@@ -163,6 +166,8 @@ func Load() {
 		FirebaseProjectID:       getEnv("FIREBASE_PROJECT_ID", ""),
 		TOTPMaxAttempts:         getEnvInt("TOTP_MAX_ATTEMPTS", 5),
 		TOTPRateLimitWindow:     getEnvInt("TOTP_RATE_LIMIT_WINDOW", 60),
+		RecaptchaSecretKey:      getEnv("RECAPTCHA_SECRET_KEY", ""),
+		RecaptchaSiteKey:        getEnv("RECAPTCHA_SITE_KEY", ""),
 	}
 }
 

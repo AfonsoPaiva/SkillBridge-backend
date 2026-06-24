@@ -13,10 +13,25 @@ import (
 
 func Setup(r *gin.Engine) {
 	// --------------------------------------------------
-	// GLOBAL RATE LIMIT — 300 req/min per IP (DDoS safety net)
-	// Applied before everything else, including static assets.
+	// GLOBAL SECURITY LAYER
+	// Applied before everything else — order matters!
 	// --------------------------------------------------
+
+	// 1. Harden HTTP response headers (HSTS, CSP, anti-clickjacking, etc.)
+	r.Use(middleware.SecurityHeaders())
+
+	// 2. Broad DDoS safety net — 300 req/min per IP globally.
 	r.Use(middleware.GlobalRateLimit())
+
+	// 3. Reject known scanner/exploit tool User-Agents.
+	r.Use(middleware.BotProtection())
+
+	// 4. Block SQL injection and XSS probes in URL paths and query strings.
+	r.Use(middleware.SQLInjectionProtection())
+
+	// 5. Cap all API request bodies at 512 KB to prevent memory-exhaustion attacks.
+	//    Upload endpoints override this with a higher limit (10 MB).
+	r.Use(middleware.LimitBodySize(middleware.DefaultBodyLimit))
 
 	// Health check endpoint (no authentication required)
 	r.GET("/health", handlers.HealthCheck)
@@ -166,8 +181,8 @@ func Setup(r *gin.Engine) {
 		// Avaliações
 		protected.POST("/reviews", handlers.CreateReview)
 
-		// Upload de imagens
-		protected.POST("/upload/image", handlers.UploadImage)
+		// Upload de imagens — higher body limit for image files (10 MB)
+		protected.POST("/upload/image", middleware.LimitBodySize(middleware.UploadBodyLimit), handlers.UploadImage)
 		protected.DELETE("/upload/image", handlers.DeleteImage)
 
 		// Mensagens privadas E2E cifradas
@@ -196,8 +211,8 @@ func Setup(r *gin.Engine) {
 		public.GET("/users/:id/followers", handlers.GetFollowers)
 		public.GET("/users/:id/following", handlers.GetFollowing)
 		public.GET("/users/:id/follow/counts", handlers.GetFollowCounts)
-		// Mot-de-passe (público — não requer token) — rate-limited (10 req/min)
-		public.POST("/users/password-reset", middleware.AuthFlowRateLimit(), handlers.RequestPasswordReset)
+		// Mot-de-passe (público — não requer token) — rate-limited + reCAPTCHA (10 req/min)
+		public.POST("/users/password-reset", middleware.AuthFlowRateLimit(), middleware.VerifyRecaptcha(0.5), handlers.RequestPasswordReset)
 
 		// Projetos — list is rate-limited (60 req/min)
 		public.GET("/projects", middleware.HeavyReadRateLimit(), handlers.GetProjects)
@@ -212,8 +227,8 @@ func Setup(r *gin.Engine) {
 		public.GET("/universities/search", handlers.SearchUniversities)
 		public.GET("/universities/courses", handlers.ListCoursesByUniversity)
 
-		// Guest onboarding sessions (anónimo) — write limited (20 req/min)
-		public.POST("/guest/session", middleware.SensitiveWriteRateLimit(), handlers.CreateGuestSession)
+		// Guest onboarding sessions (anónimo) — write limited + reCAPTCHA (20 req/min)
+		public.POST("/guest/session", middleware.SensitiveWriteRateLimit(), middleware.VerifyRecaptcha(0.3), handlers.CreateGuestSession)
 		public.GET("/guest/session/:token", handlers.GetGuestSession)
 		public.GET("/guest/stats", handlers.GetPlatformStats)
 
@@ -279,9 +294,9 @@ func Setup(r *gin.Engine) {
 	// --------------------------------------------------
 	// ROTAS DE RECRUTADORES (públicas)
 	// --------------------------------------------------
-	// Recruiter public write endpoints — rate-limited
-	public.POST("/recruiters/apply", middleware.SensitiveWriteRateLimit(), handlers.RecruiterApply)
-	public.POST("/recruiters/request-link", middleware.AuthFlowRateLimit(), handlers.RecruiterRequestLink)
+	// Recruiter public write endpoints — rate-limited + reCAPTCHA on high-risk paths
+	public.POST("/recruiters/apply", middleware.SensitiveWriteRateLimit(), middleware.VerifyRecaptcha(0.5), handlers.RecruiterApply)
+	public.POST("/recruiters/request-link", middleware.AuthFlowRateLimit(), middleware.VerifyRecaptcha(0.5), handlers.RecruiterRequestLink)
 	public.POST("/recruiters/verify-token", middleware.AuthFlowRateLimit(), handlers.RecruiterVerifyToken)
 	// Vacancies list — heavy DB read, rate-limited (60 req/min)
 	public.GET("/vacancies", middleware.HeavyReadRateLimit(), handlers.GetPublicVacancies)
