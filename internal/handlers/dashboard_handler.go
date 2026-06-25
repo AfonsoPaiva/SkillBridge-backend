@@ -70,8 +70,10 @@ func AdminDashboard(c *gin.Context) {
 	c.Header("Content-Security-Policy",
 		"default-src 'self'; "+
 			"style-src 'unsafe-inline'; "+
-			"script-src 'unsafe-inline' https://www.gstatic.com; "+
-			"connect-src 'self' https://*.googleapis.com https://*.firebaseio.com https://identitytoolkit.googleapis.com https://securetoken.googleapis.com; "+
+			// Firebase loads api.js dynamically from apis.google.com for the Google Sign-In popup.
+			"script-src 'unsafe-inline' https://www.gstatic.com https://apis.google.com; "+
+			// www.gstatic.com is needed for .map sourcemap fetches (firebase-app.js.map etc.)
+			"connect-src 'self' https://www.gstatic.com https://*.googleapis.com https://*.firebaseio.com https://identitytoolkit.googleapis.com https://securetoken.googleapis.com; "+
 			"img-src 'self' data: https://storage.googleapis.com https://lh3.googleusercontent.com; "+
 			"frame-src 'self' https://accounts.google.com; "+
 			"font-src 'self' https://fonts.gstatic.com; "+
