@@ -75,9 +75,15 @@ func AdminDashboard(c *gin.Context) {
 			// www.gstatic.com is needed for .map sourcemap fetches (firebase-app.js.map etc.)
 			"connect-src 'self' https://www.gstatic.com https://*.googleapis.com https://*.firebaseio.com https://identitytoolkit.googleapis.com https://securetoken.googleapis.com; "+
 			"img-src 'self' data: https://storage.googleapis.com https://lh3.googleusercontent.com; "+
-			"frame-src 'self' https://accounts.google.com; "+
+			// Firebase Auth popup internally iframes the project's firebaseapp.com auth domain.
+			"frame-src 'self' https://accounts.google.com https://*.firebaseapp.com; "+
 			"font-src 'self' https://fonts.gstatic.com; "+
 			"frame-ancestors 'none';")
+	// Firebase Sign-In popup requires COOP=unsafe-none so the popup window can
+	// communicate window.closed back to the opener. The global SecurityHeaders
+	// middleware does not set COOP, but browsers may default to a restrictive
+	// policy; setting it explicitly here ensures the popup flow works.
+	c.Header("Cross-Origin-Opener-Policy", "unsafe-none")
 
 	if err := tmpl.Execute(c.Writer, data); err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Template error: " + err.Error()})
