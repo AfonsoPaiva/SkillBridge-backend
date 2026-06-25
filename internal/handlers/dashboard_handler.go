@@ -64,6 +64,18 @@ func AdminDashboard(c *gin.Context) {
 	// Prevent the dashboard from being cached or indexed
 	c.Header("Cache-Control", "no-store")
 	c.Header("X-Robots-Tag", "noindex")
+	// Override the global SecurityHeaders CSP (default-src 'none') which would
+	// block inline <style> tags, inline <script> blocks, and the Firebase CDN.
+	// This CSP is intentionally permissive and scoped only to this admin page.
+	c.Header("Content-Security-Policy",
+		"default-src 'self'; "+
+			"style-src 'unsafe-inline'; "+
+			"script-src 'unsafe-inline' https://www.gstatic.com; "+
+			"connect-src 'self' https://*.googleapis.com https://*.firebaseio.com https://identitytoolkit.googleapis.com https://securetoken.googleapis.com; "+
+			"img-src 'self' data: https://storage.googleapis.com https://lh3.googleusercontent.com; "+
+			"frame-src 'self' https://accounts.google.com; "+
+			"font-src 'self' https://fonts.gstatic.com; "+
+			"frame-ancestors 'none';")
 
 	if err := tmpl.Execute(c.Writer, data); err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Template error: " + err.Error()})

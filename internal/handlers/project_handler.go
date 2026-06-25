@@ -149,6 +149,13 @@ func ensureUniqueUserSlug(baseSlug string, excludeID uint) string {
 // @Failure      400  {object}  map[string]string
 // @Failure      404  {object}  map[string]string
 // @Router       /projects [post]
+// projectLimits defines the hard caps enforced on project creation and updates.
+const (
+	maxProjectsPerDay = 5  // per-user daily project creation cap
+	maxRolesPerProject = 10 // max vacancies/roles per project
+	maxLinksPerProject = 10 // max external links per project
+)
+
 func CreateProject(c *gin.Context) {
 	firebaseUID := c.GetString("firebase_uid")
 
@@ -158,17 +165,46 @@ func CreateProject(c *gin.Context) {
 		return
 	}
 
+	// ── Limit: max 5 projects created per user per calendar day (UTC) ──
+	dayStart := time.Now().UTC().Truncate(24 * time.Hour)
+	var dailyCount int64
+	database.DB.Model(&models.Project{}).
+		Where("owner_id = ? AND created_at >= ?", owner.ID, dayStart).
+		Count(&dailyCount)
+	if dailyCount >= maxProjectsPerDay {
+		c.JSON(http.StatusTooManyRequests, gin.H{
+			"error": fmt.Sprintf("Limite atingido: podes criar no máximo %d projetos por dia.", maxProjectsPerDay),
+		})
+		return
+	}
+
 	var input struct {
-		Title       string             `json:"title" binding:"required"`
-		Description string             `json:"description"`
-		ImageURL    string             `json:"image_url"`
-		Status      string             `json:"status"`
+		Title       string              `json:"title" binding:"required"`
+		Description string              `json:"description"`
+		ImageURL    string              `json:"image_url"`
+		Status      string              `json:"status"`
 		Links       models.ProjectLinks `json:"links"`
-		Roles       []projectRoleInput `json:"roles"`
+		Roles       []projectRoleInput  `json:"roles"`
 	}
 
 	if err := c.ShouldBindJSON(&input); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	// ── Limit: max 10 roles per project ──
+	if len(input.Roles) > maxRolesPerProject {
+		c.JSON(http.StatusBadRequest, gin.H{
+			"error": fmt.Sprintf("Um projeto pode ter no máximo %d vagas.", maxRolesPerProject),
+		})
+		return
+	}
+
+	// ── Limit: max 10 links per project ──
+	if len(input.Links) > maxLinksPerProject {
+		c.JSON(http.StatusBadRequest, gin.H{
+			"error": fmt.Sprintf("Um projeto pode ter no máximo %d links.", maxLinksPerProject),
+		})
 		return
 	}
 
@@ -523,6 +559,22 @@ func UpdateProject(c *gin.Context) {
 		return
 	}
 
+	// ── Limit: max 10 roles per project (on update) ──
+	if input.Roles != nil && len(input.Roles) > maxRolesPerProject {
+		c.JSON(http.StatusBadRequest, gin.H{
+			"error": fmt.Sprintf("Um projeto pode ter no máximo %d vagas.", maxRolesPerProject),
+		})
+		return
+	}
+
+	// ── Limit: max 10 links per project (on update) ──
+	if input.Links != nil && len(*input.Links) > maxLinksPerProject {
+		c.JSON(http.StatusBadRequest, gin.H{
+			"error": fmt.Sprintf("Um projeto pode ter no máximo %d links.", maxLinksPerProject),
+		})
+		return
+	}
+
 	var roles []models.ProjectRole
 	if input.Roles != nil {
 		preparedRoles, err := prepareProjectRoles(input.Roles, false)
@@ -711,6 +763,17 @@ func CreateProjectRole(c *gin.Context) {
 	if !ok {
 		return
 	}
+
+	// ── Limit: max 10 roles per project (adding individually) ──
+	var existingRoleCount int64
+	database.DB.Model(&models.ProjectRole{}).Where("project_id = ?", project.ID).Count(&existingRoleCount)
+	if existingRoleCount >= maxRolesPerProject {
+		c.JSON(http.StatusBadRequest, gin.H{
+			"error": fmt.Sprintf("Este projeto já atingiu o limite máximo de %d vagas.", maxRolesPerProject),
+		})
+		return
+	}
+
 	var input projectRoleInput
 	if err := c.ShouldBindJSON(&input); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
