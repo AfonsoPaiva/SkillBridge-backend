@@ -170,12 +170,18 @@ func StripeWebhook(c *gin.Context) {
 			break
 		}
 
+		// Route to the correct handler based on metadata type
+		if session.Metadata != nil && session.Metadata["type"] == "contest" {
+			HandleContestWebhook(event.Data.Raw)
+		}
+
 		// Não guardar dados de pagamento localmente.
 		// O Stripe é a fonte de verdade para pagamentos.
-		log.Printf("✅ Donativo confirmado no Stripe: session=%s amount=%.2f€ currency=%s",
+		log.Printf("✅ Pagamento confirmado no Stripe: session=%s amount=%.2f€ currency=%s type=%s",
 			session.ID,
 			float64(session.AmountTotal)/100,
-			session.Currency)
+			session.Currency,
+			session.Metadata["type"])
 	}
 
 	c.JSON(http.StatusOK, gin.H{"received": true})

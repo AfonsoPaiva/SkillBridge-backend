@@ -870,3 +870,56 @@ func AdminGetUniversityStats(c *gin.Context) {
 
 // AdminListVacancies lists all vacancies.
 // GET /api/admin/vacancies
+
+// ── Admin Contest Management ──────────────────────────────
+
+// AdminListContestRegistrations lists all contest registrations.
+// GET /api/admin/contest-registrations
+func AdminListContestRegistrations(c *gin.Context) {
+	var registrations []models.ContestRegistration
+	database.DB.Preload("User").Preload("Project").Order("created_at DESC").Find(&registrations)
+	c.JSON(http.StatusOK, registrations)
+}
+
+// AdminUpdateContestRegistration updates a contest registration status/track.
+// PUT /api/admin/contest-registrations/:id
+func AdminUpdateContestRegistration(c *gin.Context) {
+	var reg models.ContestRegistration
+	if err := database.DB.First(&reg, c.Param("id")).Error; err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "Inscrição não encontrada."})
+		return
+	}
+
+	var input struct {
+		Track         string `json:"track"`
+		PaymentStatus string `json:"payment_status"`
+	}
+
+	if err := c.ShouldBindJSON(&input); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	if input.Track != "" {
+		reg.Track = input.Track
+	}
+	if input.PaymentStatus != "" {
+		reg.PaymentStatus = input.PaymentStatus
+	}
+
+	database.DB.Save(&reg)
+	c.JSON(http.StatusOK, gin.H{"message": "Inscrição atualizada.", "registration": reg})
+}
+
+// AdminDeleteContestRegistration removes a contest registration.
+// DELETE /api/admin/contest-registrations/:id
+func AdminDeleteContestRegistration(c *gin.Context) {
+	var reg models.ContestRegistration
+	if err := database.DB.First(&reg, c.Param("id")).Error; err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "Inscrição não encontrada."})
+		return
+	}
+
+	database.DB.Delete(&reg)
+	c.JSON(http.StatusOK, gin.H{"message": "Inscrição eliminada."})
+}

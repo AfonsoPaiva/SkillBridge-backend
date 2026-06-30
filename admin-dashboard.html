@@ -364,6 +364,7 @@
     <a onclick="showPage('projects')" data-page="projects">Projects</a>
     <a onclick="showPage('reviews')"  data-page="reviews">Reviews</a>
     <a onclick="showPage('recruiters')" data-page="recruiters">Recruiters</a>
+    <a onclick="showPage('contest')" data-page="contest">Build Challenge</a>
     <a onclick="showPage('email')"    data-page="email">Email Marketing</a>
     <a onclick="showPage('security')" data-page="security">Security (TOTP)</a>
     <a onclick="signOut()" style="margin-top:auto;color:#ef4444">Sign out</a>
@@ -490,6 +491,26 @@
         <table>
           <thead><tr><th>ID</th><th>Company</th><th>Name</th><th>Email</th><th>Created</th><th>Status</th><th></th></tr></thead>
           <tbody id="recruiters-body"><tr><td colspan="7" class="loading">Loading...</td></tr></tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- CONTEST -->
+    <div id="page-contest" class="page">
+      <h2 class="page-title">Build Challenge Registrations</h2>
+      <div class="toolbar">
+        <select id="contest-filter" onchange="filterContest()">
+          <option value="all">All Status</option>
+          <option value="paid">Paid</option>
+          <option value="pending">Pending</option>
+          <option value="failed">Failed</option>
+        </select>
+        <button class="btn btn-ghost" onclick="loadContest()">Refresh</button>
+      </div>
+      <div class="card">
+        <table>
+          <thead><tr><th>ID</th><th>User</th><th>Project</th><th>Track</th><th>Status</th><th>Date</th><th></th></tr></thead>
+          <tbody id="contest-body"><tr><td colspan="7" class="loading">Loading...</td></tr></tbody>
         </table>
       </div>
     </div>
@@ -782,6 +803,7 @@
     if (name === "projects")  loadProjects();
     if (name === "reviews")   loadReviews();
     if (name === "recruiters") loadRecruiters();
+    if (name === "contest")   loadContest();
     if (name === "overview")  { loadOverview(); loadUniversityStats(); }
     if (name === "security")  loadSecurityPage();
     if (name === "email")     loadEmailRecipients();
@@ -1423,6 +1445,64 @@
       if (e.key === 'Enter') verifyTOTPSetup();
     });
   });
+
+
+  // ── CONTEST ──────────────────────────────────────────────────
+  let allContest = [];
+  async function loadContest() {
+    const tbody = document.getElementById("contest-body");
+    tbody.innerHTML = '<tr><td colspan="7" class="loading">Loading...</td></tr>';
+    try {
+      allContest = await api("GET", "/admin/contest-registrations");
+      filterContest();
+    } catch(e) { tbody.innerHTML = `<tr><td colspan="7" style="color:red">Error: ${escHtml(e.message)}</td></tr>`; }
+  }
+  function filterContest() {
+    const filter = document.getElementById("contest-filter").value;
+    let list = allContest || [];
+    if (filter !== "all") list = list.filter(c => c.payment_status === filter);
+    
+    const tbody = document.getElementById("contest-body");
+    if (!list.length) { tbody.innerHTML = '<tr><td colspan="7" class="empty">No registrations found</td></tr>'; return; }
+    
+    tbody.innerHTML = list.map(c => {
+      let bClass = c.payment_status === 'paid' ? 'badge-approved' : (c.payment_status === 'failed' ? 'badge-rejected' : 'badge-pending');
+      let userName = c.user ? escHtml(c.user.name) : '-';
+      let projectTitle = c.project ? escHtml(c.project.title) : '-';
+      return `<tr>
+        <td>${c.id}</td>
+        <td>${userName}</td>
+        <td>${projectTitle}</td>
+        <td><strong>${c.track}</strong></td>
+        <td><span class="badge ${bClass}">${c.payment_status}</span></td>
+        <td>${fmt(c.created_at)}</td>
+        <td>
+          <button class="btn btn-ghost" onclick="editContest(${c.id}, '${c.track}', '${c.payment_status}')">Edit</button>
+          <button class="btn btn-danger" onclick="deleteContest(${c.id})">Del</button>
+        </td>
+      </tr>`;
+    }).join("");
+  }
+  async function editContest(id, track, status) {
+    let newTrack = prompt("Track (A-L):", track);
+    if (newTrack === null) return;
+    let newStatus = prompt("Payment Status (paid, pending, failed):", status);
+    if (newStatus === null) return;
+    
+    try {
+      await api("PUT", "/admin/contest-registrations/" + id, { track: newTrack, payment_status: newStatus });
+      toast("Registration updated");
+      loadContest();
+    } catch(e) { toast(e.message, true); }
+  }
+  async function deleteContest(id) {
+    if (!confirm("Delete registration?")) return;
+    try {
+      await api("DELETE", "/admin/contest-registrations/" + id);
+      toast("Registration deleted");
+      loadContest();
+    } catch(e) { toast(e.message, true); }
+  }
 
 
   // ── EMAIL MARKETING ──────────────────────────────────────────────────────

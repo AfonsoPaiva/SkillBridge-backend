@@ -253,6 +253,8 @@ func migrate() error {
 		&models.Recruiter{},
 		&models.Vacancy{},
 		&models.RecruiterToken{},
+		// Build Challenge contest
+		&models.ContestRegistration{},
 	}
 	for _, t := range tables {
 		if !DB.Migrator().HasTable(t) {

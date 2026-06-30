@@ -239,6 +239,20 @@ func Setup(r *gin.Engine) {
 
 		// Proxy de Imagens — rate-limited to 120 req/min (cache-miss path)
 		public.GET("/proxy/image", middleware.ProxyImageRateLimit(), handlers.ProxyImage)
+
+		// Build Challenge — public stats
+		public.GET("/contest/stats", handlers.ContestGetStats)
+	}
+
+	// --------------------------------------------------
+	// ROTAS DO CONCURSO (requerem token Firebase)
+	// --------------------------------------------------
+	contest := api.Group("/contest")
+	contest.Use(middleware.AuthRequired())
+	{
+		contest.POST("/register", middleware.SensitiveWriteRateLimit(), handlers.ContestRegister)
+		contest.GET("/registrations/me", handlers.ContestGetMyRegistration)
+		contest.GET("/my-projects", handlers.ContestGetUserProjects)
 	}
 
 	// --------------------------------------------------
@@ -289,6 +303,11 @@ func Setup(r *gin.Engine) {
 		admin.DELETE("/recruiters/:id", handlers.AdminDeleteRecruiter)
 		admin.POST("/recruiters/:id/resend-email", handlers.AdminResendRecruiterEmail)
 		// Vacancy management
+
+		// Contest management
+		admin.GET("/contest-registrations", handlers.AdminListContestRegistrations)
+		admin.PUT("/contest-registrations/:id", handlers.AdminUpdateContestRegistration)
+		admin.DELETE("/contest-registrations/:id", handlers.AdminDeleteContestRegistration)
 	}
 
 	// --------------------------------------------------

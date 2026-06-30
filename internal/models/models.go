@@ -460,3 +460,21 @@ type RecruiterToken struct {
 	Recruiter Recruiter `gorm:"foreignKey:RecruiterID" json:"recruiter,omitempty"`
 }
 
+// --------------------------------------------------
+// CONTEST_REGISTRATION — Inscrição no Build Challenge.
+// Cada utilizador só pode inscrever-se uma vez.
+// O pagamento (7 €) é processado via Stripe Embedded Checkout.
+// --------------------------------------------------
+type ContestRegistration struct {
+	ID              uint      `gorm:"primaryKey;autoIncrement" json:"id"`
+	UserID          uint      `gorm:"not null;uniqueIndex:idx_contest_user" json:"user_id"`
+	ProjectID       uint      `gorm:"not null" json:"project_id"`
+	Track           string    `gorm:"type:varchar(2);not null" json:"track"`            // A–L
+	StripeSessionID string    `gorm:"type:varchar(255);default:''" json:"-"`             // internal only
+	PaymentStatus   string    `gorm:"type:varchar(20);default:'pending'" json:"payment_status"` // pending | paid | failed
+	CreatedAt       time.Time `json:"created_at"`
+
+	User    User    `gorm:"foreignKey:UserID" json:"user,omitempty"`
+	Project Project `gorm:"foreignKey:ProjectID" json:"project,omitempty"`
+}
+
