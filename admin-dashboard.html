@@ -1477,11 +1477,43 @@
         <td><span class="badge ${bClass}">${c.payment_status}</span></td>
         <td>${fmt(c.created_at)}</td>
         <td>
+          <button class="btn btn-ghost" onclick="viewContest(${c.id})">View</button>
           <button class="btn btn-ghost" onclick="editContest(${c.id}, '${c.track}', '${c.payment_status}')">Edit</button>
           <button class="btn btn-danger" onclick="deleteContest(${c.id})">Del</button>
         </td>
       </tr>`;
     }).join("");
+  }
+  function viewContest(id) {
+    const c = allContest.find(x => x.id === id);
+    if (!c) return;
+
+    let projectMembers = [];
+    if (c.project && c.project.members) {
+      projectMembers = c.project.members.map(m => {
+        let name = m.user ? m.user.name : 'Unknown';
+        let email = m.user ? m.user.email : 'No email';
+        return name + " (" + email + ") - Role: " + m.role;
+      });
+    }
+
+    openDetail(
+      "Contest Registration",
+      c.project ? c.project.title : "No project",
+      [
+        { heading: "Details", rows: [
+          { label: "ID", value: c.id },
+          { label: "Main User", value: c.user ? (c.user.name + " (" + c.user.email + ")") : '-' },
+          { label: "Project Title", value: c.project ? c.project.title : '-' },
+          { label: "Track", value: c.track },
+          { label: "Payment Status", value: c.payment_status },
+          { label: "Date", value: c.created_at ? new Date(c.created_at).toLocaleString() : '-' }
+        ]},
+        { heading: "Project Members & Emails", rows: [
+          { label: "Members", value: projectMembers.length ? projectMembers : ["No members found"] }
+        ]}
+      ]
+    );
   }
   async function editContest(id, track, status) {
     let newTrack = prompt("Track (A-L):", track);
