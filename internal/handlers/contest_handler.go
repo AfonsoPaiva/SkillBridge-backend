@@ -151,8 +151,14 @@ func ContestRegister(c *gin.Context) {
 		database.DB.Delete(&existingReg)
 	}
 
-	// Create Stripe checkout session with FIXED amount (€7.00 = 700 cents)
-	// The amount is hardcoded server-side; the client cannot manipulate it.
+	// Create Stripe checkout session
+	// The team size is calculated dynamically (owner + accepted members).
+	var acceptedMembers int64
+	database.DB.Model(&models.ProjectMember{}).
+		Where("project_id = ? AND status = 'accepted'", req.ProjectID).
+		Count(&acceptedMembers)
+	totalTeamSize := acceptedMembers + 1 // +1 for the owner
+
 	stripe.Key = config.AppConfig.StripeSecretKey
 
 	returnURL := config.AppConfig.FrontendURL + "/contest?payment=complete"
@@ -163,11 +169,12 @@ func ContestRegister(c *gin.Context) {
 		ReturnURL: stripe.String(returnURL),
 		LineItems: []*stripe.CheckoutSessionLineItemParams{
 			{
-				Quantity: stripe.Int64(1),
+				Quantity: stripe.Int64(totalTeamSize),
 				PriceData: &stripe.CheckoutSessionLineItemPriceDataParams{
 					Currency: stripe.String(string(stripe.CurrencyEUR)),
 					ProductData: &stripe.CheckoutSessionLineItemPriceDataProductDataParams{
-						Name: stripe.String("Build Challenge — Inscrição"),
+						Name:        stripe.String("Build Challenge — Inscrição de Equipa"),
+						Description: stripe.String(fmt.Sprintf("Taxa de inscrição para %d elementos", totalTeamSize)),
 					},
 					UnitAmount: stripe.Int64(contestFeeCents),
 				},
