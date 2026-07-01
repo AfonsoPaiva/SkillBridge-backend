@@ -161,7 +161,7 @@ func ContestRegister(c *gin.Context) {
 
 	stripe.Key = config.AppConfig.StripeSecretKey
 
-	returnURL := config.AppConfig.FrontendURL + "/contest?payment=complete"
+	returnURL := config.AppConfig.FrontendURL + "/contest/inscrever?payment=complete"
 
 	params := &stripe.CheckoutSessionParams{
 		Mode:      stripe.String(string(stripe.CheckoutSessionModePayment)),
@@ -252,6 +252,19 @@ func ContestGetMyRegistration(c *gin.Context) {
 	if err != nil {
 		c.JSON(http.StatusNotFound, gin.H{"error": "Não estás inscrito no Build Challenge."})
 		return
+	}
+
+	// Active polling: Se estiver pendente, verificar o Stripe ativamente.
+	// Isto previne problemas se o Webhook falhar ou atrasar.
+	if reg.PaymentStatus == "pending" && reg.StripeSessionID != "" {
+		stripe.Key = config.AppConfig.StripeSecretKey
+		sess, err := session.Get(reg.StripeSessionID, nil)
+		if err == nil && sess.PaymentStatus == stripe.CheckoutSessionPaymentStatusPaid {
+			log.Printf("🔄 Confirmação ativa (Polling): O pagamento da sessão %s já foi recebido, invocando webhook manualmente.", sess.ID)
+			HandleContestWebhook(sess)
+			// Recarregar os dados da inscrição após atualizar
+			database.DB.Preload("Project").First(&reg, reg.ID)
+		}
 	}
 
 	c.JSON(http.StatusOK, gin.H{
@@ -360,5 +373,7 @@ func HandleContestWebhook(sess *stripe.CheckoutSession) {
 		} else {
 			log.Printf("Erro ao carregar projeto para enviar emails de concurso: %v", err)
 		}
+	} else {
+		log.Printf("⚠️ Webhook do Stripe (contest) recebido, mas a inscrição pendente não foi encontrada (session_id=%s)", sess.ID)
 	}
 }
