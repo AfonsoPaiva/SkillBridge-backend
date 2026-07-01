@@ -127,16 +127,9 @@ func ContestRegister(c *gin.Context) {
 		return
 	}
 
-	// Verify user is owner or accepted member of the project
-	isOwner := project.OwnerID == user.ID
-	var memberCount int64
-	if !isOwner {
-		database.DB.Model(&models.ProjectMember{}).
-			Where("project_id = ? AND user_id = ? AND status = 'accepted'", req.ProjectID, user.ID).
-			Count(&memberCount)
-	}
-	if !isOwner && memberCount == 0 {
-		c.JSON(http.StatusForbidden, gin.H{"error": "Tens de ser membro ou dono do projeto para te inscreveres."})
+	// Verify user is the owner of the project
+	if project.OwnerID != user.ID {
+		c.JSON(http.StatusForbidden, gin.H{"error": "Apenas o dono do projeto pode inscrever a equipa no Build Challenge."})
 		return
 	}
 
@@ -276,8 +269,8 @@ func ContestGetStats(c *gin.Context) {
 	})
 }
 
-// ContestGetUserProjects returns projects owned by or with accepted membership
-// for the authenticated user, for contest registration project selection.
+// ContestGetUserProjects returns projects owned by the authenticated user,
+// for contest registration project selection. Only owners can register.
 //
 // @Summary      Projetos do utilizador para inscrição
 // @Tags         contest
@@ -297,39 +290,10 @@ func ContestGetUserProjects(c *gin.Context) {
 		return
 	}
 
-	// Get projects owned by user
-	var ownedProjects []models.Project
+	// Only return projects owned by the user
+	var projects []models.Project
 	database.DB.Preload("Roles").Preload("Members", "status = 'accepted'").
-		Where("owner_id = ?", user.ID).Find(&ownedProjects)
-
-	// Get projects where user is accepted member
-	var memberEntries []models.ProjectMember
-	database.DB.Where("user_id = ? AND status = 'accepted'", user.ID).Find(&memberEntries)
-
-	memberProjectIDs := make([]uint, 0)
-	for _, m := range memberEntries {
-		memberProjectIDs = append(memberProjectIDs, m.ProjectID)
-	}
-
-	var memberProjects []models.Project
-	if len(memberProjectIDs) > 0 {
-		database.DB.Preload("Roles").Preload("Members", "status = 'accepted'").
-			Where("id IN ?", memberProjectIDs).Find(&memberProjects)
-	}
-
-	// Merge and deduplicate
-	projectMap := make(map[uint]models.Project)
-	for _, p := range ownedProjects {
-		projectMap[p.ID] = p
-	}
-	for _, p := range memberProjects {
-		projectMap[p.ID] = p
-	}
-
-	projects := make([]models.Project, 0, len(projectMap))
-	for _, p := range projectMap {
-		projects = append(projects, p)
-	}
+		Where("owner_id = ?", user.ID).Find(&projects)
 
 	c.JSON(http.StatusOK, gin.H{
 		"projects": projects,

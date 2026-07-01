@@ -1488,32 +1488,68 @@
     const c = allContest.find(x => x.id === id);
     if (!c) return;
 
-    let projectMembers = [];
-    if (c.project && c.project.members) {
-      projectMembers = c.project.members.map(m => {
-        let name = m.user ? m.user.name : 'Unknown';
-        let email = m.user ? m.user.email : 'No email';
-        return name + " (" + email + ") - Role: " + m.role;
+    // Build team members list HTML
+    let membersHtml = '';
+    
+    // Project owner (the person who created the project)
+    if (c.project && c.project.owner) {
+      const o = c.project.owner;
+      membersHtml += '<div style="display:flex;align-items:center;gap:8px;padding:8px 10px;background:#faf5ff;border:1px solid #e9d5ff;border-radius:8px;margin-bottom:6px">' +
+        '<div style="width:32px;height:32px;border-radius:50%;background:#7c3aed;color:#fff;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:13px;flex-shrink:0">' + escHtml((o.name || '?')[0].toUpperCase()) + '</div>' +
+        '<div style="flex:1;min-width:0">' +
+          '<div style="font-weight:600;font-size:13px;color:#1e293b">' + escHtml(o.name || 'Unknown') + ' <span style="background:#7c3aed;color:#fff;font-size:10px;padding:1px 6px;border-radius:9999px;margin-left:4px">Dono</span></div>' +
+          '<div style="font-size:12px;color:#64748b;word-break:break-all">' + escHtml(o.email || 'Sem email') + '</div>' +
+        '</div></div>';
+    }
+
+    // Registered user (if different from the owner — same person usually, but show for clarity)
+    if (c.user && (!c.project || !c.project.owner || c.user.id !== c.project.owner.id)) {
+      const u = c.user;
+      membersHtml += '<div style="display:flex;align-items:center;gap:8px;padding:8px 10px;background:#f0fdf4;border:1px solid #bbf7d0;border-radius:8px;margin-bottom:6px">' +
+        '<div style="width:32px;height:32px;border-radius:50%;background:#16a34a;color:#fff;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:13px;flex-shrink:0">' + escHtml((u.name || '?')[0].toUpperCase()) + '</div>' +
+        '<div style="flex:1;min-width:0">' +
+          '<div style="font-weight:600;font-size:13px;color:#1e293b">' + escHtml(u.name || 'Unknown') + ' <span style="background:#16a34a;color:#fff;font-size:10px;padding:1px 6px;border-radius:9999px;margin-left:4px">Inscrito</span></div>' +
+          '<div style="font-size:12px;color:#64748b;word-break:break-all">' + escHtml(u.email || 'Sem email') + '</div>' +
+        '</div></div>';
+    }
+
+    // Team members
+    if (c.project && c.project.members && c.project.members.length > 0) {
+      c.project.members.forEach(function(m) {
+        if (!m.user) return;
+        const u = m.user;
+        // Skip if same as owner (already shown above)
+        if (c.project.owner && u.id === c.project.owner.id) return;
+        const statusColor = m.status === 'accepted' ? '#16a34a' : (m.status === 'pending' ? '#f59e0b' : '#94a3b8');
+        membersHtml += '<div style="display:flex;align-items:center;gap:8px;padding:8px 10px;background:#f8fafc;border:1px solid #e2e8f0;border-radius:8px;margin-bottom:6px">' +
+          '<div style="width:32px;height:32px;border-radius:50%;background:#94a3b8;color:#fff;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:13px;flex-shrink:0">' + escHtml((u.name || '?')[0].toUpperCase()) + '</div>' +
+          '<div style="flex:1;min-width:0">' +
+            '<div style="font-weight:600;font-size:13px;color:#1e293b">' + escHtml(u.name || 'Unknown') + ' <span style="background:' + statusColor + ';color:#fff;font-size:10px;padding:1px 6px;border-radius:9999px;margin-left:4px">' + escHtml(m.status || 'member') + '</span></div>' +
+            '<div style="font-size:12px;color:#64748b;word-break:break-all">' + escHtml(u.email || 'Sem email') + '</div>' +
+          '</div></div>';
       });
     }
 
-    openDetail(
-      "Contest Registration",
-      c.project ? c.project.title : "No project",
-      [
-        { heading: "Details", rows: [
-          { label: "ID", value: c.id },
-          { label: "Main User", value: c.user ? (c.user.name + " (" + c.user.email + ")") : '-' },
-          { label: "Project Title", value: c.project ? c.project.title : '-' },
-          { label: "Track", value: c.track },
-          { label: "Payment Status", value: c.payment_status },
-          { label: "Date", value: c.created_at ? new Date(c.created_at).toLocaleString() : '-' }
-        ]},
-        { heading: "Project Members & Emails", rows: [
-          { label: "Members", value: projectMembers.length ? projectMembers : ["No members found"] }
-        ]}
-      ]
-    );
+    if (!membersHtml) {
+      membersHtml = '<div style="color:#94a3b8;padding:12px;text-align:center">Nenhum membro encontrado</div>';
+    }
+
+    // Build the detail panel directly
+    let bClass = c.payment_status === 'paid' ? 'badge-approved' : (c.payment_status === 'failed' ? 'badge-rejected' : 'badge-pending');
+    
+    let html = '<div class="detail-section"><h4>Detalhes da Inscrição</h4>' +
+      '<div class="kv"><span class="k">ID</span><span class="v">' + c.id + '</span></div>' +
+      '<div class="kv"><span class="k">Projeto</span><span class="v">' + (c.project ? escHtml(c.project.title) : '—') + '</span></div>' +
+      '<div class="kv"><span class="k">Área</span><span class="v"><strong>' + escHtml(c.track) + '</strong></span></div>' +
+      '<div class="kv"><span class="k">Pagamento</span><span class="v"><span class="badge ' + bClass + '">' + escHtml(c.payment_status) + '</span></span></div>' +
+      '<div class="kv"><span class="k">Data</span><span class="v">' + (c.created_at ? new Date(c.created_at).toLocaleString() : '—') + '</span></div>' +
+    '</div>' +
+    '<div class="detail-section"><h4>Equipa — Emails</h4>' + membersHtml + '</div>';
+
+    document.getElementById("detail-title").textContent = "Build Challenge";
+    document.getElementById("detail-sub").textContent = c.project ? c.project.title : "Sem projeto";
+    document.getElementById("detail-content").innerHTML = html;
+    document.getElementById("detail-overlay").classList.add("open");
   }
   async function editContest(id, track, status) {
     let newTrack = prompt("Track (A-L):", track);

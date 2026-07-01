@@ -877,7 +877,7 @@ func AdminGetUniversityStats(c *gin.Context) {
 // GET /api/admin/contest-registrations
 func AdminListContestRegistrations(c *gin.Context) {
 	var registrations []models.ContestRegistration
-	database.DB.Preload("User").Preload("Project").Preload("Project.Members.User").Order("created_at DESC").Find(&registrations)
+	database.DB.Preload("User").Preload("Project").Preload("Project.Owner").Preload("Project.Members.User").Order("created_at DESC").Find(&registrations)
 	c.JSON(http.StatusOK, registrations)
 }
 
