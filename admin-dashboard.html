@@ -1479,6 +1479,7 @@
         <td>
           <button class="btn btn-ghost" onclick="viewContest(${c.id})">View</button>
           <button class="btn btn-ghost" onclick="editContest(${c.id}, '${c.track}', '${c.payment_status}')">Edit</button>
+          ${c.payment_status !== 'paid' ? `<button class="btn btn-success" onclick="markPaid(${c.id}, '${c.track}')">Pagar</button>` : ''}
           <button class="btn btn-danger" onclick="deleteContest(${c.id})">Del</button>
         </td>
       </tr>`;
@@ -1560,6 +1561,14 @@
     try {
       await api("PUT", "/admin/contest-registrations/" + id, { track: newTrack, payment_status: newStatus });
       toast("Registration updated");
+      loadContest();
+    } catch(e) { toast(e.message, true); }
+  }
+  async function markPaid(id, track) {
+    if (!confirm("Marcar inscrição como paga manualmente? Isto não envia os emails automáticos do stripe, se foi um erro do stripe os emails só serão acionados via webhook. Confirmar?")) return;
+    try {
+      await api("PUT", "/admin/contest-registrations/" + id, { track: track, payment_status: "paid" });
+      toast("Registration marked as paid");
       loadContest();
     } catch(e) { toast(e.message, true); }
   }

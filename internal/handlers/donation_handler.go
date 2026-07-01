@@ -172,7 +172,7 @@ func StripeWebhook(c *gin.Context) {
 
 		// Route to the correct handler based on metadata type
 		if session.Metadata != nil && session.Metadata["type"] == "contest" {
-			HandleContestWebhook(event.Data.Raw)
+			HandleContestWebhook(&session)
 		}
 
 		// Não guardar dados de pagamento localmente.

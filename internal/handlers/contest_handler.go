@@ -324,18 +324,9 @@ func ContestGetUserProjects(c *gin.Context) {
 
 // handleContestWebhook processes contest-specific webhook events.
 // Called from the main StripeWebhook handler when metadata.type == "contest".
-func HandleContestWebhook(sessionData json.RawMessage) {
-	var sess struct {
-		ID            string `json:"id"`
-		PaymentStatus string `json:"payment_status"`
-		Metadata      map[string]string `json:"metadata"`
-	}
-	if err := json.Unmarshal(sessionData, &sess); err != nil {
-		log.Printf("Erro ao fazer parse do evento de concurso: %v", err)
-		return
-	}
-
-	if sess.PaymentStatus != "paid" {
+func HandleContestWebhook(sess *stripe.CheckoutSession) {
+	if sess.PaymentStatus != stripe.CheckoutSessionPaymentStatusPaid {
+		log.Printf("⚠️ Tentativa de confirmar concurso com payment_status = %s (esperado 'paid')", sess.PaymentStatus)
 		return
 	}
 
