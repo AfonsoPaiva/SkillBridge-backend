@@ -233,7 +233,7 @@ func Setup(r *gin.Engine) {
 		public.GET("/guest/stats", handlers.GetPlatformStats)
 
 		// Donativos
-		public.POST("/donations/embedded-checkout", handlers.CreateEmbeddedCheckoutSession)
+		public.POST("/donations/embedded-checkout", middleware.DonationCheckoutRateLimit(), handlers.CreateEmbeddedCheckoutSession)
 		public.POST("/donations/webhook", handlers.StripeWebhook)
 		public.GET("/donations/stats", handlers.GetDonationStats)
 

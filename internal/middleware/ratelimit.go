@@ -126,6 +126,10 @@ var (
 
 	// heavyReadLimiter: 60 req/min — vacancies list / projects list (heavy DB scans).
 	heavyReadLimiter = newRateLimiter(60, time.Minute)
+
+	// donationCheckoutLimiter: 5 req/hour — strictly prevents Stripe API abuse
+	// for unauthenticated checkout session creation.
+	donationCheckoutLimiter = newRateLimiter(5, time.Hour)
 )
 
 // ---------------------------------------------------------------------------
@@ -210,4 +214,10 @@ func ProxyImageRateLimit() gin.HandlerFunc {
 // Use on: GET /vacancies, GET /projects.
 func HeavyReadRateLimit() gin.HandlerFunc {
 	return rateLimitMiddleware(heavyReadLimiter)
+}
+
+// DonationCheckoutRateLimit strictly limits unauthenticated checkout session
+// creation to 5 req/hour per IP to prevent Stripe API abuse.
+func DonationCheckoutRateLimit() gin.HandlerFunc {
+	return rateLimitMiddleware(donationCheckoutLimiter)
 }
