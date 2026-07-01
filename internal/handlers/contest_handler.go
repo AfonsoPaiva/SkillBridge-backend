@@ -12,6 +12,7 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/paiva/SkillBridge/Backend/config"
 	"github.com/paiva/SkillBridge/Backend/internal/database"
+	"github.com/paiva/SkillBridge/Backend/internal/email"
 	"github.com/paiva/SkillBridge/Backend/internal/models"
 	"github.com/stripe/stripe-go/v76"
 	"github.com/stripe/stripe-go/v76/checkout/session"
@@ -133,15 +134,22 @@ func ContestRegister(c *gin.Context) {
 		return
 	}
 
-	// Check for existing registration (prevent double registration)
+	// Check if this project is already registered (prevent double registration)
 	var existingReg models.ContestRegistration
-	if err := database.DB.Where("user_id = ?", user.ID).First(&existingReg).Error; err == nil {
+	if err := database.DB.Where("project_id = ?", req.ProjectID).First(&existingReg).Error; err == nil {
 		if existingReg.PaymentStatus == "paid" {
-			c.JSON(http.StatusConflict, gin.H{"error": "Já estás inscrito no Build Challenge."})
+			c.JSON(http.StatusConflict, gin.H{"error": "Este projeto (e a respetiva equipa) já se encontra inscrito no Build Challenge."})
 			return
 		}
 		// If pending, allow retry — delete old one
 		database.DB.Delete(&existingReg)
+	}
+
+	// Optional: Check if the user (owner) is already registered via another project
+	var otherReg models.ContestRegistration
+	if err := database.DB.Where("user_id = ? AND payment_status = 'paid'", user.ID).First(&otherReg).Error; err == nil {
+		c.JSON(http.StatusConflict, gin.H{"error": "Já te encontras inscrito noutro projeto."})
+		return
 	}
 
 	// Create Stripe checkout session
@@ -228,7 +236,21 @@ func ContestGetMyRegistration(c *gin.Context) {
 	}
 
 	var reg models.ContestRegistration
-	if err := database.DB.Preload("Project").Where("user_id = ?", user.ID).First(&reg).Error; err != nil {
+	err := database.DB.Preload("Project").Where("user_id = ?", user.ID).First(&reg).Error
+	
+	if err != nil {
+		// Se não foi o próprio a inscrever (dono), verifica se é membro de um projeto inscrito
+		var memberProjects []uint
+		database.DB.Model(&models.ProjectMember{}).
+			Where("user_id = ? AND status = 'accepted'", user.ID).
+			Pluck("project_id", &memberProjects)
+		
+		if len(memberProjects) > 0 {
+			err = database.DB.Preload("Project").Where("project_id IN ?", memberProjects).First(&reg).Error
+		}
+	}
+
+	if err != nil {
 		c.JSON(http.StatusNotFound, gin.H{"error": "Não estás inscrito no Build Challenge."})
 		return
 	}
@@ -328,5 +350,25 @@ func HandleContestWebhook(sessionData json.RawMessage) {
 			sess.Metadata["user_id"],
 			sess.Metadata["project_id"],
 			sess.Metadata["track"])
+
+		// Enviar emails de confirmação
+		var project models.Project
+		if err := database.DB.Preload("Owner").Preload("Members", "status = 'accepted'").Preload("Members.User").
+			Where("id = ?", sess.Metadata["project_id"]).First(&project).Error; err == nil {
+			
+			// Enviar para o dono
+			if project.Owner.Email != "" {
+				go email.SendContestRegistrationConfirmed(project.Owner.Email, project.Owner.Name, project.Title)
+			}
+			
+			// Enviar para os membros aceites
+			for _, m := range project.Members {
+				if m.User.Email != "" {
+					go email.SendContestRegistrationConfirmed(m.User.Email, m.User.Name, project.Title)
+				}
+			}
+		} else {
+			log.Printf("Erro ao carregar projeto para enviar emails de concurso: %v", err)
+		}
 	}
 }

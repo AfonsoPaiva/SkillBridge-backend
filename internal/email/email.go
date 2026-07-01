@@ -172,6 +172,14 @@ func SendProjectDecisionRejected(userEmail, userName, projectTitle, projectURL, 
 	return send(getEmailFrom(), userEmail, subject, html)
 }
 
+// SendContestRegistrationConfirmed envia email quando o pagamento do Build Challenge é efetuado com sucesso
+func SendContestRegistrationConfirmed(userEmail, userName, projectName string) error {
+	subject := "Inscrição Confirmada no Build Challenge ✅"
+	html := fmt.Sprintf(contestRegistrationConfirmedTemplate, userName, projectName)
+	// Apply wrapper for styling consistency if desired, or just use the raw template
+	return send(getEmailFrom(), userEmail, subject, html)
+}
+
 type ProjectMatch struct {
 	Title       string
 	Description string
@@ -383,6 +391,20 @@ const projectDecisionRejectedTemplate = `<h2 style="margin:0 0 20px;color:#1a1a1
 </table>
 <p style="margin:32px 0 0;color:#666;font-size:14px;line-height:1.6;">
 	Continua em <a href="%s" style="color:#68007a;text-decoration:none;">skillbridge.pt</a>.
+</p>`
+
+const contestRegistrationConfirmedTemplate = `<h2 style="margin:0 0 20px;color:#1a1a1a;font-size:24px;font-weight:600;">Inscrição Confirmada ✅</h2>
+<p style="margin:0 0 16px;color:#333;font-size:16px;line-height:1.6;">
+	Olá <strong>%s</strong>,
+</p>
+<p style="margin:0 0 24px;color:#333;font-size:16px;line-height:1.6;">
+	O pagamento da taxa de inscrição do <strong>Build Challenge</strong> foi realizado com sucesso. A equipa do projeto <strong>"%s"</strong> encontra-se agora oficialmente inscrita na competição!
+</p>
+<p style="margin:0 0 24px;color:#666;font-size:15px;line-height:1.6;">
+	A partir de agora, podem focar-se no desenvolvimento do projeto. Bom trabalho e boa sorte!
+</p>
+<p style="margin:32px 0 0;color:#666;font-size:14px;line-height:1.6;">
+	A equipa SkillBridge
 </p>`
 
 const projectMatchesTemplate = `<h2 style="margin:0 0 20px;color:#1a1a1a;font-size:24px;font-weight:600;">Projetos Compatíveis</h2>
