@@ -17,6 +17,77 @@ import (
 	"gorm.io/gorm"
 )
 
+// ── Public DTOs — strip sensitive user fields from unauthenticated responses ─
+
+// PublicUser is a read-only view of a User that omits sensitive fields
+// (email, email_verified, totp_enabled) safe to expose publicly.
+type PublicUser struct {
+	ID           uint                  `json:"id"`
+	FirebaseUID  string                `json:"firebase_uid"`
+	Name         string                `json:"name"`
+	Slug         string                `json:"slug"`
+	ContactLinks models.ContactLinks   `json:"contact_links"`
+	University   string                `json:"university"`
+	Course       string                `json:"course"`
+	Year         string                `json:"year"`
+	Bio          string                `json:"bio"`
+	AvatarURL    string                `json:"avatar_url"`
+	Skills       models.StringList     `json:"skills"`
+	Role         string                `json:"role"`
+	CreatedAt    time.Time             `json:"created_at"`
+}
+
+// PublicProject mirrors models.Project but embeds PublicUser instead of User.
+type PublicProject struct {
+	ID          uint                `json:"id"`
+	OwnerID     uint                `json:"owner_id"`
+	Title       string              `json:"title"`
+	Slug        string              `json:"slug"`
+	Description string              `json:"description"`
+	Status      string              `json:"status"`
+	ImageURL    string              `json:"image_url"`
+	Links       models.ProjectLinks `json:"links"`
+	CreatedAt   time.Time           `json:"created_at"`
+	Owner       PublicUser          `json:"owner"`
+	Roles       []models.ProjectRole `json:"roles"`
+}
+
+// toPublicUser converts a full User to the public-safe DTO.
+func toPublicUser(u models.User) PublicUser {
+	return PublicUser{
+		ID:           u.ID,
+		FirebaseUID:  u.FirebaseUID,
+		Name:         u.Name,
+		Slug:         u.Slug,
+		ContactLinks: u.ContactLinks,
+		University:   u.University,
+		Course:       u.Course,
+		Year:         u.Year,
+		Bio:          u.Bio,
+		AvatarURL:    u.AvatarURL,
+		Skills:       u.Skills,
+		Role:         u.Role,
+		CreatedAt:    u.CreatedAt,
+	}
+}
+
+// toPublicProject converts a full Project to the public-safe DTO.
+func toPublicProject(p models.Project) PublicProject {
+	return PublicProject{
+		ID:          p.ID,
+		OwnerID:     p.OwnerID,
+		Title:       p.Title,
+		Slug:        p.Slug,
+		Description: p.Description,
+		Status:      p.Status,
+		ImageURL:    p.ImageURL,
+		Links:       p.Links,
+		CreatedAt:   p.CreatedAt,
+		Owner:       toPublicUser(p.Owner),
+		Roles:       p.Roles,
+	}
+}
+
 type projectRoleInput struct {
 	ID          uint     `json:"id,omitempty"`
 	Title       string   `json:"title"`
@@ -281,7 +352,13 @@ func GetProjects(c *gin.Context) {
 
 	var projects []models.Project
 	query.Order("created_at DESC").Find(&projects)
-	c.JSON(http.StatusOK, projects)
+
+	// Return public DTOs — email and other sensitive fields are stripped.
+	public := make([]PublicProject, 0, len(projects))
+	for _, p := range projects {
+		public = append(public, toPublicProject(p))
+	}
+	c.JSON(http.StatusOK, public)
 }
 
 // GetProjectByID - Detalhes de um projeto
@@ -308,7 +385,16 @@ func GetProjectByID(c *gin.Context) {
 			return
 		}
 	}
-	c.JSON(http.StatusOK, project)
+
+	// Strip sensitive user fields from the public response.
+	pub := toPublicProject(project)
+	// Also sanitise member users
+	for i := range project.Members {
+		project.Members[i].User.Email = ""
+		project.Members[i].User.EmailVerified = false
+		project.Members[i].User.TOTPEnabled = false
+	}
+	c.JSON(http.StatusOK, pub)
 }
 
 // GetProjectMembers - Lista os membros aceites de um projeto (público)
