@@ -166,17 +166,47 @@ func ScrapeLinkedInJobs() {
 					return // Skip fetching description for an already known job
 				}
 
+				// Extract published date
+				publishedAt, exists := s.Find("time.job-search-card__listdate").Attr("datetime")
+				if !exists {
+					publishedAt, _ = s.Find("time.job-search-card__listdate--new").Attr("datetime")
+				}
+				if publishedAt == "" {
+					publishedAt = time.Now().Format("2006-01-02")
+				}
+
+				// Extract work mode from location or default to On-site
+				workMode := "onsite"
+				locLower := strings.ToLower(location)
+				if strings.Contains(locLower, "hybrid") || strings.Contains(locLower, "híbrido") {
+					workMode = "hybrid"
+				} else if strings.Contains(locLower, "remote") || strings.Contains(locLower, "remoto") {
+					workMode = "remote"
+				}
+				// Clean up the location string to remove the work mode in parentheses if it exists
+				location = regexp.MustCompile(`(?i)\s*\((hybrid|remote|on-site|híbrido|remoto|presencial)\)`).ReplaceAllString(location, "")
+
 				// Prevent duplicates based on URL
 				if seenJobs[jobLink] {
 					return // continue to next element in .Each
 				}
 				seenJobs[jobLink] = true
 
-				desc := fetchJobDescription(jobLink)
+				details := fetchJobDetails(jobLink)
 				time.Sleep(500 * time.Millisecond) // Prevent rate limiting from LinkedIn
 				
+				// Fallback to check description for work mode if not found in location
+				if workMode == "onsite" {
+					descLower := strings.ToLower(details.Description)
+					if strings.Contains(descLower, "hybrid") || strings.Contains(descLower, "híbrido") {
+						workMode = "hybrid"
+					} else if strings.Contains(descLower, "remote") || strings.Contains(descLower, "remoto") {
+						workMode = "remote"
+					}
+				}
+
 				// Extra layer of validation to ensure it's a junior/internship position
-				jobType, isJunior := determineJobType(title, desc)
+				jobType, isJunior := determineJobType(title, details.Description)
 				if !isJunior {
 					return
 				}
@@ -189,11 +219,11 @@ func ScrapeLinkedInJobs() {
 					Region:            location,
 					ApplicationUrl:    jobLink,
 					Type:              jobType,
-					Tags:              extractSkills(title, desc, allSkills),
-					Description:       desc,
-					WorkMode:          "Hybrid",
-					EmploymentType:    "Full-time",
-					PublishedAt:       time.Now().Format("2006-01-02"),
+					Tags:              extractSkills(title, details.Description, allSkills),
+					Description:       details.Description,
+					WorkMode:          workMode,
+					EmploymentType:    details.EmploymentType,
+					PublishedAt:       publishedAt,
 					LogoUrl:           logoUrl,
 				}
 				
@@ -383,29 +413,59 @@ func extractSkills(title, description string, allSkills []string) []string {
 	return skills
 }
 
-func fetchJobDescription(jobUrl string) string {
+type JobDetails struct {
+	Description    string
+	EmploymentType string
+}
+
+func fetchJobDetails(jobUrl string) JobDetails {
+	details := JobDetails{
+		Description:    "Para mais detalhes, visite o link da candidatura.",
+		EmploymentType: "full_time",
+	}
+
 	client := &http.Client{Timeout: 10 * time.Second}
 	req, err := http.NewRequest("GET", jobUrl, nil)
 	if err != nil {
-		return "Para mais detalhes, visite o link da candidatura."
+		return details
 	}
 	req.Header.Set("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/115.0.0.0 Safari/537.36")
 	req.Header.Set("Accept-Language", "en-US,en;q=0.9")
 
 	resp, err := client.Do(req)
 	if err != nil {
-		return "Para mais detalhes, visite o link da candidatura."
+		return details
 	}
 	defer resp.Body.Close()
 
 	if resp.StatusCode != 200 {
-		return "Para mais detalhes, visite o link da candidatura."
+		return details
 	}
 
 	doc, err := goquery.NewDocumentFromReader(resp.Body)
 	if err != nil {
-		return "Para mais detalhes, visite o link da candidatura."
+		return details
 	}
+
+	// Extract Employment Type from Criteria
+	doc.Find("li.description__job-criteria-item").Each(func(i int, s *goquery.Selection) {
+		header := strings.TrimSpace(strings.ToLower(s.Find("h3.description__job-criteria-subheader").Text()))
+		value := strings.TrimSpace(s.Find("span.description__job-criteria-text").Text())
+		if strings.Contains(header, "employment type") || strings.Contains(header, "tipo de emprego") {
+			if value != "" {
+				valueLower := strings.ToLower(value)
+				if strings.Contains(valueLower, "full-time") || strings.Contains(valueLower, "tempo integral") || strings.Contains(valueLower, "estágio") {
+					details.EmploymentType = "full_time"
+				} else if strings.Contains(valueLower, "part-time") || strings.Contains(valueLower, "meio período") || strings.Contains(valueLower, "voluntário") {
+					details.EmploymentType = "part_time"
+				} else if strings.Contains(valueLower, "contract") || strings.Contains(valueLower, "contrato") {
+					details.EmploymentType = "contract"
+				} else {
+					details.EmploymentType = "full_time"
+				}
+			}
+		}
+	})
 
 	// Try multiple selectors where LinkedIn might put the description
 	selection := doc.Find("div.show-more-less-html__markup")
@@ -431,9 +491,9 @@ func fetchJobDescription(jobUrl string) string {
 		text = strings.TrimSpace(text)
 
 		if text != "" {
-			return text
+			details.Description = text
 		}
 	}
 
-	return "Para mais detalhes, visite o link da candidatura."
+	return details
 }
