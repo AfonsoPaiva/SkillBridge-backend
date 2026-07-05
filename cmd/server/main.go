@@ -59,6 +59,9 @@ func main() {
 	// 5.1 Iniciar cron job de expiração de vagas de recrutadores
 	jobs.StartVacancyExpiryJob()
 
+	// 5.2 Iniciar cron job para scrape de vagas do LinkedIn
+	jobs.StartLinkedInScraperJob()
+
 	// 6. Criar servidor Gin
 	r := gin.Default()
 

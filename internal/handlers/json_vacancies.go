@@ -15,7 +15,9 @@ var (
 	cachedVacancies []models.Vacancy
 	vacanciesMutex  sync.RWMutex
 	vacanciesLoaded bool
+	lastModTime     time.Time
 )
+
 
 type JsonVacancy struct {
 	CompanyName    string   `json:"company_name"`
@@ -36,17 +38,19 @@ type JsonVacancy struct {
 func loadVacanciesIfNeeded() {
 	vacanciesMutex.Lock()
 	defer vacanciesMutex.Unlock()
-	if vacanciesLoaded {
+	fileInfo, err := os.Stat("config/vagas_final.json")
+	if err != nil {
+		fmt.Println("Error stat vagas_final.json:", err)
 		return
 	}
 
-	fileInfo, err := os.Stat("config/vagas_final.json")
-	var defaultPubDate time.Time
-	if err == nil {
-		defaultPubDate = fileInfo.ModTime()
-	} else {
-		defaultPubDate = time.Now()
+	if vacanciesLoaded && fileInfo.ModTime().Equal(lastModTime) {
+		return
 	}
+	
+	lastModTime = fileInfo.ModTime()
+
+	defaultPubDate := lastModTime
 
 	file, err := os.Open("config/vagas_final.json")
 	if err != nil {
