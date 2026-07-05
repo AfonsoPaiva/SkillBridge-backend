@@ -97,11 +97,13 @@ func ScrapeLinkedInJobs() {
 	allSkills := loadAllSkills()
 	var vacancies []JsonVacancy
 	seenJobs := make(map[string]bool)
+	uniqueJobs := make(map[string]*JsonVacancy)
+	var orderedKeys []string
 	client := &http.Client{Timeout: 30 * time.Second}
 
 	for start := 0; start < 1000; start += 25 {
-		// sortBy=R garante que a pesquisa é por "Relevância", que favorece empresas maiores e com mais engagement.
-		url := fmt.Sprintf("https://www.linkedin.com/jobs-guest/jobs/api/seeMoreJobPostings/search?f_E=1,2,3&geoId=100364837&location=Portugal&sortBy=R&start=%d", start)
+		// sortBy=R garante que a pesquisa é por "Relevância". A pesquisa agora obriga a conter palavras relacionadas a posições juniores.
+		url := fmt.Sprintf("https://www.linkedin.com/jobs-guest/jobs/api/seeMoreJobPostings/search?keywords=estagio%%20OR%%20junior%%20OR%%20trainee&f_E=1,2,3&geoId=100364837&location=Portugal&sortBy=R&start=%d", start)
 		
 		req, err := http.NewRequest("GET", url, nil)
 		if err != nil {
@@ -155,7 +157,16 @@ func ScrapeLinkedInJobs() {
 			}
 
 			if title != "" && company != "" {
-				// Prevent duplicates
+				// Prevent duplicates based on Company + Title
+				key := company + "|" + title
+				if existingJob, exists := uniqueJobs[key]; exists {
+					if !strings.Contains(existingJob.Region, location) {
+						existingJob.Region += " / " + location
+					}
+					return // Skip fetching description for an already known job
+				}
+
+				// Prevent duplicates based on URL
 				if seenJobs[jobLink] {
 					return // continue to next element in .Each
 				}
@@ -163,22 +174,31 @@ func ScrapeLinkedInJobs() {
 
 				desc := fetchJobDescription(jobLink)
 				time.Sleep(500 * time.Millisecond) // Prevent rate limiting from LinkedIn
+				
+				// Extra layer of validation to ensure it's a junior/internship position
+				jobType, isJunior := determineJobType(title, desc)
+				if !isJunior {
+					return
+				}
 
-				vacancies = append(vacancies, JsonVacancy{
+				job := &JsonVacancy{
 					CompanyName:       company,
 					CompanyUrl:        companyUrl,
 					CompanyProfileUrl: companyUrl,
 					Title:             title,
 					Region:            location,
 					ApplicationUrl:    jobLink,
-					Type:              "junior_position",
+					Type:              jobType,
 					Tags:              extractSkills(title, desc, allSkills),
 					Description:       desc,
 					WorkMode:          "Hybrid",
 					EmploymentType:    "Full-time",
 					PublishedAt:       time.Now().Format("2006-01-02"),
 					LogoUrl:           logoUrl,
-				})
+				}
+				
+				uniqueJobs[key] = job
+				orderedKeys = append(orderedKeys, key)
 				jobsFound++
 			}
 		})
@@ -190,12 +210,46 @@ func ScrapeLinkedInJobs() {
 		time.Sleep(2 * time.Second)
 	}
 
+	// Assemble final array in the correct order
+	for _, k := range orderedKeys {
+		vacancies = append(vacancies, *uniqueJobs[k])
+	}
+
 	if len(vacancies) > 0 {
 		log.Printf("[jobs] Scraped %d jobs successfully", len(vacancies))
 		saveVacanciesToJson(vacancies)
 	} else {
 		log.Println("[jobs] No jobs scraped")
 	}
+}
+
+func determineJobType(title, desc string) (string, bool) {
+	textLower := strings.ToLower(title + " " + desc)
+
+	if strings.Contains(textLower, "estágio de verão") || strings.Contains(textLower, "estagio de verao") || strings.Contains(textLower, "summer internship") {
+		return "summer_internship", true
+	}
+	if strings.Contains(textLower, "estágio curricular") || strings.Contains(textLower, "estagio curricular") || strings.Contains(textLower, "curricular internship") {
+		return "curricular_internship", true
+	}
+	if strings.Contains(textLower, "estágio extracurricular") || strings.Contains(textLower, "estagio extracurricular") || strings.Contains(textLower, "extracurricular internship") {
+		return "extracurricular_internship", true
+	}
+	if strings.Contains(textLower, "estágio") || strings.Contains(textLower, "estagio") || strings.Contains(textLower, "internship") || strings.Contains(textLower, "trainee") {
+		return "professional_internship", true
+	}
+
+	juniorKeywords := []string{
+		"junior", "júnior", "recém-licenciado", "recem-licenciado", "entry level", "entry-level",
+		"primeiro emprego", "recent graduate",
+	}
+
+	for _, kw := range juniorKeywords {
+		if strings.Contains(textLower, kw) {
+			return "junior_position", true
+		}
+	}
+	return "", false
 }
 
 func saveVacanciesToJson(vacancies []JsonVacancy) {
