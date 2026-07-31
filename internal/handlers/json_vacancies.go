@@ -3,68 +3,94 @@ package handlers
 import (
 	"encoding/json"
 	"fmt"
+	"log"
 	"os"
 	"strings"
 	"sync"
 	"time"
 
+	"github.com/paiva/SkillBridge/Backend/internal/jobs"
 	"github.com/paiva/SkillBridge/Backend/internal/models"
+	"github.com/paiva/SkillBridge/Backend/internal/storage"
 )
 
 var (
 	cachedVacancies []models.Vacancy
 	vacanciesMutex  sync.RWMutex
 	vacanciesLoaded bool
-	lastModTime     time.Time
+	loadedVersion   uint64
 )
 
-
 type JsonVacancy struct {
-	CompanyName    string   `json:"company_name"`
+	CompanyName       string   `json:"company_name"`
 	CompanyUrl        string   `json:"company_url"`
 	CompanyProfileUrl string   `json:"company_profile_url"`
 	Title             string   `json:"title"`
-	Type           string   `json:"type"`
-	Tags           []string `json:"tags"`
-	Description    string   `json:"description"`
-	ApplicationUrl string   `json:"application_url"`
-	Region         string   `json:"region"`
-	WorkMode       string   `json:"work_mode"`
-	EmploymentType string   `json:"employment_type"`
-	PublishedAt    string   `json:"published_at"`
-	LogoUrl        string   `json:"logo_url"`
+	Type              string   `json:"type"`
+	Tags              []string `json:"tags"`
+	Description       string   `json:"description"`
+	ApplicationUrl    string   `json:"application_url"`
+	Region            string   `json:"region"`
+	WorkMode          string   `json:"work_mode"`
+	EmploymentType    string   `json:"employment_type"`
+	PublishedAt       string   `json:"published_at"`
+	LogoUrl           string   `json:"logo_url"`
 }
 
 func loadVacanciesIfNeeded() {
 	vacanciesMutex.Lock()
 	defer vacanciesMutex.Unlock()
-	fileInfo, err := os.Stat("config/vagas_final.json")
-	if err != nil {
-		fmt.Println("Error stat vagas_final.json:", err)
+
+	currentVersion := jobs.CacheVersion.Load()
+
+	// If cache is valid and version hasn't changed, nothing to do.
+	if vacanciesLoaded && currentVersion == loadedVersion {
 		return
 	}
-
-	if vacanciesLoaded && fileInfo.ModTime().Equal(lastModTime) {
-		return
-	}
-	
-	lastModTime = fileInfo.ModTime()
-
-	defaultPubDate := lastModTime
-
-	file, err := os.Open("config/vagas_final.json")
-	if err != nil {
-		fmt.Println("Error opening vagas_final.json:", err)
-		return
-	}
-	defer file.Close()
 
 	var jsonVacs []JsonVacancy
-	if err := json.NewDecoder(file).Decode(&jsonVacs); err != nil {
-		fmt.Println("Error decoding vagas_final.json:", err)
-		return
+	var defaultPubDate time.Time
+
+	// 1. Try GCS (primary — survives Cloud Run restarts)
+	if storage.GCSClient != nil {
+		data, err := storage.ReadObject("data/vagas_final.json")
+		if err == nil {
+			if jsonErr := json.Unmarshal(data, &jsonVacs); jsonErr == nil {
+				defaultPubDate = time.Now()
+				log.Printf("[vacancies] Loaded %d vacancies from GCS", len(jsonVacs))
+				goto build
+			} else {
+				log.Printf("[vacancies] Error decoding GCS vagas_final.json: %v", jsonErr)
+			}
+		} else {
+			log.Printf("[vacancies] GCS read failed, falling back to local file: %v", err)
+		}
 	}
 
+	// 2. Fallback: local filesystem (dev environment / first deploy seed)
+	{
+		fileInfo, err := os.Stat("config/vagas_final.json")
+		if err != nil {
+			log.Printf("[vacancies] Error stat vagas_final.json: %v", err)
+			return
+		}
+		defaultPubDate = fileInfo.ModTime()
+
+		file, err := os.Open("config/vagas_final.json")
+		if err != nil {
+			log.Printf("[vacancies] Error opening vagas_final.json: %v", err)
+			return
+		}
+		defer file.Close()
+
+		if err := json.NewDecoder(file).Decode(&jsonVacs); err != nil {
+			log.Printf("[vacancies] Error decoding vagas_final.json: %v", err)
+			return
+		}
+		log.Printf("[vacancies] Loaded %d vacancies from local file", len(jsonVacs))
+	}
+
+build:
 	cachedVacancies = make([]models.Vacancy, 0, len(jsonVacs))
 	for i, jv := range jsonVacs {
 		pubDate := defaultPubDate
@@ -76,7 +102,7 @@ func loadVacanciesIfNeeded() {
 			if err == nil {
 				pubDate = parsedDate
 			} else {
-				fmt.Printf("Error parsing published_at date for vacancy %s: %v\n", jv.Title, err)
+				fmt.Printf("[vacancies] Error parsing published_at for %s: %v\n", jv.Title, err)
 			}
 		}
 
@@ -94,7 +120,7 @@ func loadVacanciesIfNeeded() {
 				CompanyName:       jv.CompanyName,
 				CompanyURL:        jv.CompanyUrl,
 				CompanyProfileURL: jv.CompanyProfileUrl,
-				LogoURL:     func() string {
+				LogoURL: func() string {
 					if jv.LogoUrl != "" {
 						return jv.LogoUrl
 					}
@@ -118,5 +144,7 @@ func loadVacanciesIfNeeded() {
 			ApplicationURL: jv.ApplicationUrl,
 		})
 	}
+
 	vacanciesLoaded = true
+	loadedVersion = currentVersion
 }

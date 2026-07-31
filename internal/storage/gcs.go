@@ -1,6 +1,7 @@
 package storage
 
 import (
+	"bytes"
 	"context"
 	"fmt"
 	"io"
@@ -13,6 +14,9 @@ import (
 
 var GCSClient *storage.Client
 var bucketName string
+
+// BucketName returns the configured GCS bucket name.
+func BucketName() string { return bucketName }
 
 // InitGCS initializes the Google Cloud Storage client
 func InitGCS() error {
@@ -125,6 +129,56 @@ func GenerateSignedURL(objectName string, expiration time.Duration) (string, err
 	}
 
 	return url, nil
+}
+
+// ReadObject reads the full content of a GCS object and returns it as bytes.
+func ReadObject(objectName string) ([]byte, error) {
+	if GCSClient == nil {
+		return nil, fmt.Errorf("GCS client not initialized")
+	}
+
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
+
+	rc, err := GCSClient.Bucket(bucketName).Object(objectName).NewReader(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("failed to open GCS object %s: %w", objectName, err)
+	}
+	defer rc.Close()
+
+	data, err := io.ReadAll(rc)
+	if err != nil {
+		return nil, fmt.Errorf("failed to read GCS object %s: %w", objectName, err)
+	}
+
+	return data, nil
+}
+
+// WriteObject writes bytes to a GCS object, overwriting any existing content.
+func WriteObject(objectName string, data []byte, contentType string) error {
+	if GCSClient == nil {
+		return fmt.Errorf("GCS client not initialized")
+	}
+
+	ctx, cancel := context.WithTimeout(context.Background(), 60*time.Second)
+	defer cancel()
+
+	obj := GCSClient.Bucket(bucketName).Object(objectName)
+	wc := obj.NewWriter(ctx)
+	wc.ContentType = contentType
+	wc.CacheControl = "no-cache" // Always serve fresh
+
+	if _, err := io.Copy(wc, bytes.NewReader(data)); err != nil {
+		wc.Close()
+		return fmt.Errorf("failed to write GCS object %s: %w", objectName, err)
+	}
+
+	if err := wc.Close(); err != nil {
+		return fmt.Errorf("failed to close GCS writer for %s: %w", objectName, err)
+	}
+
+	log.Printf("✓ Written to GCS: %s (%d bytes)", objectName, len(data))
+	return nil
 }
 
 // CloseGCS closes the GCS client gracefully

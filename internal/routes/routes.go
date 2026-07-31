@@ -311,6 +311,9 @@ func Setup(r *gin.Engine) {
 		// admin.GET("/contest-registrations", handlers.AdminListContestRegistrations)
 		// admin.PUT("/contest-registrations/:id", handlers.AdminUpdateContestRegistration)
 		// admin.DELETE("/contest-registrations/:id", handlers.AdminDeleteContestRegistration)
+
+		// LinkedIn scrape trigger — for Cloud Scheduler or manual admin use
+		admin.POST("/scrape-jobs", handlers.AdminTriggerScrape)
 	}
 
 	// --------------------------------------------------

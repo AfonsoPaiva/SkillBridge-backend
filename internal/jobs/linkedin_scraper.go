@@ -1,6 +1,7 @@
 package jobs
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"log"
@@ -9,11 +10,13 @@ import (
 	"path/filepath"
 	"regexp"
 	"strings"
+	"sync/atomic"
 	"time"
 	"unicode"
 	"unicode/utf8"
 
 	"github.com/PuerkitoBio/goquery"
+	"github.com/paiva/SkillBridge/Backend/internal/storage"
 )
 
 type JsonVacancy struct {
@@ -32,6 +35,13 @@ type JsonVacancy struct {
 	LogoUrl           string   `json:"logo_url"`
 }
 
+// GCSVagasKey is the GCS object name for the scraped vacancies file.
+const GCSVagasKey = "data/vagas_final.json"
+
+// CacheVersion is incremented after each successful save so the handlers package
+// knows to reload the vacancy list from GCS/disk on the next request.
+var CacheVersion atomic.Uint64
+
 // StartLinkedInScraperJob initializes a job that scrapes LinkedIn every 4 weeks
 func StartLinkedInScraperJob() {
 	// 4 weeks = 28 days
@@ -41,13 +51,25 @@ func StartLinkedInScraperJob() {
 	go func() {
 		// Run on startup after a small delay
 		time.Sleep(30 * time.Second)
-		
-		path := filepath.Join("config", "vagas_final.json")
-		info, err := os.Stat(path)
+
 		shouldRun := true
-		if err == nil {
-			if time.Since(info.ModTime()) < 28*24*time.Hour {
-				log.Printf("[jobs] vagas_final.json was updated %v ago, skipping scrape.", time.Since(info.ModTime()).Round(time.Hour))
+
+		// 1. Prefer GCS: check object metadata for last-modified time.
+		if storage.GCSClient != nil {
+			attrs, err := storage.GCSClient.Bucket(storage.BucketName()).Object(GCSVagasKey).Attrs(context.Background())
+			if err == nil {
+				age := time.Since(attrs.Updated)
+				if age < 28*24*time.Hour {
+					log.Printf("[jobs] GCS vagas_final.json updated %v ago, skipping scrape.", age.Round(time.Hour))
+					shouldRun = false
+				}
+			}
+		} else {
+			// 2. Fallback: local file mod time (dev environment)
+			path := filepath.Join("config", "vagas_final.json")
+			info, err := os.Stat(path)
+			if err == nil && time.Since(info.ModTime()) < 28*24*time.Hour {
+				log.Printf("[jobs] vagas_final.json updated %v ago (local), skipping scrape.", time.Since(info.ModTime()).Round(time.Hour))
 				shouldRun = false
 			}
 		}
@@ -283,28 +305,34 @@ func determineJobType(title, desc string) (string, bool) {
 }
 
 func saveVacanciesToJson(vacancies []JsonVacancy) {
-	path := filepath.Join("config", "vagas_final.json")
+	data, err := json.MarshalIndent(vacancies, "", "  ")
+	if err != nil {
+		log.Printf("[jobs] Error encoding vacancies JSON: %v", err)
+		return
+	}
 
+	// 1. Persist to GCS (primary — survives Cloud Run restarts)
+	if storage.GCSClient != nil {
+		if err := storage.WriteObject(GCSVagasKey, data, "application/json"); err != nil {
+			log.Printf("[jobs] Error writing vagas_final.json to GCS: %v", err)
+		} else {
+			log.Println("[jobs] vagas_final.json saved to GCS successfully")
+			CacheVersion.Add(1)
+			return // GCS write succeeded, skip local fallback
+		}
+	}
+
+	// 2. Fallback: write to local filesystem (dev environment or GCS unavailable)
+	path := filepath.Join("config", "vagas_final.json")
 	if err := os.MkdirAll("config", 0755); err != nil {
 		log.Printf("[jobs] Error creating config dir: %v", err)
 		return
 	}
-
-	file, err := os.Create(path)
-	if err != nil {
-		log.Printf("[jobs] Error saving vacancies JSON: %v", err)
-		return
-	}
-	defer file.Close()
-
-	encoder := json.NewEncoder(file)
-	encoder.SetIndent("", "  ")
-	encoder.SetEscapeHTML(false) // Previne que o "&" seja convertido para "\u0026"
-
-	if err := encoder.Encode(vacancies); err != nil {
-		log.Printf("[jobs] Error encoding vacancies JSON: %v", err)
+	if err := os.WriteFile(path, data, 0644); err != nil {
+		log.Printf("[jobs] Error saving vacancies JSON locally: %v", err)
 	} else {
-		log.Println("[jobs] vagas_final.json updated successfully")
+		log.Println("[jobs] vagas_final.json saved locally (GCS unavailable)")
+		CacheVersion.Add(1)
 	}
 }
 

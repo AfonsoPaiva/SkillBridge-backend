@@ -7,15 +7,12 @@ import (
 	"log"
 	"time"
 
-	"github.com/paiva/SkillBridge/Backend/config"
 	"github.com/paiva/SkillBridge/Backend/internal/database"
-	"github.com/paiva/SkillBridge/Backend/internal/email"
 	"github.com/paiva/SkillBridge/Backend/internal/models"
 )
 
 // StartVacancyExpiryJob runs a daily check for expired vacancies.
-// Expired vacancies are marked as 'expired' and the recruiter receives a renewal email
-// with a secure access token that redirects to the vacancy edit page.
+// Expired vacancies are marked as 'expired'.
 func StartVacancyExpiryJob() {
 	ticker := time.NewTicker(24 * time.Hour)
 	log.Println("[jobs] Vacancy expiry job started (runs every 24h)")
@@ -36,7 +33,6 @@ func checkExpiredVacancies() {
 
 	var vacancies []models.Vacancy
 	if err := database.DB.
-		Preload("Recruiter").
 		Where("expires_at < ? AND status = ?", time.Now(), "active").
 		Find(&vacancies).Error; err != nil {
 		log.Printf("[jobs] Erro ao buscar vagas expiradas: %v", err)
@@ -55,28 +51,6 @@ func checkExpiredVacancies() {
 		if err := database.DB.Model(&vacancy).Update("status", "expired").Error; err != nil {
 			log.Printf("[jobs] Erro ao expirar vaga %s: %v", vacancy.ID, err)
 			continue
-		}
-
-		// Generate a secure access token for the recruiter with renew param
-		token, err := CreateRecruiterToken(vacancy.RecruiterID)
-		if err != nil {
-			log.Printf("[jobs] Erro ao gerar token de renovação para vaga %s: %v", vacancy.ID, err)
-			// Fallback: use frontend URL directly (recruiter will need to sign in manually)
-			renewLink := config.AppConfig.FrontendURL + "/recruiter/dashboard"
-			email.SendVacancyExpired(vacancy.Recruiter.FullName, vacancy.Recruiter.Email, vacancy.Title, renewLink)
-			continue
-		}
-
-		renewLink := config.AppConfig.FrontendURL + "/recruiter/auth?token=" + token + "&renew=" + vacancy.ID
-
-		// Send expiry notification email
-		if err := email.SendVacancyExpired(
-			vacancy.Recruiter.FullName,
-			vacancy.Recruiter.Email,
-			vacancy.Title,
-			renewLink,
-		); err != nil {
-			log.Printf("[jobs] Erro ao enviar email de expiração para vaga %s: %v", vacancy.ID, err)
 		}
 
 		log.Printf("[jobs] Vaga expirada: %s (%s)", vacancy.Title, vacancy.ID)
