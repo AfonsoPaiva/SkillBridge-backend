@@ -241,19 +241,21 @@ func Setup(r *gin.Engine) {
 		public.GET("/proxy/image", middleware.ProxyImageRateLimit(), handlers.ProxyImage)
 
 		// Build Challenge — public stats
-		public.GET("/contest/stats", handlers.ContestGetStats)
+		// TODO: Build Challenge desativado temporariamente (ninguém se inscreveu)
+		// public.GET("/contest/stats", handlers.ContestGetStats)
 	}
 
 	// --------------------------------------------------
 	// ROTAS DO CONCURSO (requerem token Firebase)
+	// TODO: Build Challenge desativado temporariamente (ninguém se inscreveu)
 	// --------------------------------------------------
-	contest := api.Group("/contest")
-	contest.Use(middleware.AuthRequired())
-	{
-		contest.POST("/register", middleware.SensitiveWriteRateLimit(), handlers.ContestRegister)
-		contest.GET("/registrations/me", handlers.ContestGetMyRegistration)
-		contest.GET("/my-projects", handlers.ContestGetUserProjects)
-	}
+	// contest := api.Group("/contest")
+	// contest.Use(middleware.AuthRequired())
+	// {
+	// 	contest.POST("/register", middleware.SensitiveWriteRateLimit(), handlers.ContestRegister)
+	// 	contest.GET("/registrations/me", handlers.ContestGetMyRegistration)
+	// 	contest.GET("/my-projects", handlers.ContestGetUserProjects)
+	// }
 
 	// --------------------------------------------------
 	// ROTAS DE TOTP (requerem IP whitelist + token Firebase, não TOTP)
@@ -305,9 +307,10 @@ func Setup(r *gin.Engine) {
 		// Vacancy management
 
 		// Contest management
-		admin.GET("/contest-registrations", handlers.AdminListContestRegistrations)
-		admin.PUT("/contest-registrations/:id", handlers.AdminUpdateContestRegistration)
-		admin.DELETE("/contest-registrations/:id", handlers.AdminDeleteContestRegistration)
+		// TODO: Build Challenge desativado temporariamente (ninguém se inscreveu)
+		// admin.GET("/contest-registrations", handlers.AdminListContestRegistrations)
+		// admin.PUT("/contest-registrations/:id", handlers.AdminUpdateContestRegistration)
+		// admin.DELETE("/contest-registrations/:id", handlers.AdminDeleteContestRegistration)
 	}
 
 	// --------------------------------------------------

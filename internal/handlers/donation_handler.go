@@ -122,9 +122,10 @@ func StripeWebhook(c *gin.Context) {
 		}
 
 		// Route to the correct handler based on metadata type
-		if session.Metadata != nil && session.Metadata["type"] == "contest" {
-			HandleContestWebhook(&session)
-		}
+		// TODO: Build Challenge desativado temporariamente (ninguém se inscreveu)
+		// if session.Metadata != nil && session.Metadata["type"] == "contest" {
+		// 	HandleContestWebhook(&session)
+		// }
 
 		// Não guardar dados de pagamento localmente.
 		// O Stripe é a fonte de verdade para pagamentos.

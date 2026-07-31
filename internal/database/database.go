@@ -86,6 +86,7 @@ func Connect() {
 	alterIfMissing("recruiters", "logo_url", "TEXT DEFAULT ''")
 	alterIfMissing("recruiters", "company_url", "TEXT DEFAULT ''")
 	alterIfMissing("recruiters", "vacancy_description", "TEXT DEFAULT ''")
+	alterIfMissing("recruiters", "company_profile_url", "TEXT DEFAULT ''")
 
 	// Vacancy enrichment fields
 	alterIfMissing("vacancies", "region", "VARCHAR(100) DEFAULT ''")
@@ -254,7 +255,8 @@ func migrate() error {
 		&models.Vacancy{},
 		&models.RecruiterToken{},
 		// Build Challenge contest
-		&models.ContestRegistration{},
+		// TODO: Build Challenge desativado temporariamente (ninguém se inscreveu)
+		// &models.ContestRegistration{},
 	}
 	for _, t := range tables {
 		if !DB.Migrator().HasTable(t) {
