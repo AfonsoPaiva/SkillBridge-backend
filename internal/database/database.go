@@ -94,6 +94,33 @@ func Connect() {
 	alterIfMissing("vacancies", "employment_type", "VARCHAR(20) DEFAULT ''")
 
 	migrateFaviconToIconHorse()
+	migrateVacancyIdToVarchar()
+}
+
+func migrateVacancyIdToVarchar() {
+	migrateColToVarchar("user_vacancy_favorites", "vacancy_id")
+	migrateColToVarchar("vacancy_applications", "vacancy_id")
+}
+
+func migrateColToVarchar(table, col string) {
+	var dataType string
+	DB.Raw(
+		"SELECT data_type FROM information_schema.columns WHERE table_name = ? AND column_name = ?",
+		table, col,
+	).Scan(&dataType)
+
+	if dataType == "" || dataType == "character varying" || dataType == "varchar" || dataType == "text" {
+		return // already varchar or doesn't exist
+	}
+
+	log.Printf("[migrate] %s.%s is %s — converting to VARCHAR(255)...", table, col, dataType)
+
+	sql := fmt.Sprintf("ALTER TABLE %s ALTER COLUMN %s TYPE VARCHAR(255) USING %s::VARCHAR", table, col, col)
+	if err := DB.Exec(sql).Error; err != nil {
+		log.Printf("[migrate] Erro ao converter %s.%s para VARCHAR: %v", table, col, err)
+	} else {
+		log.Printf("[migrate] %s.%s convertido para VARCHAR(255) com sucesso.", table, col)
+	}
 }
 
 func migrateFaviconToIconHorse() {
