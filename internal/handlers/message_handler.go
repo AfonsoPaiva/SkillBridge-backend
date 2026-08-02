@@ -562,16 +562,12 @@ func GetUnreadCount(c *gin.Context) {
 		return
 	}
 
-	// Get all conversations where user participates
-	var convIDs []uint
-	database.DB.Model(&models.Conversation{}).
-		Where("user_a_id = ? OR user_b_id = ?", me.ID, me.ID).
-		Pluck("id", &convIDs)
-
-	// Count unread messages across all conversations
+	// Count unread messages in a single JOIN query (avoids a round-trip for the conversation IDs)
 	var unreadCount int64
 	database.DB.Model(&models.Message{}).
-		Where("conversation_id IN ? AND sender_id != ? AND read_at IS NULL", convIDs, me.ID).
+		Joins("JOIN conversations ON conversations.id = messages.conversation_id").
+		Where("(conversations.user_a_id = ? OR conversations.user_b_id = ?) AND messages.sender_id != ? AND messages.read_at IS NULL",
+			me.ID, me.ID, me.ID).
 		Count(&unreadCount)
 
 	c.JSON(http.StatusOK, gin.H{"unread_count": unreadCount})
