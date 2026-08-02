@@ -254,6 +254,8 @@ func migrate() error {
 		&models.Recruiter{},
 		&models.Vacancy{},
 		&models.RecruiterToken{},
+		&models.UserVacancyFavorite{},
+		&models.VacancyApplication{},
 		// Build Challenge contest
 		// TODO: Build Challenge desativado temporariamente (ninguém se inscreveu)
 		// &models.ContestRegistration{},

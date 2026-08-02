@@ -503,6 +503,37 @@ func SendAdminNewRecruiterNotification(companyName, recruiterName string) error 
 	return send(getEmailFrom(), "afonsecapaiva@gmail.com", subject, html)
 }
 
+// SendVacancyApplicationFollowup envia email passado 1 semana da candidatura a perguntar se foi aceite.
+func SendVacancyApplicationFollowup(name, toEmail, vacancyTitle, companyName, dashboardURL string) error {
+	subject := fmt.Sprintf("Foste aceite na vaga \"%s\"? — SkillBridge", vacancyTitle)
+	html := fmt.Sprintf(vacancyFollowupTemplate, name, vacancyTitle, companyName, dashboardURL, dashboardURL)
+	return send(getEmailFrom(), toEmail, subject, html)
+}
+
+const vacancyFollowupTemplate = `<h2 style="margin:0 0 20px;color:#1a1a1a;font-size:24px;font-weight:600;">Como correu a tua candidatura? 💼</h2>
+<p style="margin:0 0 16px;color:#333;font-size:16px;line-height:1.6;">
+	Olá <strong>%s</strong>,
+</p>
+<p style="margin:0 0 24px;color:#333;font-size:16px;line-height:1.6;">
+	Passou 1 semana desde que te candidataste à vaga <strong>"%s"</strong>%s. Gostávamos de saber se tiveste novidades ou se foste aceite na vaga!
+</p>
+<p style="margin:0 0 32px;color:#666;font-size:15px;line-height:1.6;">
+	A tua resposta ajuda a comunidade do SkillBridge a recolher estatísticas reais sobre tempos de resposta e taxa de aceitação de empresas.
+</p>
+<table width="100%%" cellpadding="0" cellspacing="0">
+	<tr>
+		<td align="center">
+			<a href="%s" style="display:inline-block;background:#68007a;color:#ffffff;padding:16px 40px;border-radius:6px;text-decoration:none;font-weight:600;font-size:16px;text-align:center;">
+				Atualizar Estado na Dashboard
+			</a>
+		</td>
+	</tr>
+</table>
+<p style="margin:32px 0 0;color:#666;font-size:14px;line-height:1.6;">
+	Acede à tua dashboard em <a href="%s" style="color:#68007a;text-decoration:none;">skillbridge.pt</a> para atualizar as tuas vagas guardadas.
+</p>`
+
+
 
 const recruiterApprovedTemplate = `<h2 style="margin:0 0 20px;color:#1a1a1a;font-size:24px;font-weight:600;">Conta Aprovada ✓</h2>
 <p style="margin:0 0 16px;color:#333;font-size:16px;line-height:1.6;">

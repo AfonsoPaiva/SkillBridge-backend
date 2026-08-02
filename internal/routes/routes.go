@@ -164,6 +164,12 @@ func Setup(r *gin.Engine) {
 		protected.POST("/users/me/skills", handlers.AddUserSkill)
 		protected.DELETE("/users/me/skills", handlers.RemoveUserSkill)
 
+		// Vagas favoritas e candidaturas
+		protected.POST("/vacancies/:id/favorite", handlers.ToggleFavoriteVacancy)
+		protected.GET("/vacancies/favorites/me", handlers.GetMyFavoriteVacancies)
+		protected.POST("/vacancies/:id/apply", handlers.ApplyToVacancy)
+		protected.POST("/vacancies/:id/application-status", handlers.UpdateApplicationStatus)
+
 		// Projetos
 		protected.POST("/projects", handlers.CreateProject)
 		protected.PUT("/projects/:id", handlers.UpdateProject)
@@ -333,6 +339,7 @@ func Setup(r *gin.Engine) {
 	public.POST("/recruiters/verify-token", middleware.AuthFlowRateLimit(), handlers.RecruiterVerifyToken)
 	// Vacancies list — heavy DB read, rate-limited (60 req/min)
 	public.GET("/vacancies", middleware.HeavyReadRateLimit(), handlers.GetPublicVacancies)
+	public.GET("/vacancies/community-stats", handlers.GetCommunityVacancyStats)
 	public.GET("/vacancies/:id", handlers.GetPublicVacancy)
 
 	// --------------------------------------------------

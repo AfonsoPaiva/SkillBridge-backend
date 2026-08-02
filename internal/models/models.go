@@ -466,6 +466,36 @@ type RecruiterToken struct {
 // Cada utilizador só pode inscrever-se uma vez.
 // O pagamento (7 €) é processado via Stripe Embedded Checkout.
 // --------------------------------------------------
+// --------------------------------------------------
+// USER_VACANCY_FAVORITE — Vagas favoritas guardadas pelos utilizadores (máx 10 por dia).
+// --------------------------------------------------
+type UserVacancyFavorite struct {
+	ID        uint      `gorm:"primaryKey;autoIncrement" json:"id"`
+	UserID    uint      `gorm:"not null;uniqueIndex:idx_user_vac_fav" json:"user_id"`
+	VacancyID string    `gorm:"type:uuid;not null;uniqueIndex:idx_user_vac_fav" json:"vacancy_id"`
+	CreatedAt time.Time `gorm:"default:NOW();index" json:"created_at"`
+
+	User    User    `gorm:"foreignKey:UserID" json:"-"`
+	Vacancy Vacancy `gorm:"foreignKey:VacancyID" json:"vacancy,omitempty"`
+}
+
+// --------------------------------------------------
+// VACANCY_APPLICATION — Registo de candidatura a vaga efetuada pelo estudante.
+// --------------------------------------------------
+type VacancyApplication struct {
+	ID                uint       `gorm:"primaryKey;autoIncrement" json:"id"`
+	UserID            uint       `gorm:"not null;uniqueIndex:idx_user_vac_app" json:"user_id"`
+	VacancyID         string     `gorm:"type:uuid;not null;uniqueIndex:idx_user_vac_app" json:"vacancy_id"`
+	AppliedAt         time.Time  `gorm:"default:NOW()" json:"applied_at"`
+	FollowupEmailSent bool       `gorm:"default:false" json:"followup_email_sent"`
+	FollowupEmailDate time.Time  `json:"followup_email_date"`
+	Status            string     `gorm:"type:varchar(20);default:'pending'" json:"status"` // pending | accepted | rejected | no_response
+	ResponseTimeDays  *int       `json:"response_time_days,omitempty"`
+
+	User    User    `gorm:"foreignKey:UserID" json:"-"`
+	Vacancy Vacancy `gorm:"foreignKey:VacancyID" json:"vacancy,omitempty"`
+}
+
 // type ContestRegistration struct {
 // 	ID              uint      `gorm:"primaryKey;autoIncrement" json:"id"`
 // 	UserID          uint      `gorm:"not null;uniqueIndex:idx_contest_user" json:"user_id"`
@@ -478,4 +508,5 @@ type RecruiterToken struct {
 // 	User    User    `gorm:"foreignKey:UserID" json:"user,omitempty"`
 // 	Project Project `gorm:"foreignKey:ProjectID" json:"project,omitempty"`
 // }
+
 
