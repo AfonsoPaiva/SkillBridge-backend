@@ -515,6 +515,75 @@ func GetMyFavoriteVacancies(c *gin.Context) {
 	})
 }
 
+// GetMyVacancyApplications returns all vacancies to which the authenticated user has applied.
+// GET /api/vacancies/applications/me
+func GetMyVacancyApplications(c *gin.Context) {
+	firebaseUID := c.GetString("firebase_uid")
+
+	var user models.User
+	if err := database.DB.Where("firebase_uid = ?", firebaseUID).First(&user).Error; err != nil {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "Utilizador não encontrado."})
+		return
+	}
+
+	var apps []models.VacancyApplication
+	if err := database.DB.Where("user_id = ?", user.ID).Order("applied_at DESC").Find(&apps).Error; err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Erro ao carregar candidaturas."})
+		return
+	}
+
+	var favs []models.UserVacancyFavorite
+	database.DB.Where("user_id = ?", user.ID).Find(&favs)
+	favMap := make(map[string]bool)
+	for _, f := range favs {
+		favMap[f.VacancyID] = true
+	}
+
+	loadVacanciesIfNeeded()
+	vacanciesMutex.RLock()
+	vacMap := make(map[string]models.Vacancy)
+	for _, v := range cachedVacancies {
+		vacMap[v.ID] = v
+	}
+	vacanciesMutex.RUnlock()
+
+	type ApplicationItem struct {
+		models.Vacancy
+		IsFavorite        bool      `json:"is_favorite"`
+		Applied           bool      `json:"applied"`
+		ApplicationStatus string    `json:"application_status"`
+		AppliedAt         time.Time `json:"applied_at"`
+	}
+
+	var result []ApplicationItem
+	for _, app := range apps {
+		v, exists := vacMap[app.VacancyID]
+		if !exists {
+			var dbVac models.Vacancy
+			if err := database.DB.Preload("Recruiter").Where("id = ?", app.VacancyID).First(&dbVac).Error; err == nil {
+				v = dbVac
+			} else {
+				continue
+			}
+		}
+
+		item := ApplicationItem{
+			Vacancy:           v,
+			IsFavorite:        favMap[app.VacancyID],
+			Applied:           true,
+			ApplicationStatus: app.Status,
+			AppliedAt:         app.AppliedAt,
+		}
+
+		result = append(result, item)
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"vacancies": result,
+		"count":     len(result),
+	})
+}
+
 // ApplyToVacancy records that a user applied to a vacancy and schedules a 1-week follow-up email.
 // POST /api/vacancies/:id/apply
 func ApplyToVacancy(c *gin.Context) {
@@ -562,7 +631,29 @@ func ApplyToVacancy(c *gin.Context) {
 	})
 }
 
-// UpdateApplicationStatus updates status of a user's application (e.g. accepted / rejected).
+// RemoveApplication removes a user's application.
+// DELETE /api/vacancies/:id/apply
+func RemoveApplication(c *gin.Context) {
+	firebaseUID := c.GetString("firebase_uid")
+	vacancyID := c.Param("id")
+
+	var user models.User
+	if err := database.DB.Where("firebase_uid = ?", firebaseUID).First(&user).Error; err != nil {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "Utilizador não encontrado."})
+		return
+	}
+
+	if err := database.DB.Where("user_id = ? AND vacancy_id = ?", user.ID, vacancyID).Delete(&models.VacancyApplication{}).Error; err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Erro ao remover candidatura."})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"message": "Candidatura removida com sucesso.",
+	})
+}
+
+// UpdateApplicationStatus updates status of a user's application (e.g. accepted / rejected / ignored).
 // POST /api/vacancies/:id/application-status
 func UpdateApplicationStatus(c *gin.Context) {
 	firebaseUID := c.GetString("firebase_uid")
@@ -599,7 +690,7 @@ func UpdateApplicationStatus(c *gin.Context) {
 
 	if input.ResponseTimeDays != nil {
 		app.ResponseTimeDays = input.ResponseTimeDays
-	} else if app.ResponseTimeDays == nil && (input.Status == "accepted" || input.Status == "rejected") {
+	} else if app.ResponseTimeDays == nil && (input.Status == "accepted" || input.Status == "rejected" || input.Status == "ignored") {
 		days := int(time.Since(app.AppliedAt).Hours() / 24)
 		if days < 1 {
 			days = 1

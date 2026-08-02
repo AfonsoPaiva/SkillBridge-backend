@@ -167,7 +167,9 @@ func Setup(r *gin.Engine) {
 		// Vagas favoritas e candidaturas
 		protected.POST("/vacancies/:id/favorite", handlers.ToggleFavoriteVacancy)
 		protected.GET("/vacancies/favorites/me", handlers.GetMyFavoriteVacancies)
+		protected.GET("/vacancies/applications/me", handlers.GetMyVacancyApplications)
 		protected.POST("/vacancies/:id/apply", handlers.ApplyToVacancy)
+		protected.DELETE("/vacancies/:id/apply", handlers.RemoveApplication)
 		protected.POST("/vacancies/:id/application-status", handlers.UpdateApplicationStatus)
 
 		// Projetos
