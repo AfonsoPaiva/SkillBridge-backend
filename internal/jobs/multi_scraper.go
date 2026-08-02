@@ -88,30 +88,32 @@ func faviconURL(companyURL, companyName string) string {
 // ─────────────────────────────────────────────────────────────────────────────
 
 func ScrapeIndeedJobs(allSkills []string, seen map[string]bool) []JsonVacancy {
-	log.Println("[jobs] Starting Indeed scraper...")
+	log.Println("[jobs] Starting Indeed scraper (multi-pass: estágio + trainee + júnior + recém-licenciado)...")
 
 	client := newBrowserClient(30 * time.Second)
-	var vacancies []JsonVacancy
 	uniqueJobs := make(map[string]*JsonVacancy)
 	var orderedKeys []string
 
-	queries := []string{"estágio", "junior", "trainee"}
-
-	for _, q := range queries {
-		for page := 0; page < 4; page++ {
+	// indeedPass executes one paginated Indeed search and merges results.
+	// We trust the search query — any job returned by Indeed for "estágio" IS an
+	// estágio, so we do NOT re-filter by title keywords (that was discarding valid jobs).
+	// We still run determineJobType to correctly classify the Type field.
+	indeedPass := func(query, passLabel string, maxPages int) int {
+		added := 0
+		for page := 0; page < maxPages; page++ {
 			start := page * 10
 			searchURL := fmt.Sprintf(
 				"https://pt.indeed.com/jobs?q=%s&l=Portugal&sort=date&start=%d",
-				url.QueryEscape(q), start,
+				url.QueryEscape(query), start,
 			)
 
 			doc, _, err := doGet(client, searchURL)
 			if err != nil {
-				log.Printf("[jobs][indeed] Error fetching page %d for query '%s': %v", page, q, err)
+				log.Printf("[jobs][indeed][%s] Error fetching page %d: %v", passLabel, page, err)
 				break
 			}
 
-			jobsFound := 0
+			pageFound := 0
 			doc.Find("div.job_seen_beacon, div.resultWithShelf").Each(func(_ int, s *goquery.Selection) {
 				title := strings.TrimSpace(s.Find("h2.jobTitle span[title], h2.jobTitle a span").First().Text())
 				if title == "" {
@@ -120,6 +122,7 @@ func ScrapeIndeedJobs(allSkills []string, seen map[string]bool) []JsonVacancy {
 				company := strings.TrimSpace(s.Find("span[data-testid='company-name'], .companyName").First().Text())
 				location := strings.TrimSpace(s.Find("div[data-testid='text-location'], .companyLocation").First().Text())
 
+				// Build the canonical job URL
 				jk, _ := s.Find("a[data-jk], a[id^='job_']").First().Attr("data-jk")
 				if jk == "" {
 					href, _ := s.Find("h2.jobTitle a, a.jcs-JobTitle").First().Attr("href")
@@ -140,19 +143,18 @@ func ScrapeIndeedJobs(allSkills []string, seen map[string]bool) []JsonVacancy {
 				if title == "" || company == "" {
 					return
 				}
+
+				// Global dedup across all passes (by URL and by company+title)
 				key := company + "|" + title
 				if seen[jk] || uniqueJobs[key] != nil {
 					return
 				}
 				seen[jk] = true
 
-				jobType, isJunior := determineJobType(title, "")
-				if !isJunior {
-					isJunior = isLikelyJuniorTitle(title)
-					if !isJunior {
-						return
-					}
-					jobType = "junior_position"
+				// Classify type using title first; trust query result — don't discard
+				jobType, _ := determineJobType(title, "")
+				if jobType == "" {
+					jobType = "junior_position" // sensible default; refined after fetching description
 				}
 
 				workMode, cleanLoc := detectWorkMode(location, "")
@@ -164,6 +166,7 @@ func ScrapeIndeedJobs(allSkills []string, seen map[string]bool) []JsonVacancy {
 				if workMode == "onsite" {
 					workMode, _ = detectWorkMode(cleanLoc, details.Description)
 				}
+				// Refine type with full description
 				if jt, ok := determineJobType(title, details.Description); ok {
 					jobType = jt
 				}
@@ -185,57 +188,75 @@ func ScrapeIndeedJobs(allSkills []string, seen map[string]bool) []JsonVacancy {
 				}
 				uniqueJobs[key] = job
 				orderedKeys = append(orderedKeys, key)
-				jobsFound++
+				pageFound++
+				added++
 			})
 
-			if jobsFound == 0 {
+			if pageFound == 0 {
 				break
 			}
 			time.Sleep(2 * time.Second)
 		}
-		time.Sleep(3 * time.Second)
+		log.Printf("[jobs][indeed][%s] → %d novos empregos", passLabel, added)
+		time.Sleep(3 * time.Second) // pausa entre passes
+		return added
 	}
 
+	// ── Pass A: Estágios ──────────────────────────────────────────────────────
+	// URL: https://pt.indeed.com/jobs?q=est%C3%A1gio&l=Portugal&sort=date
+	indeedPass("estágio", "estagios", 8)
+
+	// ── Pass B: Trainee ───────────────────────────────────────────────────────
+	indeedPass("trainee", "trainee", 6)
+
+	// ── Pass C: Júnior ────────────────────────────────────────────────────────
+	indeedPass("júnior", "junior", 8)
+
+	// ── Pass D: Recém-Licenciado ──────────────────────────────────────────────
+	indeedPass("recém-licenciado", "recem-licenciado", 6)
+
+	// ── Pass E: Graduate (apanha inglês) ─────────────────────────────────────
+	indeedPass("graduate", "graduate", 4)
+
+	var vacancies []JsonVacancy
 	for _, k := range orderedKeys {
 		vacancies = append(vacancies, *uniqueJobs[k])
 	}
-	log.Printf("[jobs][indeed] Scraped %d jobs", len(vacancies))
+	log.Printf("[jobs][indeed] Total unique jobs: %d", len(vacancies))
 	return vacancies
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Net-Empregos scraper  (maior portal de emprego em Portugal)
-// URL estrutura: https://www.net-empregos.com/pesquisa-empregos.asp?q=<query>&zona=0&ordem=1&pagina=<n>
+// URL correcta: https://www.net-empregos.com/pesquisa-empregos.asp?chaves=<query>&cidade=&categoria=0&zona=0&tipo=0&pagina=<n>
 // ─────────────────────────────────────────────────────────────────────────────
 
 func ScrapeNetEmpregos(allSkills []string, seen map[string]bool) []JsonVacancy {
-	log.Println("[jobs] Starting Net-Empregos scraper...")
+	log.Println("[jobs] Starting Net-Empregos scraper (multi-pass: estágio + trainee + júnior + recém-licenciado)...")
 
 	client := newBrowserClient(30 * time.Second)
-	var vacancies []JsonVacancy
 	uniqueJobs := make(map[string]*JsonVacancy)
 	var orderedKeys []string
 
-	queries := []string{"estágio", "junior", "trainee", "estagiário"}
-
-	for _, q := range queries {
-		for page := 1; page <= 6; page++ {
+	// netPass executes one paginated Net-Empregos search and merges results.
+	// We trust the search query — no secondary title filter applied.
+	netPass := func(query, passLabel string, maxPages int) int {
+		added := 0
+		for page := 1; page <= maxPages; page++ {
+			// Correct URL: parameter is 'chaves' (not 'q'), with required extra params
 			searchURL := fmt.Sprintf(
-				"https://www.net-empregos.com/pesquisa-empregos.asp?q=%s&zona=0&ordem=1&pagina=%d",
-				url.QueryEscape(q), page,
+				"https://www.net-empregos.com/pesquisa-empregos.asp?chaves=%s&cidade=&categoria=0&zona=0&tipo=0&pagina=%d",
+				url.QueryEscape(query), page,
 			)
 
 			doc, status, err := doGet(client, searchURL)
 			if err != nil {
-				log.Printf("[jobs][netempregos] Error fetching page %d for '%s': %v (status=%d)", page, q, err, status)
+				log.Printf("[jobs][netempregos][%s] Error fetching page %d: %v (status=%d)", passLabel, page, err, status)
 				break
 			}
 
-			jobsFound := 0
-
-			// Net-Empregos job cards: each offer is inside a div with class "oferta" or similar
+			pageFound := 0
 			doc.Find("div.oferta, div.job-result, article.job-item, div[class*='oferta']").Each(func(_ int, s *goquery.Selection) {
-				// Title: usually inside an <a> within an h2 or h3
 				title := strings.TrimSpace(s.Find("h2 a, h3 a, .titulo a, a.titulo-oferta, span.titulo").First().Text())
 				if title == "" {
 					title = strings.TrimSpace(s.Find("a[href*='/emprego/']").First().Text())
@@ -259,18 +280,17 @@ func ScrapeNetEmpregos(allSkills []string, seen map[string]bool) []JsonVacancy {
 				if title == "" || company == "" {
 					return
 				}
+
+				// Global dedup across all passes
 				key := company + "|" + title
 				if seen[cleanLink] || uniqueJobs[key] != nil {
 					return
 				}
 				seen[cleanLink] = true
 
-				jobType, isJunior := determineJobType(title, "")
-				if !isJunior {
-					isJunior = isLikelyJuniorTitle(title)
-					if !isJunior {
-						return
-					}
+				// Classify type; trust search query — don't discard based on title
+				jobType, _ := determineJobType(title, "")
+				if jobType == "" {
 					jobType = "junior_position"
 				}
 
@@ -285,7 +305,6 @@ func ScrapeNetEmpregos(allSkills []string, seen map[string]bool) []JsonVacancy {
 				workMode, cleanLoc := detectWorkMode(location, "")
 				publishedAt := time.Now().Format("2006-01-02")
 
-				// Published date
 				dateAttr := s.Find("time").First().AttrOr("datetime", "")
 				if dateAttr != "" {
 					publishedAt = dateAttr
@@ -318,23 +337,44 @@ func ScrapeNetEmpregos(allSkills []string, seen map[string]bool) []JsonVacancy {
 				}
 				uniqueJobs[key] = job
 				orderedKeys = append(orderedKeys, key)
-				jobsFound++
+				pageFound++
+				added++
 			})
 
-			if jobsFound == 0 {
+			if pageFound == 0 {
 				break
 			}
 			time.Sleep(2 * time.Second)
 		}
+		log.Printf("[jobs][netempregos][%s] → %d novos empregos", passLabel, added)
 		time.Sleep(3 * time.Second)
+		return added
 	}
 
+	// ── Pass A: Estágio ───────────────────────────────────────────────────────
+	netPass("estágio", "estagio", 8)
+
+	// ── Pass B: Estagiário (variante PT) ─────────────────────────────────────
+	netPass("estagiário", "estagiario", 6)
+
+	// ── Pass C: Trainee ───────────────────────────────────────────────────────
+	netPass("trainee", "trainee", 6)
+
+	// ── Pass D: Júnior ────────────────────────────────────────────────────────
+	netPass("júnior", "junior", 8)
+
+	// ── Pass E: Recém-Licenciado ──────────────────────────────────────────────
+	netPass("recém-licenciado", "recem-licenciado", 6)
+
+	var vacancies []JsonVacancy
 	for _, k := range orderedKeys {
 		vacancies = append(vacancies, *uniqueJobs[k])
 	}
-	log.Printf("[jobs][netempregos] Scraped %d jobs", len(vacancies))
+	log.Printf("[jobs][netempregos] Total unique jobs: %d", len(vacancies))
 	return vacancies
 }
+
+
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Expresso Emprego scraper
@@ -587,6 +627,244 @@ func ScrapeEmpregoJobs(allSkills []string, seen map[string]bool) []JsonVacancy {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
+// Jobsora Portugal scraper
+// URL: https://pt.jobsora.com/empregos?experience=0&p=<n>
+// ─────────────────────────────────────────────────────────────────────────────
+
+func ScrapeJobsoraJobs(allSkills []string, seen map[string]bool) []JsonVacancy {
+	log.Println("[jobs] Starting Jobsora scraper (experience=0,1,2,3 & estagios)...")
+
+	client := newBrowserClient(30 * time.Second)
+	uniqueJobs := make(map[string]*JsonVacancy)
+	var orderedKeys []string
+
+	jobsoraPass := func(expVal, query, passLabel string, maxPages int) int {
+		added := 0
+		for page := 1; page <= maxPages; page++ {
+			searchURL := fmt.Sprintf(
+				"https://pt.jobsora.com/empregos?experience=%s&q=%s&p=%d",
+				expVal, url.QueryEscape(query), page,
+			)
+
+			doc, status, err := doGet(client, searchURL)
+			if err != nil {
+				log.Printf("[jobs][jobsora][%s] Error fetching page %d: %v (status=%d)", passLabel, page, err, status)
+				break
+			}
+
+			pageFound := 0
+			doc.Find("div.c-job-item, article.c-job-item, div.job-card, div.c-job-card, article[class*='job']").Each(func(_ int, s *goquery.Selection) {
+				title := strings.TrimSpace(s.Find("a.c-job-item__title, .c-job-item__title a, h2 a, h3 a").First().Text())
+				company := strings.TrimSpace(s.Find("span.c-job-item__company, .c-job-item__company, div.c-job-item__company, .company-name").First().Text())
+				location := strings.TrimSpace(s.Find("span.c-job-item__location, .c-job-item__location, .location").First().Text())
+
+				jobLink, exists := s.Find("a.c-job-item__title, .c-job-item__title a, h2 a, a[href*='/emprego']").First().Attr("href")
+				if !exists || jobLink == "" {
+					return
+				}
+				if strings.HasPrefix(jobLink, "/") {
+					jobLink = "https://pt.jobsora.com" + jobLink
+				}
+				cleanLink := jobLink
+				if idx := strings.Index(cleanLink, "?"); idx != -1 {
+					cleanLink = cleanLink[:idx]
+				}
+
+				if title == "" || company == "" {
+					return
+				}
+
+				key := company + "|" + title
+				if seen[cleanLink] || uniqueJobs[key] != nil {
+					return
+				}
+				seen[cleanLink] = true
+
+				jobType, _ := determineJobType(title, "")
+				if jobType == "" {
+					jobType = "junior_position"
+				}
+
+				workMode, cleanLoc := detectWorkMode(location, "")
+				publishedAt := time.Now().Format("2006-01-02")
+
+				details := fetchJobDetails(jobLink)
+				time.Sleep(500 * time.Millisecond)
+
+				if workMode == "onsite" {
+					workMode, _ = detectWorkMode(cleanLoc, details.Description)
+				}
+				if jt, ok := determineJobType(title, details.Description); ok {
+					jobType = jt
+				}
+
+				job := &JsonVacancy{
+					CompanyName:       company,
+					CompanyUrl:        "",
+					CompanyProfileUrl: "",
+					Title:             title,
+					Region:            strings.TrimSpace(cleanLoc),
+					ApplicationUrl:    jobLink,
+					Type:              jobType,
+					Tags:              extractSkills(title, details.Description, allSkills),
+					Description:       details.Description,
+					WorkMode:          workMode,
+					EmploymentType:    details.EmploymentType,
+					PublishedAt:       publishedAt,
+					LogoUrl:           faviconURL("", company),
+				}
+				uniqueJobs[key] = job
+				orderedKeys = append(orderedKeys, key)
+				pageFound++
+				added++
+			})
+
+			if pageFound == 0 {
+				break
+			}
+			time.Sleep(2 * time.Second)
+		}
+		log.Printf("[jobs][jobsora][%s] → %d novos empregos", passLabel, added)
+		time.Sleep(3 * time.Second)
+		return added
+	}
+
+	// Experience level 0 (Sem experiência / Estágio)
+	jobsoraPass("0", "", "exp0-sem-experiencia", 5)
+	// Experience level 1 (1 ano)
+	jobsoraPass("1", "", "exp1-um-ano", 5)
+	// Experience level 2 (2 anos)
+	jobsoraPass("2", "junior", "exp2-dois-anos", 4)
+	// Targeted search for estagios
+	jobsoraPass("", "estágio", "estagio-kw", 4)
+
+	var vacancies []JsonVacancy
+	for _, k := range orderedKeys {
+		vacancies = append(vacancies, *uniqueJobs[k])
+	}
+	log.Printf("[jobs][jobsora] Total unique jobs: %d", len(vacancies))
+	return vacancies
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Jooble Portugal scraper
+// URL: https://pt.jooble.org/SearchResult?workExp=2&p=<n>
+// ─────────────────────────────────────────────────────────────────────────────
+
+func ScrapeJoobleJobs(allSkills []string, seen map[string]bool) []JsonVacancy {
+	log.Println("[jobs] Starting Jooble scraper (workExp=1,2 & junior/estágio)...")
+
+	client := newBrowserClient(30 * time.Second)
+	uniqueJobs := make(map[string]*JsonVacancy)
+	var orderedKeys []string
+
+	jooblePass := func(workExp, query, passLabel string, maxPages int) int {
+		added := 0
+		for page := 1; page <= maxPages; page++ {
+			searchURL := fmt.Sprintf(
+				"https://pt.jooble.org/SearchResult?rgns=Portugal&q=%s&workExp=%s&p=%d",
+				url.QueryEscape(query), workExp, page,
+			)
+
+			doc, status, err := doGet(client, searchURL)
+			if err != nil {
+				log.Printf("[jobs][jooble][%s] Error fetching page %d: %v (status=%d)", passLabel, page, err, status)
+				break
+			}
+
+			pageFound := 0
+			doc.Find("article[data-test-name='_jobCard'], div[data-test-name='_jobCard'], article.card-job, div.vacancy-card, article[class*='job']").Each(func(_ int, s *goquery.Selection) {
+				title := strings.TrimSpace(s.Find("h2 a, a[data-test-name='_jobTitle'], .job-title a, h2").First().Text())
+				company := strings.TrimSpace(s.Find("span[data-test-name='_companyName'], .company-name, span.company, p[class*='company']").First().Text())
+				location := strings.TrimSpace(s.Find("span[data-test-name='_location'], .location-name, span.location, div[class*='location']").First().Text())
+
+				jobLink, exists := s.Find("h2 a, a[data-test-name='_jobTitle'], a[href*='/desc/'], a[href*='jooble']").First().Attr("href")
+				if !exists || jobLink == "" {
+					return
+				}
+				if strings.HasPrefix(jobLink, "/") {
+					jobLink = "https://pt.jooble.org" + jobLink
+				}
+				cleanLink := jobLink
+				if idx := strings.Index(cleanLink, "?"); idx != -1 {
+					cleanLink = cleanLink[:idx]
+				}
+
+				if title == "" || company == "" {
+					return
+				}
+
+				key := company + "|" + title
+				if seen[cleanLink] || uniqueJobs[key] != nil {
+					return
+				}
+				seen[cleanLink] = true
+
+				jobType, _ := determineJobType(title, "")
+				if jobType == "" {
+					jobType = "junior_position"
+				}
+
+				workMode, cleanLoc := detectWorkMode(location, "")
+				publishedAt := time.Now().Format("2006-01-02")
+
+				details := fetchJobDetails(jobLink)
+				time.Sleep(500 * time.Millisecond)
+
+				if workMode == "onsite" {
+					workMode, _ = detectWorkMode(cleanLoc, details.Description)
+				}
+				if jt, ok := determineJobType(title, details.Description); ok {
+					jobType = jt
+				}
+
+				job := &JsonVacancy{
+					CompanyName:       company,
+					CompanyUrl:        "",
+					CompanyProfileUrl: "",
+					Title:             title,
+					Region:            strings.TrimSpace(cleanLoc),
+					ApplicationUrl:    jobLink,
+					Type:              jobType,
+					Tags:              extractSkills(title, details.Description, allSkills),
+					Description:       details.Description,
+					WorkMode:          workMode,
+					EmploymentType:    details.EmploymentType,
+					PublishedAt:       publishedAt,
+					LogoUrl:           faviconURL("", company),
+				}
+				uniqueJobs[key] = job
+				orderedKeys = append(orderedKeys, key)
+				pageFound++
+				added++
+			})
+
+			if pageFound == 0 {
+				break
+			}
+			time.Sleep(2 * time.Second)
+		}
+		log.Printf("[jobs][jooble][%s] → %d novos empregos", passLabel, added)
+		time.Sleep(3 * time.Second)
+		return added
+	}
+
+	// Pass 1: workExp=1 (Sem experiência / Pouca experiência)
+	jooblePass("1", "estágio", "exp1-estagio", 5)
+	// Pass 2: workExp=2 (Até 3 anos experiência)
+	jooblePass("2", "junior", "exp2-junior", 5)
+	// Pass 3: Trainee
+	jooblePass("1", "trainee", "exp1-trainee", 4)
+
+	var vacancies []JsonVacancy
+	for _, k := range orderedKeys {
+		vacancies = append(vacancies, *uniqueJobs[k])
+	}
+	log.Printf("[jobs][jooble] Total unique jobs: %d", len(vacancies))
+	return vacancies
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
 // Helpers
 // ─────────────────────────────────────────────────────────────────────────────
 
@@ -608,3 +886,4 @@ func isLikelyJuniorTitle(title string) bool {
 	}
 	return false
 }
+

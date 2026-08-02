@@ -114,7 +114,7 @@ func loadAllSkills() []string {
 }
 
 func ScrapeLinkedInJobs() {
-	log.Println("[jobs] Starting multi-platform job scraper (LinkedIn + Indeed + Net-Empregos + Expresso Emprego + Emprego.pt)...")
+	log.Println("[jobs] Starting multi-platform job scraper (LinkedIn + Indeed + Net-Empregos + Expresso Emprego + Emprego.pt + Jobsora + Jooble)...")
 
 	allSkills := loadAllSkills()
 	globalSeen := make(map[string]bool)
@@ -157,6 +157,16 @@ func ScrapeLinkedInJobs() {
 	mergeInto(empregoVacs)
 	log.Printf("[jobs] Emprego.pt contributed %d jobs", len(empregoVacs))
 
+	// ── 6. Jobsora Portugal ──────────────────────────────────────────────────
+	jobsoraVacs := ScrapeJobsoraJobs(allSkills, globalSeen)
+	mergeInto(jobsoraVacs)
+	log.Printf("[jobs] Jobsora contributed %d jobs", len(jobsoraVacs))
+
+	// ── 7. Jooble Portugal ───────────────────────────────────────────────────
+	joobleVacs := ScrapeJoobleJobs(allSkills, globalSeen)
+	mergeInto(joobleVacs)
+	log.Printf("[jobs] Jooble contributed %d jobs", len(joobleVacs))
+
 	// ── Assemble final de-duplicated list ─────────────────────────────────────
 	var vacancies []JsonVacancy
 	for _, k := range orderedKeys {
@@ -172,49 +182,50 @@ func ScrapeLinkedInJobs() {
 }
 
 
-// scrapeLinkedIn is the internal LinkedIn-only scrape, extracted so that it
-// can be called independently by the multi-platform orchestrator.
-func scrapeLinkedIn(allSkills []string, seenJobs map[string]bool) []JsonVacancy {
-	var vacancies []JsonVacancy
-	uniqueJobs := make(map[string]*JsonVacancy)
-	var orderedKeys []string
-	client := &http.Client{Timeout: 30 * time.Second}
-
-	for start := 0; start < 1000; start += 25 {
-		// sortBy=R garante que a pesquisa é por "Relevância". A pesquisa agora obriga a conter palavras relacionadas a posições juniores.
-		rawURL := fmt.Sprintf("https://www.linkedin.com/jobs-guest/jobs/api/seeMoreJobPostings/search?keywords=estagio%%20OR%%20junior%%20OR%%20trainee&f_E=1,2,3&geoId=100364837&location=Portugal&sortBy=R&start=%d", start)
+// linkedInSearchPass fetches one paginated LinkedIn search and merges results
+// into uniqueJobs/orderedKeys/seenJobs. Returns the number of new jobs added.
+// searchLabel is used only for logging.
+func linkedInSearchPass(
+	client *http.Client,
+	rawURLTemplate string, // must contain one %d placeholder for start offset
+	searchLabel string,
+	allSkills []string,
+	seenJobs map[string]bool,
+	uniqueJobs map[string]*JsonVacancy,
+	orderedKeys *[]string,
+) int {
+	added := 0
+	for start := 0; start < 500; start += 25 {
+		rawURL := fmt.Sprintf(rawURLTemplate, start)
 
 		req, err := http.NewRequest("GET", rawURL, nil)
 		if err != nil {
-			log.Printf("[jobs][linkedin] Error creating request: %v", err)
+			log.Printf("[jobs][linkedin][%s] Error creating request: %v", searchLabel, err)
 			break
 		}
-
 		req.Header.Set("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36")
 		req.Header.Set("Accept", "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8")
 		req.Header.Set("Accept-Language", "pt-PT,pt;q=0.9,en-US;q=0.8,en;q=0.7")
 
 		resp, err := client.Do(req)
 		if err != nil {
-			log.Printf("[jobs][linkedin] Error fetching jobs: %v", err)
+			log.Printf("[jobs][linkedin][%s] Error fetching jobs: %v", searchLabel, err)
 			break
 		}
-
 		if resp.StatusCode != 200 {
-			log.Printf("[jobs][linkedin] Failed to fetch jobs, status code: %d", resp.StatusCode)
+			log.Printf("[jobs][linkedin][%s] Status %d, stopping pass.", searchLabel, resp.StatusCode)
 			resp.Body.Close()
 			break
 		}
 
 		doc, err := goquery.NewDocumentFromReader(resp.Body)
 		resp.Body.Close()
-
 		if err != nil {
-			log.Printf("[jobs][linkedin] Error parsing HTML: %v", err)
+			log.Printf("[jobs][linkedin][%s] Error parsing HTML: %v", searchLabel, err)
 			break
 		}
 
-		jobsFound := 0
+		pageFound := 0
 		doc.Find("div.job-search-card").Each(func(i int, s *goquery.Selection) {
 			title := strings.TrimSpace(s.Find("h3.base-search-card__title").Text())
 			company := strings.TrimSpace(s.Find("h4.base-search-card__subtitle").Text())
@@ -226,89 +237,126 @@ func scrapeLinkedIn(allSkills []string, seenJobs map[string]bool) []JsonVacancy 
 			if logoUrl == "" {
 				logoUrl, _ = s.Find("img.artdeco-entity-image").Attr("src")
 			}
-
 			if idx := strings.Index(jobLink, "?"); idx != -1 {
 				jobLink = jobLink[:idx]
 			}
-
 			if idx := strings.Index(companyUrl, "?"); idx != -1 {
 				companyUrl = companyUrl[:idx]
 			}
 
-			if title != "" && company != "" {
-				// Prevent duplicates based on Company + Title
-				key := company + "|" + title
-				if existingJob, exists := uniqueJobs[key]; exists {
-					if !strings.Contains(existingJob.Region, location) {
-						existingJob.Region += " / " + location
-					}
-					return // Skip fetching description for an already known job
-				}
-
-				// Extract published date
-				publishedAt, exists := s.Find("time.job-search-card__listdate").Attr("datetime")
-				if !exists {
-					publishedAt, _ = s.Find("time.job-search-card__listdate--new").Attr("datetime")
-				}
-				if publishedAt == "" {
-					publishedAt = time.Now().Format("2006-01-02")
-				}
-
-				// Extract work mode from location or default to On-site
-				workMode, cleanLoc := detectWorkMode(location, "")
-				location = cleanLoc
-
-				// Prevent duplicates based on URL
-				if seenJobs[jobLink] {
-					return // continue to next element in .Each
-				}
-				seenJobs[jobLink] = true
-
-				details := fetchJobDetails(jobLink)
-				time.Sleep(500 * time.Millisecond) // Prevent rate limiting from LinkedIn
-
-				// Fallback to check description for work mode if not found in location
-				if workMode == "onsite" {
-					workMode, _ = detectWorkMode(location, details.Description)
-				}
-
-				// The LinkedIn search query already pre-filters for
-				// "estagio OR junior OR trainee", so we trust it.
-				// Only post-classify the type; never discard the job.
-				jobType, _ := determineJobType(title, details.Description)
-				if jobType == "" {
-					jobType = "junior_position" // sensible default
-				}
-
-				job := &JsonVacancy{
-					CompanyName:       company,
-					CompanyUrl:        companyUrl,
-					CompanyProfileUrl: companyUrl,
-					Title:             title,
-					Region:            location,
-					ApplicationUrl:    jobLink,
-					Type:              jobType,
-					Tags:              extractSkills(title, details.Description, allSkills),
-					Description:       details.Description,
-					WorkMode:          workMode,
-					EmploymentType:    details.EmploymentType,
-					PublishedAt:       publishedAt,
-					LogoUrl:           logoUrl,
-				}
-
-				uniqueJobs[key] = job
-				orderedKeys = append(orderedKeys, key)
-				jobsFound++
+			if title == "" || company == "" {
+				return
 			}
+
+			// De-duplicate by URL across all passes
+			if seenJobs[jobLink] {
+				return
+			}
+			seenJobs[jobLink] = true
+
+			key := company + "|" + title
+			if existingJob, exists := uniqueJobs[key]; exists {
+				if !strings.Contains(existingJob.Region, location) {
+					existingJob.Region += " / " + location
+				}
+				return
+			}
+
+			publishedAt, exists := s.Find("time.job-search-card__listdate").Attr("datetime")
+			if !exists {
+				publishedAt, _ = s.Find("time.job-search-card__listdate--new").Attr("datetime")
+			}
+			if publishedAt == "" {
+				publishedAt = time.Now().Format("2006-01-02")
+			}
+
+			workMode, cleanLoc := detectWorkMode(location, "")
+			location = cleanLoc
+
+			details := fetchJobDetails(jobLink)
+			time.Sleep(500 * time.Millisecond)
+
+			if workMode == "onsite" {
+				workMode, _ = detectWorkMode(location, details.Description)
+			}
+
+			jobType, _ := determineJobType(title, details.Description)
+			if jobType == "" {
+				jobType = "junior_position"
+			}
+
+			job := &JsonVacancy{
+				CompanyName:       company,
+				CompanyUrl:        companyUrl,
+				CompanyProfileUrl: companyUrl,
+				Title:             title,
+				Region:            location,
+				ApplicationUrl:    jobLink,
+				Type:              jobType,
+				Tags:              extractSkills(title, details.Description, allSkills),
+				Description:       details.Description,
+				WorkMode:          workMode,
+				EmploymentType:    details.EmploymentType,
+				PublishedAt:       publishedAt,
+				LogoUrl:           logoUrl,
+			}
+
+			uniqueJobs[key] = job
+			*orderedKeys = append(*orderedKeys, key)
+			pageFound++
+			added++
 		})
 
-		if jobsFound == 0 {
+		if pageFound == 0 {
 			break
 		}
-
 		time.Sleep(2 * time.Second)
 	}
+	return added
+}
 
+// scrapeLinkedIn runs multiple targeted LinkedIn search passes to maximise
+// coverage of entry-level roles in Portugal:
+//
+//   Pass A — Estágios & Trainees (f_E=1, keywords: estágio/trainee)
+//             → internships and curricular/extracurricular placements
+//   Pass B — Entry-level sem keywords (f_E=2)
+//             → qualquer vaga catalogada como entry-level pelo recrutador,
+//               independentemente do título (apanha "Analista", "Consultor", etc.)
+//   Pass C — Júniores explícitos (f_E=2,3, keywords: junior/recém-licenciado)
+//             → posições com ≤3 anos de experiência exigida e título explícito
+//
+// Todos os passes partilham o mesmo seenJobs e uniqueJobs, logo não há duplicados.
+func scrapeLinkedIn(allSkills []string, seenJobs map[string]bool) []JsonVacancy {
+	uniqueJobs := make(map[string]*JsonVacancy)
+	var orderedKeys []string
+	client := &http.Client{Timeout: 30 * time.Second}
+
+	// LinkedIn f_E values:
+	//   1 = Internship (estágio)
+	//   2 = Entry level (≤ 2 anos experiência)
+	//   3 = Associate   (≤ 3 anos experiência)
+
+	// ── Pass A: Estágios & Trainees ──────────────────────────────────────────
+	passA := "https://www.linkedin.com/jobs/search?keywords=estagio%%20OR%%20trainee%%20OR%%20internship&location=Portugal&geoId=100364837&f_E=1&sortBy=R&start=%d"
+	nA := linkedInSearchPass(client, passA, "PassA-estagios", allSkills, seenJobs, uniqueJobs, &orderedKeys)
+	log.Printf("[jobs][linkedin] Pass A (estágios/trainees) → %d novos empregos", nA)
+
+	time.Sleep(3 * time.Second) // pausa entre passes para evitar rate limit
+
+	// ── Pass B: Entry-level sem keywords (apanha títulos que não dizem "júnior") ─
+	passB := "https://www.linkedin.com/jobs/search?keywords=&location=Portugal&geoId=100364837&f_E=2&sortBy=R&start=%d"
+	nB := linkedInSearchPass(client, passB, "PassB-entry-level", allSkills, seenJobs, uniqueJobs, &orderedKeys)
+	log.Printf("[jobs][linkedin] Pass B (entry-level, sem keywords) → %d novos empregos", nB)
+
+	time.Sleep(3 * time.Second)
+
+	// ── Pass C: Júniores explícitos (f_E=2,3 + keywords de júnior) ───────────
+	passC := "https://www.linkedin.com/jobs/search?keywords=junior%%20OR%%20j%%C3%%BAnior%%20OR%%20rec%%C3%%A9m-licenciado%%20OR%%20graduate&location=Portugal&geoId=100364837&f_E=2,3&sortBy=R&start=%d"
+	nC := linkedInSearchPass(client, passC, "PassC-junior", allSkills, seenJobs, uniqueJobs, &orderedKeys)
+	log.Printf("[jobs][linkedin] Pass C (júniores explícitos, ≤3 anos) → %d novos empregos", nC)
+
+	var vacancies []JsonVacancy
 	for _, k := range orderedKeys {
 		vacancies = append(vacancies, *uniqueJobs[k])
 	}
