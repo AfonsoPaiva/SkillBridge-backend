@@ -510,7 +510,7 @@ func SendVacancyApplicationFollowup(name, toEmail, vacancyTitle, companyName, da
 	return send(getEmailFrom(), toEmail, subject, html)
 }
 
-const vacancyFollowupTemplate = `<h2 style="margin:0 0 20px;color:#1a1a1a;font-size:24px;font-weight:600;">Como correu a tua candidatura? 💼</h2>
+const vacancyFollowupTemplate = `<h2 style="margin:0 0 20px;color:#1a1a1a;font-size:24px;font-weight:600;">Como correu a tua candidatura?</h2>
 <p style="margin:0 0 16px;color:#333;font-size:16px;line-height:1.6;">
 	Olá <strong>%s</strong>,
 </p>
@@ -535,7 +535,7 @@ const vacancyFollowupTemplate = `<h2 style="margin:0 0 20px;color:#1a1a1a;font-s
 
 
 
-const recruiterApprovedTemplate = `<h2 style="margin:0 0 20px;color:#1a1a1a;font-size:24px;font-weight:600;">Conta Aprovada ✓</h2>
+const recruiterApprovedTemplate = `<h2 style="margin:0 0 20px;color:#1a1a1a;font-size:24px;font-weight:600;">Conta Aprovada</h2>
 <p style="margin:0 0 16px;color:#333;font-size:16px;line-height:1.6;">
 	Olá <strong>%s</strong>,
 </p>
