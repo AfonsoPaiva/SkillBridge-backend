@@ -3,6 +3,8 @@ package handlers
 import (
 	"log"
 	"net/http"
+	"regexp"
+	"strconv"
 	"strings"
 	"time"
 
@@ -242,12 +244,14 @@ func PermanentDeleteVacancy(c *gin.Context) {
 
 // GetPublicVacancies returns all active vacancies (public endpoint for students).
 // GET /api/vacancies
+// Query params: tag, type, max_experience (0|1|2|3 — max years of experience in description)
 func GetPublicVacancies(c *gin.Context) {
 	loadVacanciesIfNeeded()
 
 	var result []models.Vacancy
 	tagFilter := c.Query("tag")
 	typeFilter := c.Query("type")
+	maxExpStr := c.Query("max_experience") // e.g. "0", "1", "2", "3"
 
 	vacanciesMutex.RLock()
 	defer vacanciesMutex.RUnlock()
@@ -272,6 +276,17 @@ func GetPublicVacancies(c *gin.Context) {
 			continue
 		}
 
+		// Filter by max years of experience (parsed from description)
+		if maxExpStr != "" {
+			maxExp, err := strconv.Atoi(maxExpStr)
+			if err == nil {
+				years := extractExperienceYears(v.Description)
+				if years > maxExp {
+					continue
+				}
+			}
+		}
+
 		result = append(result, v)
 	}
 
@@ -280,6 +295,58 @@ func GetPublicVacancies(c *gin.Context) {
 		"count":     len(result),
 	})
 }
+
+// extractExperienceYears parses the maximum years of experience required from a
+// job description. Returns 0 if no experience is required or none is mentioned.
+func extractExperienceYears(description string) int {
+	d := strings.ToLower(description)
+
+	noExpPhrases := []string{
+		"sem experiência", "sem experiencia",
+		"não é necessária experiência", "não requer experiência",
+		"no experience required", "no prior experience",
+	}
+	for _, p := range noExpPhrases {
+		if strings.Contains(d, p) {
+			return 0
+		}
+	}
+
+	patterns := []*regexp.Regexp{
+		regexp.MustCompile(`(\d+)\s*[-–a]\s*(\d+)\s*anos?\s*de\s*experi`), // "1-2 anos de experiência"
+		regexp.MustCompile(`m[ií]nimo\s+(\d+)\s+anos?`),                    // "mínimo 2 anos"
+		regexp.MustCompile(`at[ée]\s+(\d+)\s+anos?`),                       // "até 2 anos"
+		regexp.MustCompile(`(\d+)\+\s*anos?`),                              // "2+ anos"
+		regexp.MustCompile(`(\d+)\s+anos?\s*de\s*experi`),                  // "2 anos de experiência"
+		regexp.MustCompile(`(\d+)\s+ano\s*de\s*experi`),                    // "1 ano de experiência"
+		regexp.MustCompile(`(\d+)\s+years?\s*of\s*experience`),             // "2 years of experience"
+	}
+
+	maxFound := -1
+	for _, re := range patterns {
+		m := re.FindStringSubmatch(d)
+		if m != nil {
+			a, _ := strconv.Atoi(m[1])
+			b := a
+			if len(m) > 2 && m[2] != "" {
+				b, _ = strconv.Atoi(m[2])
+			}
+			v := a
+			if b > v {
+				v = b
+			}
+			if v > maxFound {
+				maxFound = v
+			}
+		}
+	}
+
+	if maxFound == -1 {
+		return 0 // no mention → treat as entry-level
+	}
+	return maxFound
+}
+
 
 // GetPublicVacancy returns a single public vacancy by ID.
 // GET /api/vacancies/:id

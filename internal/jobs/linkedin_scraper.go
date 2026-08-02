@@ -114,73 +114,48 @@ func loadAllSkills() []string {
 }
 
 func ScrapeLinkedInJobs() {
-	log.Println("[jobs] Starting multi-platform job scraper (LinkedIn + Indeed + Emprego.pt + SAPO + Glassdoor)...")
+	log.Println("[jobs] Starting multi-platform job scraper (LinkedIn + Indeed + Net-Empregos + Expresso Emprego + Emprego.pt)...")
 
 	allSkills := loadAllSkills()
-	// globalSeen is shared across all scrapers to avoid cross-platform duplicates by URL.
 	globalSeen := make(map[string]bool)
-	uniqueByKey := make(map[string]*JsonVacancy) // key = company|title
+	uniqueByKey := make(map[string]*JsonVacancy)
 	var orderedKeys []string
+
+	mergeInto := func(vacs []JsonVacancy) {
+		for i := range vacs {
+			v := &vacs[i]
+			k := v.CompanyName + "|" + v.Title
+			if uniqueByKey[k] == nil {
+				uniqueByKey[k] = v
+				orderedKeys = append(orderedKeys, k)
+			}
+		}
+	}
 
 	// ── 1. LinkedIn ──────────────────────────────────────────────────────────
 	linkedinVacs := scrapeLinkedIn(allSkills, globalSeen)
-	for i := range linkedinVacs {
-		v := &linkedinVacs[i]
-		k := v.CompanyName + "|" + v.Title
-		if uniqueByKey[k] == nil {
-			uniqueByKey[k] = v
-			orderedKeys = append(orderedKeys, k)
-		}
-	}
+	mergeInto(linkedinVacs)
 	log.Printf("[jobs] LinkedIn contributed %d jobs", len(linkedinVacs))
 
 	// ── 2. Indeed Portugal ───────────────────────────────────────────────────
 	indeedVacs := ScrapeIndeedJobs(allSkills, globalSeen)
-	for i := range indeedVacs {
-		v := &indeedVacs[i]
-		k := v.CompanyName + "|" + v.Title
-		if uniqueByKey[k] == nil {
-			uniqueByKey[k] = v
-			orderedKeys = append(orderedKeys, k)
-		}
-	}
+	mergeInto(indeedVacs)
 	log.Printf("[jobs] Indeed contributed %d jobs", len(indeedVacs))
 
-	// ── 3. Emprego.pt ────────────────────────────────────────────────────────
+	// ── 3. Net-Empregos ──────────────────────────────────────────────────────
+	netEmprVacs := ScrapeNetEmpregos(allSkills, globalSeen)
+	mergeInto(netEmprVacs)
+	log.Printf("[jobs] Net-Empregos contributed %d jobs", len(netEmprVacs))
+
+	// ── 4. Expresso Emprego ──────────────────────────────────────────────────
+	expressoVacs := ScrapeExpressoEmprego(allSkills, globalSeen)
+	mergeInto(expressoVacs)
+	log.Printf("[jobs] Expresso Emprego contributed %d jobs", len(expressoVacs))
+
+	// ── 5. Emprego.pt ────────────────────────────────────────────────────────
 	empregoVacs := ScrapeEmpregoJobs(allSkills, globalSeen)
-	for i := range empregoVacs {
-		v := &empregoVacs[i]
-		k := v.CompanyName + "|" + v.Title
-		if uniqueByKey[k] == nil {
-			uniqueByKey[k] = v
-			orderedKeys = append(orderedKeys, k)
-		}
-	}
+	mergeInto(empregoVacs)
 	log.Printf("[jobs] Emprego.pt contributed %d jobs", len(empregoVacs))
-
-	// ── 4. SAPO Emprego ───────────────────────────────────────────────────────
-	sapoVacs := ScrapeSapoJobs(allSkills, globalSeen)
-	for i := range sapoVacs {
-		v := &sapoVacs[i]
-		k := v.CompanyName + "|" + v.Title
-		if uniqueByKey[k] == nil {
-			uniqueByKey[k] = v
-			orderedKeys = append(orderedKeys, k)
-		}
-	}
-	log.Printf("[jobs] SAPO Emprego contributed %d jobs", len(sapoVacs))
-
-	// ── 5. Glassdoor ─────────────────────────────────────────────────────────
-	glassdoorVacs := ScrapeGlassdoorJobs(allSkills, globalSeen)
-	for i := range glassdoorVacs {
-		v := &glassdoorVacs[i]
-		k := v.CompanyName + "|" + v.Title
-		if uniqueByKey[k] == nil {
-			uniqueByKey[k] = v
-			orderedKeys = append(orderedKeys, k)
-		}
-	}
-	log.Printf("[jobs] Glassdoor contributed %d jobs", len(glassdoorVacs))
 
 	// ── Assemble final de-duplicated list ─────────────────────────────────────
 	var vacancies []JsonVacancy
@@ -195,6 +170,7 @@ func ScrapeLinkedInJobs() {
 		log.Println("[jobs] No jobs scraped from any platform")
 	}
 }
+
 
 // scrapeLinkedIn is the internal LinkedIn-only scrape, extracted so that it
 // can be called independently by the multi-platform orchestrator.
@@ -296,10 +272,12 @@ func scrapeLinkedIn(allSkills []string, seenJobs map[string]bool) []JsonVacancy 
 					workMode, _ = detectWorkMode(location, details.Description)
 				}
 
-				// Extra layer of validation to ensure it's a junior/internship position
-				jobType, isJunior := determineJobType(title, details.Description)
-				if !isJunior {
-					return
+				// The LinkedIn search query already pre-filters for
+				// "estagio OR junior OR trainee", so we trust it.
+				// Only post-classify the type; never discard the job.
+				jobType, _ := determineJobType(title, details.Description)
+				if jobType == "" {
+					jobType = "junior_position" // sensible default
 				}
 
 				job := &JsonVacancy{
@@ -366,25 +344,94 @@ func determineJobType(title, desc string) (string, bool) {
 	return "", false
 }
 
-func saveVacanciesToJson(vacancies []JsonVacancy) {
-	data, err := json.MarshalIndent(vacancies, "", "  ")
+// saveVacanciesToJson merges new vacancies with the existing set already saved
+// in GCS (or local file), prunes entries older than 45 days, caps at maxVacancies
+// total, and persists the result. This means each scrape RUN accumulates results
+// instead of replacing them, keeping the list full even when individual platforms
+// return few results on a given day.
+const maxVacancies = 400 // memory-safe cap for Cloud Run
+
+func saveVacanciesToJson(newVacancies []JsonVacancy) {
+	cutoff := time.Now().AddDate(0, 0, -45)
+
+	// ── 1. Load existing data ─────────────────────────────────────────────
+	var existing []JsonVacancy
+	if storage.GCSClient != nil {
+		if raw, err := storage.ReadObject(GCSVagasKey); err == nil {
+			_ = json.Unmarshal(raw, &existing)
+		}
+	} else {
+		path := filepath.Join("config", "vagas_final.json")
+		if raw, err := os.ReadFile(path); err == nil {
+			_ = json.Unmarshal(raw, &existing)
+		}
+	}
+
+	// ── 2. Build dedup map from existing (keeping only non-expired) ───────
+	type key struct{ company, title string }
+	unique := make(map[key]*JsonVacancy)
+	var order []key
+
+	for i := range existing {
+		v := &existing[i]
+		// Drop vacancies older than 45 days
+		if v.PublishedAt != "" {
+			if t, err := time.Parse("2006-01-02", v.PublishedAt); err == nil && t.Before(cutoff) {
+				continue
+			}
+		}
+		k := key{v.CompanyName, v.Title}
+		if unique[k] == nil {
+			unique[k] = v
+			order = append(order, k)
+		}
+	}
+
+	// ── 3. Merge new vacancies (newer entries take priority) ──────────────
+	for i := range newVacancies {
+		v := &newVacancies[i]
+		k := key{v.CompanyName, v.Title}
+		if unique[k] == nil {
+			unique[k] = v
+			order = append(order, k)
+		} else {
+			// Update with fresher data
+			unique[k] = v
+		}
+	}
+
+	// ── 4. Assemble & cap ─────────────────────────────────────────────────
+	result := make([]JsonVacancy, 0, len(order))
+	for _, k := range order {
+		if v, ok := unique[k]; ok {
+			result = append(result, *v)
+		}
+	}
+	// Keep the most recent maxVacancies entries (tail of the slice = newest)
+	if len(result) > maxVacancies {
+		result = result[len(result)-maxVacancies:]
+	}
+
+	log.Printf("[jobs] Saving %d vacancies (%d existing + %d new, capped at %d)",
+		len(result), len(existing), len(newVacancies), maxVacancies)
+
+	data, err := json.MarshalIndent(result, "", "  ")
 	if err != nil {
 		log.Printf("[jobs] Error encoding vacancies JSON: %v", err)
 		return
 	}
 
-	// 1. Persist to GCS (primary — survives Cloud Run restarts)
+	// ── 5. Persist ────────────────────────────────────────────────────────
 	if storage.GCSClient != nil {
 		if err := storage.WriteObject(GCSVagasKey, data, "application/json"); err != nil {
 			log.Printf("[jobs] Error writing vagas_final.json to GCS: %v", err)
 		} else {
 			log.Println("[jobs] vagas_final.json saved to GCS successfully")
 			CacheVersion.Add(1)
-			return // GCS write succeeded, skip local fallback
+			return
 		}
 	}
 
-	// 2. Fallback: write to local filesystem (dev environment or GCS unavailable)
 	path := filepath.Join("config", "vagas_final.json")
 	if err := os.MkdirAll("config", 0755); err != nil {
 		log.Printf("[jobs] Error creating config dir: %v", err)
@@ -397,6 +444,7 @@ func saveVacanciesToJson(vacancies []JsonVacancy) {
 		CacheVersion.Add(1)
 	}
 }
+
 
 func containsExactWord(text, word string) bool {
 	if word == "" {
