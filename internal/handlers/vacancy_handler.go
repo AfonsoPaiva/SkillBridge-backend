@@ -299,12 +299,18 @@ func GetPublicVacancies(c *gin.Context) {
 // extractExperienceYears parses the maximum years of experience required from a
 // job description. Returns 0 if no experience is required or none is mentioned.
 func extractExperienceYears(description string) int {
+	if strings.TrimSpace(description) == "" {
+		return 0
+	}
 	d := strings.ToLower(description)
 
+	// Explicit 0 experience / entry-level phrases
 	noExpPhrases := []string{
 		"sem experiência", "sem experiencia",
 		"não é necessária experiência", "não requer experiência",
-		"no experience required", "no prior experience",
+		"no experience required", "no prior experience", "no experience needed",
+		"0+ years", "0 years", "0 anos", "0-0 years", "0-0 anos",
+		"entry level", "entry-level",
 	}
 	for _, p := range noExpPhrases {
 		if strings.Contains(d, p) {
@@ -313,30 +319,42 @@ func extractExperienceYears(description string) int {
 	}
 
 	patterns := []*regexp.Regexp{
-		regexp.MustCompile(`(\d+)\s*[-–a]\s*(\d+)\s*anos?\s*de\s*experi`), // "1-2 anos de experiência"
-		regexp.MustCompile(`m[ií]nimo\s+(\d+)\s+anos?`),                    // "mínimo 2 anos"
-		regexp.MustCompile(`at[ée]\s+(\d+)\s+anos?`),                       // "até 2 anos"
-		regexp.MustCompile(`(\d+)\+\s*anos?`),                              // "2+ anos"
-		regexp.MustCompile(`(\d+)\s+anos?\s*de\s*experi`),                  // "2 anos de experiência"
-		regexp.MustCompile(`(\d+)\s+ano\s*de\s*experi`),                    // "1 ano de experiência"
-		regexp.MustCompile(`(\d+)\s+years?\s*of\s*experience`),             // "2 years of experience"
+		// 1. Range of years (e.g. "1-2 years", "1–2 years", "1—2 years", "1 to 2 years", "1 a 2 anos", "0-1 years")
+		regexp.MustCompile(`(\d+)\s*(?:[-–—]|to|a)\s*(\d+)\s*(?:anos?|years?|yrs?)`),
+
+		// 2. Prefixes like "mínimo 2 anos", "min 2 years", "at least 3 years", "up to 2 years", "até 2 anos"
+		regexp.MustCompile(`(?:m[ií]nimo|min\.?|at least|pelo menos|at[ée]|up to|maximum|m[áa]ximo)\s*(\d+)\s*\+?\s*(?:anos?|years?|yrs?)`),
+
+		// 3. Experience context + numbers + years (e.g. "2+ years of experience", "2 anos de experiência", "1 year of experience")
+		regexp.MustCompile(`(\d+)\s*\+?\s*(?:anos?|years?|yrs?)\s*(?:de\s+|of\s+)?(?:professional\s+|profissional\s+|effective\s+|efetiva\s+|efectiva\s+)?(?:experi[eê]nci|experienc)`),
+
+		// 4. Experience word followed within ~35 chars by number + years (e.g. "experience (1–2 years)", "experience: 2 years")
+		regexp.MustCompile(`(?:experi[eê]nci|experienc)[^\n.]{0,35}?(\d+)\s*\+?\s*(?:anos?|years?|yrs?)`),
+
+		// 5. Direct year requirement with plus: "2+ years", "3+ anos", "2+ yrs"
+		regexp.MustCompile(`(\d+)\+\s*(?:anos?|years?|yrs?)`),
+
+		// 6. Generic "X years" / "X anos" near experience terms
+		regexp.MustCompile(`(\d+)\s+(?:anos?|years?|yrs?)\s*(?:de\s+|of\s+)?experi`),
 	}
 
 	maxFound := -1
 	for _, re := range patterns {
-		m := re.FindStringSubmatch(d)
-		if m != nil {
-			a, _ := strconv.Atoi(m[1])
-			b := a
-			if len(m) > 2 && m[2] != "" {
-				b, _ = strconv.Atoi(m[2])
-			}
-			v := a
-			if b > v {
-				v = b
-			}
-			if v > maxFound {
-				maxFound = v
+		matches := re.FindAllStringSubmatch(d, -1)
+		for _, m := range matches {
+			if len(m) > 1 {
+				a, _ := strconv.Atoi(m[1])
+				b := a
+				if len(m) > 2 && m[2] != "" {
+					b, _ = strconv.Atoi(m[2])
+				}
+				v := a
+				if b > v {
+					v = b
+				}
+				if v > maxFound {
+					maxFound = v
+				}
 			}
 		}
 	}
