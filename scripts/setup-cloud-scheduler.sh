@@ -1,15 +1,20 @@
 #!/bin/bash
 # =============================================================================
 # setup-cloud-scheduler.sh
-# Configura um Cloud Scheduler job para triggar o scrape do LinkedIn
+# Configura um Cloud Scheduler job para triggar o scrape de emprego
 # periodicamente no Cloud Run do SkillBridge Backend.
+#
+# Autenticação: header  X-Scrape-Secret  (não requer Firebase nem OIDC)
+# O segredo deve ser definido como variável de ambiente SCRAPE_SECRET
+# no Cloud Run E passado aqui como variável SCRAPE_SECRET.
 #
 # Pré-requisitos:
 #   - gcloud CLI autenticado com permissões suficientes
 #   - Cloud Scheduler API ativada no projeto
-#   - Um token de admin Firebase válido para autenticar (ou usar OIDC)
+#   - SCRAPE_SECRET definido (mesmo valor que está no Cloud Run)
 #
 # Uso:
+#   export SCRAPE_SECRET="o-teu-segredo-longo-aqui"
 #   chmod +x setup-cloud-scheduler.sh
 #   ./setup-cloud-scheduler.sh
 # =============================================================================
@@ -19,54 +24,58 @@ set -e
 # ── Configuração ──────────────────────────────────────────────────────────────
 PROJECT_ID="${GCS_PROJECT_ID:-$(gcloud config get-value project)}"
 REGION="europe-west1"
-BACKEND_URL="https://skillbridge-backend-<HASH>-ew.a.run.app"  # <- Substitui pelo URL real do Cloud Run
-SERVICE_ACCOUNT="skillbridge-scheduler@${PROJECT_ID}.iam.gserviceaccount.com"
+BACKEND_URL="https://backendskillbridge-742354947031.europe-west1.run.app"
+JOB_NAME="Search-new-jobs"
 
-# ── Criar Service Account para o Scheduler (se não existir) ──────────────────
-echo "🔧 A criar service account para o Cloud Scheduler..."
-gcloud iam service-accounts create skillbridge-scheduler \
-  --display-name="SkillBridge Cloud Scheduler" \
-  --project="${PROJECT_ID}" 2>/dev/null || echo "  (já existe)"
+if [ -z "${SCRAPE_SECRET}" ]; then
+  echo "❌ SCRAPE_SECRET não está definido."
+  echo "   Executa:  export SCRAPE_SECRET=\"o-teu-segredo\""
+  exit 1
+fi
 
-# Permitir que a service account invoque o Cloud Run
-gcloud run services add-iam-policy-binding skillbridge-backend \
-  --region="${REGION}" \
-  --member="serviceAccount:${SERVICE_ACCOUNT}" \
-  --role="roles/run.invoker" \
-  --project="${PROJECT_ID}"
+ENDPOINT="${BACKEND_URL}/api/internal/scrape-jobs"
 
-echo "✓ Permissão run.invoker concedida"
+echo "🔧 A configurar Cloud Scheduler job '${JOB_NAME}'..."
+echo "   Endpoint: POST ${ENDPOINT}"
+echo "   Project:  ${PROJECT_ID}"
+echo "   Region:   ${REGION}"
+echo ""
 
-# ── Criar job do Cloud Scheduler ─────────────────────────────────────────────
-# Corre a cada 28 dias (às 03:00 UTC) para fazer scrape do LinkedIn
-echo "🕒 A criar Cloud Scheduler job (a cada 28 dias)..."
-
-gcloud scheduler jobs create http skillbridge-linkedin-scrape \
+# ── Criar ou actualizar o job ─────────────────────────────────────────────────
+# Tenta criar; se já existir, faz update.
+gcloud scheduler jobs create http "${JOB_NAME}" \
   --location="${REGION}" \
   --schedule="0 3 1,29 * *" \
-  --uri="${BACKEND_URL}/api/admin/scrape-jobs" \
+  --uri="${ENDPOINT}" \
   --http-method=POST \
-  --oidc-service-account-email="${SERVICE_ACCOUNT}" \
-  --oidc-token-audience="${BACKEND_URL}" \
+  --headers="X-Scrape-Secret=${SCRAPE_SECRET},Content-Type=application/json" \
+  --message-body="{}" \
   --attempt-deadline=30m \
-  --description="Scrape LinkedIn jobs periodicamente para o SkillBridge" \
-  --project="${PROJECT_ID}" 2>/dev/null || \
-gcloud scheduler jobs update http skillbridge-linkedin-scrape \
+  --description="Scrape multi-plataforma de vagas junior/estágio para o SkillBridge" \
+  --project="${PROJECT_ID}" 2>/dev/null \
+|| \
+gcloud scheduler jobs update http "${JOB_NAME}" \
   --location="${REGION}" \
   --schedule="0 3 1,29 * *" \
-  --uri="${BACKEND_URL}/api/admin/scrape-jobs" \
+  --uri="${ENDPOINT}" \
   --http-method=POST \
-  --oidc-service-account-email="${SERVICE_ACCOUNT}" \
-  --oidc-token-audience="${BACKEND_URL}" \
+  --headers="X-Scrape-Secret=${SCRAPE_SECRET},Content-Type=application/json" \
+  --message-body="{}" \
   --attempt-deadline=30m \
   --project="${PROJECT_ID}"
 
 echo ""
 echo "✅ Cloud Scheduler configurado com sucesso!"
 echo ""
-echo "   Job: skillbridge-linkedin-scrape"
+echo "   Job:      ${JOB_NAME}"
 echo "   Schedule: 0 3 1,29 * * (dias 1 e 29 de cada mês, às 03:00 UTC)"
-echo "   Endpoint: POST ${BACKEND_URL}/api/admin/scrape-jobs"
+echo "   Endpoint: POST ${ENDPOINT}"
 echo ""
 echo "Para triggar manualmente:"
-echo "   gcloud scheduler jobs run skillbridge-linkedin-scrape --location=${REGION}"
+echo "   gcloud scheduler jobs run ${JOB_NAME} --location=${REGION}"
+echo ""
+echo "⚠️  Certifica-te que SCRAPE_SECRET está definido no Cloud Run:"
+echo "   gcloud run services update backendskillbridge \\"
+echo "     --region=${REGION} \\"
+echo "     --set-env-vars=SCRAPE_SECRET=${SCRAPE_SECRET}"
+

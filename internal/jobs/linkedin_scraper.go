@@ -114,37 +114,118 @@ func loadAllSkills() []string {
 }
 
 func ScrapeLinkedInJobs() {
-	log.Println("[jobs] Starting LinkedIn job scraper...")
+	log.Println("[jobs] Starting multi-platform job scraper (LinkedIn + Indeed + Emprego.pt + SAPO + Glassdoor)...")
 
 	allSkills := loadAllSkills()
+	// globalSeen is shared across all scrapers to avoid cross-platform duplicates by URL.
+	globalSeen := make(map[string]bool)
+	uniqueByKey := make(map[string]*JsonVacancy) // key = company|title
+	var orderedKeys []string
+
+	// ── 1. LinkedIn ──────────────────────────────────────────────────────────
+	linkedinVacs := scrapeLinkedIn(allSkills, globalSeen)
+	for i := range linkedinVacs {
+		v := &linkedinVacs[i]
+		k := v.CompanyName + "|" + v.Title
+		if uniqueByKey[k] == nil {
+			uniqueByKey[k] = v
+			orderedKeys = append(orderedKeys, k)
+		}
+	}
+	log.Printf("[jobs] LinkedIn contributed %d jobs", len(linkedinVacs))
+
+	// ── 2. Indeed Portugal ───────────────────────────────────────────────────
+	indeedVacs := ScrapeIndeedJobs(allSkills, globalSeen)
+	for i := range indeedVacs {
+		v := &indeedVacs[i]
+		k := v.CompanyName + "|" + v.Title
+		if uniqueByKey[k] == nil {
+			uniqueByKey[k] = v
+			orderedKeys = append(orderedKeys, k)
+		}
+	}
+	log.Printf("[jobs] Indeed contributed %d jobs", len(indeedVacs))
+
+	// ── 3. Emprego.pt ────────────────────────────────────────────────────────
+	empregoVacs := ScrapeEmpregoJobs(allSkills, globalSeen)
+	for i := range empregoVacs {
+		v := &empregoVacs[i]
+		k := v.CompanyName + "|" + v.Title
+		if uniqueByKey[k] == nil {
+			uniqueByKey[k] = v
+			orderedKeys = append(orderedKeys, k)
+		}
+	}
+	log.Printf("[jobs] Emprego.pt contributed %d jobs", len(empregoVacs))
+
+	// ── 4. SAPO Emprego ───────────────────────────────────────────────────────
+	sapoVacs := ScrapeSapoJobs(allSkills, globalSeen)
+	for i := range sapoVacs {
+		v := &sapoVacs[i]
+		k := v.CompanyName + "|" + v.Title
+		if uniqueByKey[k] == nil {
+			uniqueByKey[k] = v
+			orderedKeys = append(orderedKeys, k)
+		}
+	}
+	log.Printf("[jobs] SAPO Emprego contributed %d jobs", len(sapoVacs))
+
+	// ── 5. Glassdoor ─────────────────────────────────────────────────────────
+	glassdoorVacs := ScrapeGlassdoorJobs(allSkills, globalSeen)
+	for i := range glassdoorVacs {
+		v := &glassdoorVacs[i]
+		k := v.CompanyName + "|" + v.Title
+		if uniqueByKey[k] == nil {
+			uniqueByKey[k] = v
+			orderedKeys = append(orderedKeys, k)
+		}
+	}
+	log.Printf("[jobs] Glassdoor contributed %d jobs", len(glassdoorVacs))
+
+	// ── Assemble final de-duplicated list ─────────────────────────────────────
 	var vacancies []JsonVacancy
-	seenJobs := make(map[string]bool)
+	for _, k := range orderedKeys {
+		vacancies = append(vacancies, *uniqueByKey[k])
+	}
+
+	if len(vacancies) > 0 {
+		log.Printf("[jobs] Total unique jobs scraped across all platforms: %d", len(vacancies))
+		saveVacanciesToJson(vacancies)
+	} else {
+		log.Println("[jobs] No jobs scraped from any platform")
+	}
+}
+
+// scrapeLinkedIn is the internal LinkedIn-only scrape, extracted so that it
+// can be called independently by the multi-platform orchestrator.
+func scrapeLinkedIn(allSkills []string, seenJobs map[string]bool) []JsonVacancy {
+	var vacancies []JsonVacancy
 	uniqueJobs := make(map[string]*JsonVacancy)
 	var orderedKeys []string
 	client := &http.Client{Timeout: 30 * time.Second}
 
 	for start := 0; start < 1000; start += 25 {
 		// sortBy=R garante que a pesquisa é por "Relevância". A pesquisa agora obriga a conter palavras relacionadas a posições juniores.
-		url := fmt.Sprintf("https://www.linkedin.com/jobs-guest/jobs/api/seeMoreJobPostings/search?keywords=estagio%%20OR%%20junior%%20OR%%20trainee&f_E=1,2,3&geoId=100364837&location=Portugal&sortBy=R&start=%d", start)
-		
-		req, err := http.NewRequest("GET", url, nil)
+		rawURL := fmt.Sprintf("https://www.linkedin.com/jobs-guest/jobs/api/seeMoreJobPostings/search?keywords=estagio%%20OR%%20junior%%20OR%%20trainee&f_E=1,2,3&geoId=100364837&location=Portugal&sortBy=R&start=%d", start)
+
+		req, err := http.NewRequest("GET", rawURL, nil)
 		if err != nil {
-			log.Printf("[jobs] Error creating request: %v", err)
+			log.Printf("[jobs][linkedin] Error creating request: %v", err)
 			break
 		}
 
-		req.Header.Set("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/115.0.0.0 Safari/537.36")
+		req.Header.Set("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36")
 		req.Header.Set("Accept", "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8")
-		req.Header.Set("Accept-Language", "en-US,en;q=0.5")
+		req.Header.Set("Accept-Language", "pt-PT,pt;q=0.9,en-US;q=0.8,en;q=0.7")
 
 		resp, err := client.Do(req)
 		if err != nil {
-			log.Printf("[jobs] Error fetching LinkedIn jobs: %v", err)
+			log.Printf("[jobs][linkedin] Error fetching jobs: %v", err)
 			break
 		}
 
 		if resp.StatusCode != 200 {
-			log.Printf("[jobs] Failed to fetch LinkedIn jobs, status code: %d", resp.StatusCode)
+			log.Printf("[jobs][linkedin] Failed to fetch jobs, status code: %d", resp.StatusCode)
 			resp.Body.Close()
 			break
 		}
@@ -153,7 +234,7 @@ func ScrapeLinkedInJobs() {
 		resp.Body.Close()
 
 		if err != nil {
-			log.Printf("[jobs] Error parsing HTML: %v", err)
+			log.Printf("[jobs][linkedin] Error parsing HTML: %v", err)
 			break
 		}
 
@@ -165,7 +246,7 @@ func ScrapeLinkedInJobs() {
 			location := strings.TrimSpace(s.Find("span.job-search-card__location").Text())
 			jobLink, _ := s.Find("a.base-card__full-link").Attr("href")
 			logoUrl, _ := s.Find("img.artdeco-entity-image").Attr("data-delayed-url")
-			
+
 			if logoUrl == "" {
 				logoUrl, _ = s.Find("img.artdeco-entity-image").Attr("src")
 			}
@@ -173,7 +254,7 @@ func ScrapeLinkedInJobs() {
 			if idx := strings.Index(jobLink, "?"); idx != -1 {
 				jobLink = jobLink[:idx]
 			}
-			
+
 			if idx := strings.Index(companyUrl, "?"); idx != -1 {
 				companyUrl = companyUrl[:idx]
 			}
@@ -198,15 +279,8 @@ func ScrapeLinkedInJobs() {
 				}
 
 				// Extract work mode from location or default to On-site
-				workMode := "onsite"
-				locLower := strings.ToLower(location)
-				if strings.Contains(locLower, "hybrid") || strings.Contains(locLower, "híbrido") {
-					workMode = "hybrid"
-				} else if strings.Contains(locLower, "remote") || strings.Contains(locLower, "remoto") {
-					workMode = "remote"
-				}
-				// Clean up the location string to remove the work mode in parentheses if it exists
-				location = regexp.MustCompile(`(?i)\s*\((hybrid|remote|on-site|híbrido|remoto|presencial)\)`).ReplaceAllString(location, "")
+				workMode, cleanLoc := detectWorkMode(location, "")
+				location = cleanLoc
 
 				// Prevent duplicates based on URL
 				if seenJobs[jobLink] {
@@ -216,15 +290,10 @@ func ScrapeLinkedInJobs() {
 
 				details := fetchJobDetails(jobLink)
 				time.Sleep(500 * time.Millisecond) // Prevent rate limiting from LinkedIn
-				
+
 				// Fallback to check description for work mode if not found in location
 				if workMode == "onsite" {
-					descLower := strings.ToLower(details.Description)
-					if strings.Contains(descLower, "hybrid") || strings.Contains(descLower, "híbrido") {
-						workMode = "hybrid"
-					} else if strings.Contains(descLower, "remote") || strings.Contains(descLower, "remoto") {
-						workMode = "remote"
-					}
+					workMode, _ = detectWorkMode(location, details.Description)
 				}
 
 				// Extra layer of validation to ensure it's a junior/internship position
@@ -248,7 +317,7 @@ func ScrapeLinkedInJobs() {
 					PublishedAt:       publishedAt,
 					LogoUrl:           logoUrl,
 				}
-				
+
 				uniqueJobs[key] = job
 				orderedKeys = append(orderedKeys, key)
 				jobsFound++
@@ -262,17 +331,10 @@ func ScrapeLinkedInJobs() {
 		time.Sleep(2 * time.Second)
 	}
 
-	// Assemble final array in the correct order
 	for _, k := range orderedKeys {
 		vacancies = append(vacancies, *uniqueJobs[k])
 	}
-
-	if len(vacancies) > 0 {
-		log.Printf("[jobs] Scraped %d jobs successfully", len(vacancies))
-		saveVacanciesToJson(vacancies)
-	} else {
-		log.Println("[jobs] No jobs scraped")
-	}
+	return vacancies
 }
 
 func determineJobType(title, desc string) (string, bool) {

@@ -311,11 +311,19 @@ func Setup(r *gin.Engine) {
 		// admin.GET("/contest-registrations", handlers.AdminListContestRegistrations)
 		// admin.PUT("/contest-registrations/:id", handlers.AdminUpdateContestRegistration)
 		// admin.DELETE("/contest-registrations/:id", handlers.AdminDeleteContestRegistration)
-
-		// LinkedIn scrape trigger — for Cloud Scheduler or manual admin use
-		admin.POST("/scrape-jobs", handlers.AdminTriggerScrape)
 	}
 
+	// --------------------------------------------------
+	// ROTAS INTERNAS — Cloud Scheduler / cron jobs
+	// Sem Firebase: autenticadas apenas por X-Scrape-Secret header
+	// (segredo definido na variável de ambiente SCRAPE_SECRET)
+	// --------------------------------------------------
+	internal := api.Group("/internal")
+	{
+		// Cloud Scheduler invoca este endpoint para actualizar as vagas de emprego.
+		// O handler valida o header X-Scrape-Secret internamente.
+		internal.POST("/scrape-jobs", handlers.AdminTriggerScrape)
+	}
 	// --------------------------------------------------
 	// ROTAS DE RECRUTADORES (públicas)
 	// --------------------------------------------------
