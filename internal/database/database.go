@@ -98,11 +98,11 @@ func Connect() {
 }
 
 func migrateVacancyIdToVarchar() {
-	migrateColToVarchar("user_vacancy_favorites", "vacancy_id")
-	migrateColToVarchar("vacancy_applications", "vacancy_id")
+	migrateColToVarchar("user_vacancy_favorites", "vacancy_id", "idx_user_vac_fav", "user_id, vacancy_id")
+	migrateColToVarchar("vacancy_applications", "vacancy_id", "idx_user_vac_app", "user_id, vacancy_id")
 }
 
-func migrateColToVarchar(table, col string) {
+func migrateColToVarchar(table, col, indexName, indexCols string) {
 	var dataType string
 	DB.Raw(
 		"SELECT data_type FROM information_schema.columns WHERE table_name = ? AND column_name = ?",
@@ -110,16 +110,44 @@ func migrateColToVarchar(table, col string) {
 	).Scan(&dataType)
 
 	if dataType == "" || dataType == "character varying" || dataType == "varchar" || dataType == "text" {
-		return // already varchar or doesn't exist
+		log.Printf("[migrate] %s.%s is already %s — no migration needed.", table, col, dataType)
+		return
 	}
 
-	log.Printf("[migrate] %s.%s is %s — converting to VARCHAR(255)...", table, col, dataType)
+	log.Printf("[migrate] %s.%s is currently %s — migrating to VARCHAR(255)...", table, col, dataType)
 
-	sql := fmt.Sprintf("ALTER TABLE %s ALTER COLUMN %s TYPE VARCHAR(255) USING %s::VARCHAR", table, col, col)
-	if err := DB.Exec(sql).Error; err != nil {
-		log.Printf("[migrate] Erro ao converter %s.%s para VARCHAR: %v", table, col, err)
+	// Step 1: Drop foreign key constraints and index if existing
+	DB.Exec(fmt.Sprintf("ALTER TABLE %s DROP CONSTRAINT IF EXISTS fk_%s_vacancy", table, table))
+	DB.Exec(fmt.Sprintf("ALTER TABLE %s DROP CONSTRAINT IF EXISTS fk_%s_vacancies", table, table))
+	DB.Exec(fmt.Sprintf("DROP INDEX IF EXISTS %s", indexName))
+
+	// Step 2: Try direct ALTER COLUMN TYPE first
+	alterSQL := fmt.Sprintf("ALTER TABLE %s ALTER COLUMN %s TYPE VARCHAR(255) USING %s::VARCHAR", table, col, col)
+	if err := DB.Exec(alterSQL).Error; err != nil {
+		log.Printf("[migrate] Direct ALTER failed (%v), attempting column swap migration...", err)
+
+		// Step 3: Column swap fallback for CockroachDB / Postgres with strict indexes
+		steps := []string{
+			fmt.Sprintf("ALTER TABLE %s ADD COLUMN IF NOT EXISTS %s_tmp VARCHAR(255)", table, col),
+			fmt.Sprintf("UPDATE %s SET %s_tmp = %s::VARCHAR WHERE %s_tmp IS NULL OR %s_tmp = ''", table, col, col, col, col),
+			fmt.Sprintf("ALTER TABLE %s DROP COLUMN IF EXISTS %s", table, col),
+			fmt.Sprintf("ALTER TABLE %s RENAME COLUMN %s_tmp TO %s", table, col, col),
+			fmt.Sprintf("ALTER TABLE %s ALTER COLUMN %s SET NOT NULL", table, col),
+		}
+
+		for _, step := range steps {
+			if err := DB.Exec(step).Error; err != nil {
+				log.Printf("[migrate] Step failed (%s): %v", step, err)
+			}
+		}
+	}
+
+	// Step 4: Recreate the unique index
+	idxSQL := fmt.Sprintf("CREATE UNIQUE INDEX IF NOT EXISTS %s ON %s(%s)", indexName, table, indexCols)
+	if err := DB.Exec(idxSQL).Error; err != nil {
+		log.Printf("[migrate] Recreating index %s failed: %v", indexName, err)
 	} else {
-		log.Printf("[migrate] %s.%s convertido para VARCHAR(255) com sucesso.", table, col)
+		log.Printf("[migrate] %s.%s successfully migrated to VARCHAR(255) and index %s recreated.", table, col, indexName)
 	}
 }
 
