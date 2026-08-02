@@ -472,7 +472,7 @@ type RecruiterToken struct {
 type UserVacancyFavorite struct {
 	ID        uint      `gorm:"primaryKey;autoIncrement" json:"id"`
 	UserID    uint      `gorm:"not null;uniqueIndex:idx_user_vac_fav" json:"user_id"`
-	VacancyID string    `gorm:"type:uuid;not null;uniqueIndex:idx_user_vac_fav" json:"vacancy_id"`
+	VacancyID string    `gorm:"type:varchar(255);not null;uniqueIndex:idx_user_vac_fav" json:"vacancy_id"`
 	CreatedAt time.Time `gorm:"default:NOW();index" json:"created_at"`
 
 	User    User    `gorm:"foreignKey:UserID" json:"-"`
@@ -485,7 +485,7 @@ type UserVacancyFavorite struct {
 type VacancyApplication struct {
 	ID                uint       `gorm:"primaryKey;autoIncrement" json:"id"`
 	UserID            uint       `gorm:"not null;uniqueIndex:idx_user_vac_app" json:"user_id"`
-	VacancyID         string     `gorm:"type:uuid;not null;uniqueIndex:idx_user_vac_app" json:"vacancy_id"`
+	VacancyID         string     `gorm:"type:varchar(255);not null;uniqueIndex:idx_user_vac_app" json:"vacancy_id"`
 	AppliedAt         time.Time  `gorm:"default:NOW()" json:"applied_at"`
 	FollowupEmailSent bool       `gorm:"default:false" json:"followup_email_sent"`
 	FollowupEmailDate time.Time  `json:"followup_email_date"`

@@ -428,7 +428,7 @@ func ToggleFavoriteVacancy(c *gin.Context) {
 
 	c.JSON(http.StatusOK, gin.H{
 		"is_favorite":         true,
-		"message":             "Vaga adicionada aos favoritos! ⭐",
+		"message":             "Vaga adicionada aos favoritos.",
 		"favorites_count_today": countToday + 1,
 	})
 }
