@@ -165,12 +165,12 @@ func Setup(r *gin.Engine) {
 		protected.DELETE("/users/me/skills", handlers.RemoveUserSkill)
 
 		// Vagas favoritas e candidaturas
-		protected.POST("/vacancies/:id/favorite", handlers.ToggleFavoriteVacancy)
+		protected.POST("/vacancies/:id/favorite", middleware.SensitiveWriteRateLimit(), handlers.ToggleFavoriteVacancy)
 		protected.GET("/vacancies/favorites/me", handlers.GetMyFavoriteVacancies)
 		protected.GET("/vacancies/applications/me", handlers.GetMyVacancyApplications)
-		protected.POST("/vacancies/:id/apply", handlers.ApplyToVacancy)
-		protected.DELETE("/vacancies/:id/apply", handlers.RemoveApplication)
-		protected.POST("/vacancies/:id/application-status", handlers.UpdateApplicationStatus)
+		protected.POST("/vacancies/:id/apply", middleware.SensitiveWriteRateLimit(), handlers.ApplyToVacancy)
+		protected.DELETE("/vacancies/:id/apply", middleware.SensitiveWriteRateLimit(), handlers.RemoveApplication)
+		protected.POST("/vacancies/:id/application-status", middleware.SensitiveWriteRateLimit(), handlers.UpdateApplicationStatus)
 
 		// Projetos
 		protected.POST("/projects", handlers.CreateProject)
