@@ -461,6 +461,35 @@ func CreateUniversityReview(c *gin.Context) {
 	c.JSON(http.StatusCreated, review)
 }
 
+// DeleteUniversityReview allows a user to delete their own university review.
+func DeleteUniversityReview(c *gin.Context) {
+	val, exists := c.Get("user")
+	if !exists {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "Utilizador não autenticado."})
+		return
+	}
+	currentUser := val.(*models.User)
+
+	reviewID := c.Param("id")
+	var review models.UniversityReview
+	if err := database.DB.Where("id = ?", reviewID).First(&review).Error; err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "Avaliação não encontrada."})
+		return
+	}
+
+	if review.UserID != currentUser.ID {
+		c.JSON(http.StatusForbidden, gin.H{"error": "Não tens permissão para eliminar esta avaliação."})
+		return
+	}
+
+	if err := database.DB.Delete(&review).Error; err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Erro ao eliminar a avaliação."})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{"message": "Avaliação eliminada com sucesso."})
+}
+
 func parseLimit(s string) (int, error) {
 	var l int
 	if _, err := fmt.Sscanf(s, "%d", &l); err != nil {

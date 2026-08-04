@@ -189,6 +189,7 @@ func Setup(r *gin.Engine) {
 		// Avaliações
 		protected.POST("/reviews", handlers.CreateReview)
 		protected.POST("/universities/reviews", handlers.CreateUniversityReview)
+		protected.DELETE("/universities/reviews/:id", handlers.DeleteUniversityReview)
 
 		// Upload de imagens — higher body limit for image files (10 MB)
 		protected.POST("/upload/image", middleware.LimitBodySize(middleware.UploadBodyLimit), handlers.UploadImage)
