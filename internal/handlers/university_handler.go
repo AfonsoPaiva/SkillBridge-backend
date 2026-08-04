@@ -78,7 +78,7 @@ func SearchUniversities(c *gin.Context) {
 
 // ListCoursesByUniversity returns all cursos for a given estabelecimento.
 func ListCoursesByUniversity(c *gin.Context) {
-	est := c.Query("estabelecimento")
+	est := strings.TrimSpace(c.Query("estabelecimento"))
 	if est == "" {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "Parâmetro 'estabelecimento' obrigatório."})
 		return
@@ -86,6 +86,12 @@ func ListCoursesByUniversity(c *gin.Context) {
 
 	courses, ok := config.CoursesByUniv[est]
 	if !ok {
+		for key, list := range config.CoursesByUniv {
+			if strings.EqualFold(strings.TrimSpace(key), est) {
+				c.JSON(http.StatusOK, list)
+				return
+			}
+		}
 		c.JSON(http.StatusNotFound, gin.H{"error": "Estabelecimento não encontrado."})
 		return
 	}
