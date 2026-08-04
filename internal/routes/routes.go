@@ -308,6 +308,8 @@ func Setup(r *gin.Engine) {
 		admin.POST("/clean-unused-images", handlers.AdminCleanUnusedImages)
 		admin.POST("/send-marketing-email", handlers.AdminSendMarketingEmail)
 		admin.GET("/university-stats", handlers.AdminGetUniversityStats)
+		admin.GET("/university-reviews", handlers.AdminListUniversityReviews)
+		admin.DELETE("/university-reviews/:id", handlers.AdminDeleteUniversityReview)
 		// Recruiter management
 		admin.GET("/recruiters", handlers.AdminListRecruiters)
 		admin.GET("/recruiters/pending-count", handlers.AdminGetPendingRecruitersCount)

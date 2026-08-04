@@ -276,12 +276,17 @@ type CreateUniversityReviewInput struct {
 
 // CreateUniversityReview allows an authenticated user to rate a university & course.
 func CreateUniversityReview(c *gin.Context) {
-	currentUserVal, exists := c.Get("currentUser")
-	if !exists {
+	firebaseUID := c.GetString("firebase_uid")
+	if firebaseUID == "" {
 		c.JSON(http.StatusUnauthorized, gin.H{"error": "Utilizador não autenticado."})
 		return
 	}
-	currentUser := currentUserVal.(*models.User)
+
+	var currentUser models.User
+	if err := database.DB.Where("firebase_uid = ?", firebaseUID).First(&currentUser).Error; err != nil {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "Utilizador não encontrado no sistema."})
+		return
+	}
 
 	var input CreateUniversityReviewInput
 	if err := c.ShouldBindJSON(&input); err != nil {

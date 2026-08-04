@@ -363,6 +363,7 @@
     <a onclick="showPage('users')"    data-page="users">Users</a>
     <a onclick="showPage('projects')" data-page="projects">Projects</a>
     <a onclick="showPage('reviews')"  data-page="reviews">Reviews</a>
+    <a onclick="showPage('univ-reviews')" data-page="univ-reviews">University Ranking</a>
     <a onclick="showPage('recruiters')" data-page="recruiters">Recruiters</a>
     <a onclick="showPage('contest')" data-page="contest">Build Challenge</a>
     <a onclick="showPage('email')"    data-page="email">Email Marketing</a>
@@ -459,6 +460,35 @@
         <table>
           <thead><tr><th>ID</th><th>Reviewer</th><th>Reviewed</th><th>Rating</th><th>Comment</th><th>Status</th><th></th></tr></thead>
           <tbody id="reviews-body"><tr><td colspan="7" class="loading">Loading...</td></tr></tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- UNIVERSITY RANKING REVIEWS -->
+    <div id="page-univ-reviews" class="page">
+      <h2 class="page-title">University Ranking Evaluations</h2>
+      <div class="toolbar">
+        <input id="univ-review-search" placeholder="Search by university, course, student, comment..." oninput="filterUnivReviews()" style="width:340px">
+        <button class="btn btn-ghost" onclick="loadUnivReviews()">Refresh</button>
+      </div>
+      <div class="card">
+        <table>
+          <thead>
+            <tr>
+              <th>ID</th>
+              <th>University</th>
+              <th>Course</th>
+              <th>Author</th>
+              <th>Anonymous</th>
+              <th>Score</th>
+              <th>Comment</th>
+              <th>Date</th>
+              <th></th>
+            </tr>
+          </thead>
+          <tbody id="univ-reviews-body">
+            <tr><td colspan="9" class="loading">Loading...</td></tr>
+          </tbody>
         </table>
       </div>
     </div>
@@ -802,6 +832,7 @@
     if (name === "users")     loadUsers();
     if (name === "projects")  loadProjects();
     if (name === "reviews")   loadReviews();
+    if (name === "univ-reviews") loadUnivReviews();
     if (name === "recruiters") loadRecruiters();
     if (name === "contest")   loadContest();
     if (name === "overview")  { loadOverview(); loadUniversityStats(); }
@@ -1190,6 +1221,119 @@
     if (!confirm("Delete this review? This cannot be undone.")) return;
     try { await api("DELETE", "/admin/reviews/" + id); toast("Review deleted"); loadReviews(); }
     catch(e) { toast(e.message, true); }
+  }
+
+  // ── UNIVERSITY RANKING REVIEWS ────────────────────────────────
+  var _allUnivReviews = [];
+  function esc(str) {
+    if (!str) return '';
+    return String(str).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+  }
+
+  async function loadUnivReviews() {
+    document.getElementById("univ-reviews-body").innerHTML = '<tr><td colspan="9" class="loading">Loading...</td></tr>';
+    try {
+      _allUnivReviews = await api("GET", "/admin/university-reviews");
+      renderUnivReviews(_allUnivReviews);
+    } catch(e) { toast(e.message, true); }
+  }
+
+  function filterUnivReviews() {
+    const q = (document.getElementById("univ-review-search").value || "").toLowerCase().trim();
+    if (!q) { renderUnivReviews(_allUnivReviews); return; }
+    const filtered = _allUnivReviews.filter(function(r) {
+      const uName = (r.university_name || "").toLowerCase();
+      const cName = (r.course_name || "").toLowerCase();
+      const comment = (r.comment || "").toLowerCase();
+      const author = (r.user && r.user.name ? r.user.name : "Anónimo").toLowerCase();
+      return uName.includes(q) || cName.includes(q) || comment.includes(q) || author.includes(q);
+    });
+    renderUnivReviews(filtered);
+  }
+
+  function renderUnivReviews(list) {
+    if (!list || !list.length) {
+      document.getElementById("univ-reviews-body").innerHTML = '<tr><td colspan="9" class="empty">No university evaluations found</td></tr>';
+      return;
+    }
+    document.getElementById("univ-reviews-body").innerHTML = list.map(function(r) {
+      const author = r.user ? (r.user.name + ' (' + r.user.email + ')') : (r.is_anonymous ? 'Anónimo' : 'Utilizador #' + r.user_id);
+      const isAnon = r.is_anonymous ? '<span class="badge badge-pending">Yes</span>' : '<span class="badge badge-approved">No</span>';
+      const score = (r.overall_score || 0).toFixed(1) + '/10';
+      const dateStr = r.created_at ? new Date(r.created_at).toLocaleDateString('pt-PT') : '—';
+      const commentTxt = r.comment ? (r.comment.length > 35 ? r.comment.substring(0, 35) + '...' : r.comment) : '—';
+
+      return '<tr class="clickable" onclick="openUnivReviewDetail(' + r.id + ')">' +
+        '<td>' + r.id + '</td>' +
+        '<td><strong>' + esc(r.university_name) + '</strong></td>' +
+        '<td>' + esc(r.course_name) + '</td>' +
+        '<td>' + esc(author) + '</td>' +
+        '<td>' + isAnon + '</td>' +
+        '<td><span style="font-weight:700;color:#68007a">' + score + '</span></td>' +
+        '<td>' + esc(commentTxt) + '</td>' +
+        '<td>' + dateStr + '</td>' +
+        '<td onclick="event.stopPropagation()">' +
+          '<button class="btn btn-danger" onclick="deleteUnivReview(' + r.id + ')">Delete</button>' +
+        '</td>' +
+        '</tr>';
+    }).join("");
+  }
+
+  function openUnivReviewDetail(id) {
+    const r = _allUnivReviews.find(function(item) { return item.id === id; });
+    if (!r) return;
+    openDetail(
+      r.university_name,
+      r.course_name + " • Overall Score: " + (r.overall_score || 0).toFixed(1) + "/10",
+      [
+        {
+          heading: "Evaluation Metadata",
+          rows: [
+            { label: "Review ID", value: r.id },
+            { label: "University", value: r.university_name },
+            { label: "Course", value: r.course_name },
+            { label: "Author", value: r.user ? r.user.name + " (" + r.user.email + ")" : "User #" + r.user_id },
+            { label: "Is Anonymous", value: r.is_anonymous },
+            { label: "Overall Score", value: (r.overall_score || 0).toFixed(1) + " / 10" },
+            { label: "Student Comment", value: r.comment || "—" },
+            { label: "Created At", value: r.created_at ? new Date(r.created_at).toLocaleString('pt-PT') : "—" }
+          ]
+        },
+        {
+          heading: "University Criteria (0-10)",
+          rows: [
+            { label: "Campus Quality", value: r.campus_quality + "/10" },
+            { label: "Location & Access", value: r.location_accessibility + "/10" },
+            { label: "Cost of Living", value: r.cost_of_living + "/10" },
+            { label: "Social Environment", value: r.social_environment + "/10" },
+            { label: "Reputation", value: r.reputation + "/10" },
+            { label: "Libraries Quality", value: r.libraries_quality + "/10" },
+            { label: "Food & Services", value: r.food_services + "/10" }
+          ]
+        },
+        {
+          heading: "Course Criteria (0-10)",
+          rows: [
+            { label: "Teachers Quality", value: r.teachers_quality + "/10" },
+            { label: "Subject Interest", value: r.subject_interest + "/10" },
+            { label: "Course Facilities", value: r.course_facilities + "/10" },
+            { label: "Classmates Env.", value: r.classmates_environment + "/10" },
+            { label: "Workload Balance", value: r.workload_balance + "/10" },
+            { label: "Practical Opps.", value: r.practical_opportunities + "/10" },
+            { label: "Future Prospects", value: r.future_prospects + "/10" }
+          ]
+        }
+      ]
+    );
+  }
+
+  async function deleteUnivReview(id) {
+    if (!confirm("Tem a certeza que deseja eliminar esta avaliação de universidade? Esta ação não pode ser desfeita.")) return;
+    try {
+      await api("DELETE", "/admin/university-reviews/" + id);
+      toast("Avaliação eliminada com sucesso!");
+      loadUnivReviews();
+    } catch(e) { toast(e.message, true); }
   }
   // ── RECRUITERS ──────────────────────────────────────────────
   var _recruiters = [];

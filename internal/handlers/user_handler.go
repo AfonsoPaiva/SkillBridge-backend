@@ -71,13 +71,15 @@ func RegisterUser(c *gin.Context) {
 	emailStr := fmt.Sprintf("%v", firebaseEmail)
 
 	var input struct {
-		Name         string              `json:"name" binding:"required"`
-		ContactLinks models.ContactLinks `json:"contact_links"`
-		University   string              `json:"university"`
-		Course       string              `json:"course"`
-		Year         string              `json:"year"`
-		Bio          string              `json:"bio"`
-		Role         string              `json:"role"`
+		Name                   string              `json:"name" binding:"required"`
+		ContactLinks           models.ContactLinks `json:"contact_links"`
+		University             string              `json:"university"`
+		Course                 string              `json:"course"`
+		LicenciaturaUniversity string              `json:"licenciatura_university"`
+		LicenciaturaCourse     string              `json:"licenciatura_course"`
+		Year                   string              `json:"year"`
+		Bio                    string              `json:"bio"`
+		Role                   string              `json:"role"`
 		// If the user filled the guest onboarding form, pass the token here
 		// to have role automatically applied to the new profile.
 		GuestSessionToken string `json:"guest_session_token"`
@@ -112,17 +114,19 @@ func RegisterUser(c *gin.Context) {
 	}
 
 	user := models.User{
-		FirebaseUID:   firebaseUID,
-		Name:          input.Name,
-		Slug:          slug,
-		Email:         emailStr,
-		EmailVerified: emailVerified,
-		University:    input.University,
-		Course:        input.Course,
-		Year:          input.Year,
-		Bio:           input.Bio,
-		Role:          input.Role,
-		ContactLinks:  input.ContactLinks,
+		FirebaseUID:            firebaseUID,
+		Name:                   input.Name,
+		Slug:                   slug,
+		Email:                  emailStr,
+		EmailVerified:          emailVerified,
+		University:             input.University,
+		Course:                 input.Course,
+		LicenciaturaUniversity: input.LicenciaturaUniversity,
+		LicenciaturaCourse:     input.LicenciaturaCourse,
+		Year:                   input.Year,
+		Bio:                    input.Bio,
+		Role:                   input.Role,
+		ContactLinks:           input.ContactLinks,
 	}
 
 	// Apply guest onboarding preferences if a session token was provided
@@ -240,14 +244,16 @@ func UpdateProfile(c *gin.Context) {
 	}
 
 	var input struct {
-		Name         string              `json:"name"`
-		University   string              `json:"university"`
-		Course       string              `json:"course"`
-		Year         string              `json:"year"`
-		Bio          string              `json:"bio"`
-		AvatarURL    *string             `json:"avatar_url"`
-		Role         string              `json:"role"` // needs_help | helper
-		ContactLinks models.ContactLinks `json:"contact_links"`
+		Name                   string              `json:"name"`
+		University             string              `json:"university"`
+		Course                 string              `json:"course"`
+		LicenciaturaUniversity string              `json:"licenciatura_university"`
+		LicenciaturaCourse     string              `json:"licenciatura_course"`
+		Year                   string              `json:"year"`
+		Bio                    string              `json:"bio"`
+		AvatarURL              *string             `json:"avatar_url"`
+		Role                   string              `json:"role"` // needs_help | helper
+		ContactLinks           models.ContactLinks `json:"contact_links"`
 	}
 
 	if err := c.ShouldBindJSON(&input); err != nil {
@@ -280,12 +286,10 @@ func UpdateProfile(c *gin.Context) {
 	if input.Name != "" {
 		user.Name = input.Name
 	}
-	if input.University != "" {
-		user.University = input.University
-	}
-	if input.Course != "" {
-		user.Course = input.Course
-	}
+	user.University = input.University
+	user.Course = input.Course
+	user.LicenciaturaUniversity = input.LicenciaturaUniversity
+	user.LicenciaturaCourse = input.LicenciaturaCourse
 	if input.Year != "" {
 		user.Year = input.Year
 	}

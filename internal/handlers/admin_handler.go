@@ -924,3 +924,51 @@ func AdminGetUniversityStats(c *gin.Context) {
 // 	database.DB.Delete(&reg)
 // 	c.JSON(http.StatusOK, gin.H{"message": "Inscrição eliminada."})
 // }
+
+// AdminListUniversityReviews - Lista todas as avaliações de universidades do ranking (admin)
+//
+// @Summary      [Admin] Listar avaliações do ranking de universidades
+// @Description  Devolve todas as avaliações de universidades com detalhes do autor
+// @Tags         admin
+// @Produce      json
+// @Security     BearerAuth
+// @Success      200  {array}   models.UniversityReview
+// @Router       /admin/university-reviews [get]
+func AdminListUniversityReviews(c *gin.Context) {
+	var reviews []models.UniversityReview
+	if err := database.DB.Preload("User").Order("created_at DESC").Find(&reviews).Error; err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Erro ao carregar avaliações do ranking."})
+		return
+	}
+	c.JSON(http.StatusOK, reviews)
+}
+
+// AdminDeleteUniversityReview - Elimina uma avaliação de universidade do ranking (admin)
+//
+// @Summary      [Admin] Eliminar avaliação do ranking de universidade
+// @Description  Remove permanentemente uma avaliação de universidade
+// @Tags         admin
+// @Produce      json
+// @Security     BearerAuth
+// @Param        id  path  int  true  "ID da avaliação"
+// @Success      200  {object}  map[string]string
+// @Failure      404  {object}  map[string]string
+// @Router       /admin/university-reviews/{id} [delete]
+func AdminDeleteUniversityReview(c *gin.Context) {
+	var review models.UniversityReview
+	if err := database.DB.First(&review, c.Param("id")).Error; err != nil {
+		audit.LogFailure(c, audit.ActionReviewDelete, "University review not found")
+		c.JSON(http.StatusNotFound, gin.H{"error": "Avaliação de universidade não encontrada."})
+		return
+	}
+
+	reviewID := review.ID
+	universityName := review.UniversityName
+	courseName := review.CourseName
+
+	database.DB.Delete(&review)
+
+	audit.LogAction(c, audit.ActionReviewDelete, "Deleted university review ID=%d (%s - %s)", reviewID, universityName, courseName)
+
+	c.JSON(http.StatusOK, gin.H{"message": "Avaliação de universidade eliminada com sucesso."})
+}

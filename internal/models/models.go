@@ -107,9 +107,11 @@ type User struct {
 	Email         string       `gorm:"uniqueIndex:idx_users_email;not null" json:"email"`
 	EmailVerified bool         `gorm:"default:false" json:"email_verified"`
 	ContactLinks  ContactLinks `gorm:"type:jsonb" json:"contact_links"`
-	University    string       `json:"university"`
-	Course        string       `json:"course"`
-	Year          string       `gorm:"type:varchar(50)" json:"year"`
+	University             string       `json:"university"`
+	Course                 string       `json:"course"`
+	LicenciaturaUniversity string       `json:"licenciatura_university"`
+	LicenciaturaCourse     string       `json:"licenciatura_course"`
+	Year                   string       `gorm:"type:varchar(50)" json:"year"`
 	Bio           string       `json:"bio"`
 	AvatarURL     string       `json:"avatar_url"`
 	Skills        StringList   `gorm:"type:jsonb;default:'[]'" json:"skills"`
