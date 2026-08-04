@@ -130,6 +130,10 @@ var (
 	// donationCheckoutLimiter: 5 req/hour — strictly prevents Stripe API abuse
 	// for unauthenticated checkout session creation.
 	donationCheckoutLimiter = newRateLimiter(5, time.Hour)
+
+	// universityReviewLimiter: 5 submissions/hour per IP — prevents review bombing
+	// and spam on the university rating endpoint.
+	universityReviewLimiter = newRateLimiter(5, time.Hour)
 )
 
 // ---------------------------------------------------------------------------
@@ -220,4 +224,10 @@ func HeavyReadRateLimit() gin.HandlerFunc {
 // creation to 5 req/hour per IP to prevent Stripe API abuse.
 func DonationCheckoutRateLimit() gin.HandlerFunc {
 	return rateLimitMiddleware(donationCheckoutLimiter)
+}
+
+// UniversityReviewRateLimit limits university review submissions to 5 per hour
+// per IP to prevent review bombing and spam.
+func UniversityReviewRateLimit() gin.HandlerFunc {
+	return rateLimitMiddleware(universityReviewLimiter)
 }

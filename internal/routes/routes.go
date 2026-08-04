@@ -188,7 +188,8 @@ func Setup(r *gin.Engine) {
 
 		// Avaliações
 		protected.POST("/reviews", handlers.CreateReview)
-		protected.POST("/universities/reviews", handlers.CreateUniversityReview)
+		// University reviews: rate-limited to 5 per hour per IP to prevent review bombing & spam.
+		protected.POST("/universities/reviews", middleware.UniversityReviewRateLimit(), handlers.CreateUniversityReview)
 		protected.DELETE("/universities/reviews/:id", handlers.DeleteUniversityReview)
 
 		// Upload de imagens — higher body limit for image files (10 MB)

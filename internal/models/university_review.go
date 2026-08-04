@@ -12,7 +12,8 @@ type UniversityReview struct {
 	UniversityName string    `gorm:"type:varchar(255);not null;index" json:"university_name"`
 	CourseName     string    `gorm:"type:varchar(255);not null;index" json:"course_name"`
 	IsAnonymous    bool      `gorm:"default:false" json:"is_anonymous"`
-	Comment        string    `gorm:"type:text" json:"comment"`
+	// Comment is optional; max 2000 characters enforced at both handler and DB level.
+	Comment        string    `gorm:"type:varchar(2000)" json:"comment"`
 
 	// University Criteria (0 to 10)
 	CampusQuality         float64 `gorm:"type:decimal(4,2);default:0" json:"campus_quality"`

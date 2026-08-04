@@ -4,14 +4,77 @@ import (
 	"fmt"
 	"math"
 	"net/http"
+	"regexp"
 	"sort"
 	"strings"
+	"unicode/utf8"
 
 	"github.com/gin-gonic/gin"
 	"github.com/paiva/SkillBridge/Backend/config"
 	"github.com/paiva/SkillBridge/Backend/internal/database"
 	"github.com/paiva/SkillBridge/Backend/internal/models"
 )
+
+const (
+	// maxCommentLength is the maximum allowed length (in Unicode runes) for a university review comment.
+	maxCommentLength = 2000
+	// minCommentLength is the minimum required length when a comment is provided.
+	minCommentLength = 10
+)
+
+// urlPattern detects URLs inside comment text (spam vector).
+var urlPattern = regexp.MustCompile(`(?i)(https?://|www\.)\S+`)
+
+// repeatedCharPattern detects sequences of the same character repeated 6+ times (e.g. "aaaaaaa").
+var repeatedCharPattern = regexp.MustCompile(`(.)\1{5,}`)
+
+// validateComment checks the comment for length, spam signals, and sanitises whitespace.
+// Returns a non-empty error string when the comment fails validation.
+func validateComment(raw string) (sanitised string, errMsg string) {
+	// Collapse excessive internal whitespace and trim edges.
+	sanitised = strings.Join(strings.Fields(raw), " ")
+
+	if sanitised == "" {
+		// Empty comment is allowed (field is optional).
+		return sanitised, ""
+	}
+
+	runeCount := utf8.RuneCountInString(sanitised)
+	if runeCount < minCommentLength {
+		return "", fmt.Sprintf("O comentário é demasiado curto (mínimo %d caracteres).", minCommentLength)
+	}
+	if runeCount > maxCommentLength {
+		return "", fmt.Sprintf("O comentário excede o limite de %d caracteres (%d fornecidos).", maxCommentLength, runeCount)
+	}
+
+	// Spam: excessive URLs (more than 2 links in one comment).
+	urlMatches := urlPattern.FindAllString(sanitised, -1)
+	if len(urlMatches) > 2 {
+		return "", "O comentário contém demasiadas hiperligações e foi recusado como spam."
+	}
+
+	// Spam: repeated character sequences (e.g. "aaaaaaa", "!!!!!!!").
+	if repeatedCharPattern.MatchString(sanitised) {
+		return "", "O comentário contém sequências de caracteres repetidos e foi recusado."
+	}
+
+	// Spam: comment that is mostly upper-case (shouting / low quality).
+	upperCount := 0
+	letterCount := 0
+	for _, r := range sanitised {
+		if r >= 'A' && r <= 'Z' {
+			upperCount++
+			letterCount++
+		} else if r >= 'a' && r <= 'z' {
+			letterCount++
+		}
+	}
+	if letterCount > 20 && upperCount*100/letterCount > 70 {
+		return "", "O comentário está escrito maioritariamente em maiúsculas. Por favor escreva normalmente."
+	}
+
+	return sanitised, ""
+}
 
 // UniversitySearchResult represents a university with its courses.
 type UniversitySearchResult struct {
@@ -307,6 +370,7 @@ type CreateUniversityReviewInput struct {
 	UniversityName string  `json:"university_name" binding:"required"`
 	CourseName     string  `json:"course_name" binding:"required"`
 	IsAnonymous    bool    `json:"is_anonymous"`
+	// Comment is optional but, when provided, must be between 10 and 2000 runes.
 	Comment        string  `json:"comment"`
 
 	// University Criteria
@@ -347,6 +411,14 @@ func CreateUniversityReview(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "Dados inválidos: " + err.Error()})
 		return
 	}
+
+	// Validate and sanitise the comment field.
+	sanitisedComment, commentErr := validateComment(input.Comment)
+	if commentErr != "" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": commentErr})
+		return
+	}
+	input.Comment = sanitisedComment
 
 	// Validate university existence
 	courses, univExists := config.CoursesByUniv[input.UniversityName]
@@ -404,7 +476,7 @@ func CreateUniversityReview(c *gin.Context) {
 		// Update existing review (enforce maximum 1 review per university per user)
 		existing.CourseName = input.CourseName
 		existing.IsAnonymous = input.IsAnonymous
-		existing.Comment = strings.TrimSpace(input.Comment)
+		existing.Comment = input.Comment // already sanitised above
 		existing.CampusQuality = u1
 		existing.LocationAccessibility = u2
 		existing.CostOfLiving = u3
@@ -435,7 +507,7 @@ func CreateUniversityReview(c *gin.Context) {
 		UniversityName:         input.UniversityName,
 		CourseName:             input.CourseName,
 		IsAnonymous:            input.IsAnonymous,
-		Comment:                strings.TrimSpace(input.Comment),
+		Comment:                input.Comment, // already sanitised above
 		CampusQuality:          u1,
 		LocationAccessibility: u2,
 		CostOfLiving:          u3,

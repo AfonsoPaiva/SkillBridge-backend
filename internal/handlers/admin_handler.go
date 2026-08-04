@@ -278,6 +278,8 @@ func AdminDeleteUser(c *gin.Context) {
 	database.DB.Where("user_id = ?", user.ID).Delete(&models.ProjectMember{})
 	database.DB.Where("reviewer_id = ? OR reviewed_id = ?", user.ID, user.ID).Delete(&models.Review{})
 	database.DB.Where("follower_id = ? OR following_id = ?", user.ID, user.ID).Delete(&models.Follow{})
+	// Delete all university reviews submitted by this user.
+	database.DB.Where("user_id = ?", user.ID).Delete(&models.UniversityReview{})
 	var convs []models.Conversation
 	database.DB.Where("user_a_id = ? OR user_b_id = ?", user.ID, user.ID).Find(&convs)
 	if len(convs) > 0 {
