@@ -34,6 +34,7 @@ type UnivEntry struct {
 	Estabelecimento string   `json:"Estabelecimento"`
 	TotalCursos     int      `json:"TotalCursos"`
 	Cursos          []string `json:"Cursos"`
+	Icon            string   `json:"Icon"`
 }
 
 // UnivEntries holds every record from the JSON file.

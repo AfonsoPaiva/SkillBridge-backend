@@ -4,7 +4,8 @@
     "TotalCursos": 1,
     "Cursos": [
       "Música"
-    ]
+    ],
+    "Icon": "https://i.postimg.cc/mrqqJ5Px/image.png"
   },
   {
     "Estabelecimento": "Atlântica - Instituto Universitário",
@@ -19,7 +20,8 @@
       "Gestão de Sistemas e Computação",
       "Gestão do Transporte Aéreo",
       "Gestão em Saúde"
-    ]
+    ],
+    "Icon": "https://pbs.twimg.com/profile_images/1494005855439704067/wEPg0wyx_400x400.jpg"
   },
   {
     "Estabelecimento": "Escola Superior Artística do Porto",
@@ -32,7 +34,8 @@
       "Cinema e Audiovisual",
       "Design de Comunicação",
       "Teatro"
-    ]
+    ],
+    "Icon": "https://media.licdn.com/dms/image/v2/C560BAQGIJMR6Jmcz5Q/company-logo_200_200/company-logo_200_200/0/1630572459023/escola_superior_artstica_do_porto_logo?e=1787184000&v=beta&t=SjtfkE6yVo7RINjEHTc3KWMLfoKfbhVifdI9AJ9qwGs"
   },
   {
     "Estabelecimento": "Escola Superior Náutica Infante D. Henrique",
@@ -44,7 +47,8 @@
       "Gestão Portuária",
       "Gestão de Transportes e Logística",
       "Pilotagem"
-    ]
+    ],
+    "Icon": "https://media.licdn.com/dms/image/v2/D4D0BAQEYCYZUS6nLGg/company-logo_200_200/company-logo_200_200/0/1691144892621/enautica_logo?e=2147483647&v=beta&t=H15X-mdzdJzc-3PVHcTg6jIRkdBY8Fz3S5X0CEvqdT0"
   },
   {
     "Estabelecimento": "Escola Superior de Actividades Imobiliárias",
@@ -53,7 +57,8 @@
       "Engenharia Civil",
       "Gestão Imobiliária",
       "Gestão da Edificação e Obras"
-    ]
+    ],
+    "Icon": "https://media.licdn.com/dms/image/v2/D4E0BAQGBoPD_U68Okg/company-logo_200_200/company-logo_200_200/0/1666964518339/esai_logo?e=2147483647&v=beta&t=MEk7IGah8usUloO8vSTXwzdePTf5HGKD0tsUgBm8rH8"
   },
   {
     "Estabelecimento": "Escola Superior de Artes e Design",
@@ -61,7 +66,8 @@
     "Cursos": [
       "Artes Digitais e Multimédia",
       "Design"
-    ]
+    ],
+    "Icon": "https://media.licdn.com/dms/image/v2/C4D0BAQF4TIE8NfgBzw/company-logo_200_200/company-logo_200_200/0/1631313447039?e=2147483647&v=beta&t=vRJo2OCEEUZaTb_5zpaTyWmfZ4LnF7_euT-udK8T9F8"
   },
   {
     "Estabelecimento": "Escola Superior de Educação de Fafe",
@@ -70,14 +76,16 @@
       "Desporto",
       "Educação Básica",
       "Educação Social"
-    ]
+    ],
+    "Icon": "https://media.licdn.com/dms/image/v2/C4E0BAQFLyN-r-3ux0Q/company-logo_200_200/company-logo_200_200/0/1677503931382/esef_logo?e=2147483647&v=beta&t=FF-ZQbdZ6Va4upjnAcPlQmCx55C8GqV1-oMZOELqRQ0"
   },
   {
     "Estabelecimento": "Escola Superior de Educação de João de Deus",
     "TotalCursos": 1,
     "Cursos": [
       "Educação Básica"
-    ]
+    ],
+    "Icon": "https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcSyiYClKQpyYLknAV8JltWGCGUJSzRBzwft42IESs3WApu8xio0GAu7mtA&s=10"
   },
   {
     "Estabelecimento": "Escola Superior de Educação de Paula Frassinetti",
@@ -85,28 +93,32 @@
     "Cursos": [
       "Educação Básica",
       "Educação Social"
-    ]
+    ],
+    "Icon": "https://media.licdn.com/dms/image/v2/C4D0BAQHOVanFq7MxHg/company-logo_200_200/company-logo_200_200/0/1630580635993/esepf_logo?e=2147483647&v=beta&t=ygx4OX2gHSOCRZQfudUZQeigS2zWDkd3fngPuTvg7JU"
   },
   {
     "Estabelecimento": "Escola Superior de Enfermagem S. Francisco das Misericórdias",
     "TotalCursos": 1,
     "Cursos": [
       "Enfermagem"
-    ]
+    ],
+    "Icon": "https://academy.esesfm.pt/wp-content/uploads/2023/04/Logotipo-ESESFM.png"
   },
   {
     "Estabelecimento": "Escola Superior de Enfermagem de Lisboa",
     "TotalCursos": 1,
     "Cursos": [
       "Enfermagem"
-    ]
+    ],
+    "Icon": "https://media.licdn.com/dms/image/v2/C560BAQF328YsPwxgJw/company-logo_200_200/company-logo_200_200/0/1631366573941?e=2147483647&v=beta&t=tdEwJWGnK3UJBAFsJXL98raGMARCJK0wD6sjKPYv3Ns"
   },
   {
     "Estabelecimento": "Escola Superior de Enfermagem de S. José de Cluny",
     "TotalCursos": 1,
     "Cursos": [
       "Enfermagem"
-    ]
+    ],
+    "Icon": "https://static.wixstatic.com/media/edb90a_9664e9fce72e4c6e9e1597959be9e31c~mv2.png"
   },
   {
     "Estabelecimento": "Escola Superior de Hotelaria e Turismo do Estoril",
@@ -121,7 +133,8 @@
       "Informação Turística",
       "Produção Alimentar em Restauração",
       "Produção Alimentar em Restauração (regime pós-laboral)"
-    ]
+    ],
+    "Icon": "https://media.licdn.com/dms/image/v2/C4D0BAQG6pwG5yK9fMg/company-logo_200_200/company-logo_200_200/0/1650373604202/eshte_logo?e=2147483647&v=beta&t=oIY41wDpTwT_jKh9KYRPkPiOFnJRv9_KD51UEiCCVi4"
   },
   {
     "Estabelecimento": "Escola Superior de Negócios Atlântico",
@@ -129,7 +142,8 @@
     "Cursos": [
       "Gestão e Negócios",
       "Gestão e Negócios (EaD)"
-    ]
+    ],
+    "Icon": "https://www.abs.pt/wp-content/uploads/2019/05/logo-abs-grande-900x412.png"
   },
   {
     "Estabelecimento": "Escola Superior de Saúde Atlântica",
@@ -139,14 +153,16 @@
       "Farmácia",
       "Fisioterapia",
       "Osteopatia"
-    ]
+    ],
+    "Icon": "https://scontent.fopo5-2.fna.fbcdn.net/v/t1.6435-9/102454155_2991308440988228_1484353149807329994_n.jpg?stp=dst-jpg_tt6&cstp=mx940x788&ctp=s940x788&_nc_cat=111&ccb=1-7&_nc_sid=833d8c&_nc_ohc=gZU7BCL5jjcQ7kNvwEPw19R&_nc_oc=AdpjxAoyseZWXppc_El004VoI6NzUGPg_JxT1PjrODx_nme2gUHefDqAwkUBoaoa5oUuoV6GwF3UgG5jijzF7h__&_nc_zt=23&_nc_ht=scontent.fopo5-2.fna&_nc_gid=L_5jYjU9vlC2yf75dLDbDA&_nc_ss=7b2a8&oh=00_AQEFN1L-5P_GcSxgwoEpww9F1V3aqb_w5NTJfgXiarIhmQ&oe=6A99367B"
   },
   {
     "Estabelecimento": "Escola Superior de Saúde Cruz Vermelha Portuguesa - Alto Tâmega",
     "TotalCursos": 1,
     "Cursos": [
       "Enfermagem"
-    ]
+    ],
+    "Icon": "https://media.licdn.com/dms/image/v2/C560BAQFd7i6QGfOp-w/company-logo_200_200/company-logo_200_200/0/1649791816008/ess_cvp_altotamega_logo?e=2147483647&v=beta&t=Y1ZiZ0wCuzGkFJXf0gKL2QXa6gF6--eGIq1ua2skunw"
   },
   {
     "Estabelecimento": "Escola Superior de Saúde Egas Moniz",
@@ -157,7 +173,8 @@
       "Enfermagem Veterinária",
       "Fisioterapia",
       "Prótese Dentária"
-    ]
+    ],
+    "Icon": "https://media.licdn.com/dms/image/v2/C4D0BAQHtwfCfn3U5sw/company-logo_200_200/company-logo_200_200/0/1674732971026?e=2147483647&v=beta&t=1tFclDn1v3CA0icIpzLGwxB-3mSMa10Ib8U2jhNk__U"
   },
   {
     "Estabelecimento": "Escola Superior de Saúde Jean Piaget de Viseu",
@@ -165,7 +182,8 @@
     "Cursos": [
       "Enfermagem",
       "Fisioterapia"
-    ]
+    ],
+    "Icon": "https://www.dges.gov.pt/simges/public/storage/files/instituicoes_uo/60_logotipo.jpg"
   },
   {
     "Estabelecimento": "Escola Superior de Saúde Norte da Cruz Vermelha Portuguesa",
@@ -174,7 +192,8 @@
       "Enfermagem",
       "Fisioterapia",
       "Osteopatia"
-    ]
+    ],
+    "Icon": "https://media.licdn.com/dms/image/v2/C4D0BAQHeVhXIl6Q1Qw/company-logo_200_200/company-logo_200_200/0/1630577182855?e=2147483647&v=beta&t=HP0XFuDoidHxWEvHmw8VJ6Rqt7Mfcpzu8NAhp1afOYA"
   },
   {
     "Estabelecimento": "Escola Superior de Saúde da Cruz Vermelha Portuguesa - Lisboa",
@@ -187,7 +206,8 @@
       "Imagem Médica e Radioterapia",
       "Osteopatia",
       "Podologia"
-    ]
+    ],
+    "Icon": "https://media.licdn.com/dms/image/v2/D560BAQHzXdj9aO7veA/company-logo_200_200/company-logo_200_200/0/1719256861464/esscvplisboa_logo?e=2147483647&v=beta&t=xYSl8jONz0dP7COBWDjyza9durWc1sBSiROrM9KdBy8"
   },
   {
     "Estabelecimento": "Escola Superior de Saúde da Fundação \"Fernando Pessoa\"",
@@ -197,7 +217,8 @@
       "Enfermagem",
       "Fisioterapia",
       "Terapia da Fala"
-    ]
+    ],
+    "Icon": "https://media.licdn.com/dms/image/v2/C4D0BAQGIv8acZxjZJA/company-logo_200_200/company-logo_200_200/0/1630466152534/universidade_fernando_pessoa_logo?e=2147483647&v=beta&t=wut4LzQ5NfS8korcZvF_DhbP4RsXY-ixEigJCjzvpeM"
   },
   {
     "Estabelecimento": "Escola Superior de Saúde de Santa Maria",
@@ -207,7 +228,8 @@
       "Fisioterapia",
       "Gestão de dados e tecnologias em saúde",
       "Terapia Ocupacional"
-    ]
+    ],
+    "Icon": "https://media.licdn.com/dms/image/v2/D4D0BAQEEHfiT8NxIQQ/company-logo_200_200/B4DZWAkJM8HkAI-/0/1741618713915/santamariahealthschool_logo?e=2147483647&v=beta&t=ijnNAlk-3IvZ3rw2x1dJXNXbfqLaXwlbr2G62qWTqIk"
   },
   {
     "Estabelecimento": "Escola Superior de Saúde do Alcoitão",
@@ -216,7 +238,8 @@
       "Fisioterapia",
       "Terapia Ocupacional",
       "Terapia da Fala"
-    ]
+    ],
+    "Icon": "https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcSqtpBo96yDg-o7Zw-ddw8InFgQvz_xSq9v2ok5PRHNXQnqrU1zJAJ9uFMq&s=10"
   },
   {
     "Estabelecimento": "Escola Superior de Tecnologias de Fafe",
@@ -226,7 +249,8 @@
       "Gestão Hoteleira",
       "Tecnologias e Gestão de Sistemas Informação",
       "Turismo"
-    ]
+    ],
+    "Icon": "https://scontent.fopo5-2.fna.fbcdn.net/v/t39.30808-6/306140866_110512711799113_169533925603385159_n.jpg?stp=dst-jpg_tt6&cstp=mx320x320&ctp=s320x320&_nc_cat=111&ccb=1-7&_nc_sid=6ee11a&_nc_ohc=71IuRFHLaSYQ7kNvwEJDHVZ&_nc_oc=AdqtN3heliNYTKFUohPEDhgFUh41eEFikNJwPyyTjoIRiO9GhU70nr2_5YVm-_YdHCTym4ovtpkFuq65PyKndrL0&_nc_zt=23&_nc_ht=scontent.fopo5-2.fna&_nc_gid=JVNSFJg4tfFS2BxFvtYeeQ&_nc_ss=7b2a8&oh=00_AQHLXl9v4-XVk6gz-qPqy_KNezknuEQ-FvZj0WUpQvKuxw&oe=6A77A362"
   },
   {
     "Estabelecimento": "Escola Universitária Vasco da Gama",
@@ -235,7 +259,8 @@
       "Ciências Bioveterinárias",
       "Medicina Veterinária",
       "Saúde e Bem-Estar Marinho"
-    ]
+    ],
+    "Icon": "https://media.licdn.com/dms/image/v2/D4D0BAQE0Z_RGPiP0Tw/company-logo_200_200/B4DZkEhQssIYAI-/0/1756717452521/euvgpt_logo?e=2147483647&v=beta&t=2kQFmPxT20KULcVG1K9Tb0xPjkUNNcf4GealRgXsbAI"
   },
   {
     "Estabelecimento": "ISAVE - Instituto Superior de Saúde",
@@ -244,7 +269,8 @@
       "Dietética e Nutrição",
       "Enfermagem",
       "Fisioterapia"
-    ]
+    ],
+    "Icon": "https://media.licdn.com/dms/image/v2/D4D0BAQHrqv7BairVCQ/company-logo_200_200/company-logo_200_200/0/1719256721531/isave_oficial_logo?e=2147483647&v=beta&t=TbJugHyIcT5jUUjcMCzoz6vvrngp7K4fo-ra1a8HhlI"
   },
   {
     "Estabelecimento": "ISCE - Instituto Superior de Lisboa e Vale do Tejo",
@@ -255,7 +281,8 @@
       "Educação Básica",
       "Educação Social",
       "Gestão Turística"
-    ]
+    ],
+    "Icon": "https://media.licdn.com/dms/image/v2/C4D0BAQH5mYzVp8PHxw/company-logo_200_200/company-logo_200_200/0/1630477943706/instituto_superior_de_cincias_educativas_logo?e=2147483647&v=beta&t=b6I15cnSnwCTqErhObGS5fMS84xR_yq94eDN9WvlmgU"
   },
   {
     "Estabelecimento": "ISCTE - Instituto Universitário de Lisboa",
@@ -293,7 +320,8 @@
       "Tecnologias Digitais e Saúde",
       "Tecnologias Digitais e Segurança de Informação",
       "Tecnologias Digitais, Edifícios e Construção Sustentável"
-    ]
+    ],
+    "Icon": "https://media.licdn.com/dms/image/v2/D4E0BAQHNng4x_RIJWg/company-logo_200_200/company-logo_200_200/0/1729181077374/iscte_logo?e=2147483647&v=beta&t=Bw-gCa21Q7tD2CU8812R9uqcX3hxPchFclPXyXTj9No"
   },
   {
     "Estabelecimento": "ISEC Lisboa - Instituto Superior de Educação e Ciências",
@@ -312,7 +340,8 @@
       "Gestão da Proteção Civil e Segurança Comunitária",
       "Gestão de dados e tecnologias em saúde",
       "Óptica e Optometria"
-    ]
+    ],
+    "Icon": "https://media.licdn.com/dms/image/v2/D4E0BAQGyXgfirQEDTw/company-logo_200_200/B4EZwLDN0NGkAI-/0/1769711918728/iseclisboa_logo?e=2147483647&v=beta&t=jrSmmh-N8R3tMtKP9vjKqD2EBDxj43WQilPNkmP57GA"
   },
   {
     "Estabelecimento": "ISLA - Instituto Politécnico de Gestão e Tecnologia",
@@ -326,7 +355,8 @@
       "Gestão do Turismo",
       "Informática para Comércio Eletrónico",
       "Multimédia"
-    ]
+    ],
+    "Icon": "https://media.licdn.com/dms/image/v2/C560BAQHJCt2iMroPIw/company-logo_200_200/company-logo_200_200/0/1631304854295?e=2147483647&v=beta&t=JsYvm0wLh0sljaHExXxt3JJk6S53Tpl6-8cPLXFKGIg"
   },
   {
     "Estabelecimento": "ISLA Santarém — Instituto Politécnico",
@@ -340,7 +370,8 @@
       "Gestão de Recursos Humanos",
       "Gestão de dados e tecnologias em saúde",
       "Informática de Gestão"
-    ]
+    ],
+    "Icon": "https://media.licdn.com/dms/image/v2/C560BAQHJCt2iMroPIw/company-logo_200_200/company-logo_200_200/0/1631304854295?e=2147483647&v=beta&t=JsYvm0wLh0sljaHExXxt3JJk6S53Tpl6-8cPLXFKGIg"
   },
   {
     "Estabelecimento": "ISPA-Instituto Universitário de Ciências Psicológicas, Sociais e da Vida",
@@ -350,7 +381,8 @@
       "Ciências Cognitivas e do Comportamento",
       "Educação Básica",
       "Psicologia"
-    ]
+    ],
+    "Icon": "https://media.licdn.com/dms/image/v2/D4D0BAQFCOakBq00-LQ/company-logo_200_200/company-logo_200_200/0/1699982644140/ispa_logo?e=2147483647&v=beta&t=B4im_O9T8zkEgds8bUgQ7N6SM9nRr7qtA-zX5mret7U"
   },
   {
     "Estabelecimento": "Instituto Politécnico Jean Piaget do Norte",
@@ -362,7 +394,8 @@
       "Educação Social",
       "Enfermagem",
       "Fisioterapia"
-    ]
+    ],
+    "Icon": "https://www.noticiasdeviseu.com/wp-content/uploads/2021/06/cropped-INSTITUTO-PIAGET-512px.png"
   },
   {
     "Estabelecimento": "Instituto Politécnico Jean Piaget do Sul",
@@ -376,10 +409,11 @@
       "Fisioterapia",
       "Medicina Tradicional Chinesa",
       "Osteopatia"
-    ]
+    ],
+    "Icon": "https://www.noticiasdeviseu.com/wp-content/uploads/2021/06/cropped-INSTITUTO-PIAGET-512px.png"
   },
   {
-    "Estabelecimento": "Instituto Politécnico da Guarda",
+    "Estabelecimento": "Universidade Politécnica da Guarda",
     "TotalCursos": 26,
     "Cursos": [
       "Animação Sociocultural",
@@ -408,7 +442,8 @@
       "Mecânica e Informática Industrial",
       "Restauração e Catering",
       "Turismo e Lazer"
-    ]
+    ],
+    "Icon": "https://media.licdn.com/dms/image/v2/C4E0BAQH5R8LIzDuDPw/company-logo_200_200/company-logo_200_200/0/1631344727309?e=2147483647&v=beta&t=tNa8S1_jh6YQYVbybxhuBkoB2GrPuMAI7bcTiY0_uwQ"
   },
   {
     "Estabelecimento": "Instituto Politécnico da Lusofonia",
@@ -428,7 +463,8 @@
       "Ilustração e Desenho",
       "Imagem Médica e Radioterapia",
       "Osteopatia"
-    ]
+    ],
+    "Icon": "https://media.licdn.com/dms/image/v2/C4D0BAQGGre6pWb8Dgw/company-logo_200_200/company-logo_200_200/0/1631331597396?e=2147483647&v=beta&t=2Tx1DN6vPLNw8hlFYrb2P-vq2rQxGcDrjyR2dEQIAqc"
   },
   {
     "Estabelecimento": "Instituto Politécnico da Maia",
@@ -443,10 +479,11 @@
       "Solicitadoria",
       "Tecnologias de Informação, Web e Multimédia",
       "Treino Desportivo"
-    ]
+    ],
+    "Icon": "https://media.licdn.com/dms/image/v2/C4D0BAQEz3qyf9eFNdw/company-logo_200_200/company-logo_200_200/0/1635519379394/instituto_politcnico_da_maia___ipmaia_logo?e=2147483647&v=beta&t=KcWE3qUKGbCvfijtrhdk9WdBXuX1irFxPJKQ1Oi2TpI"
   },
   {
-    "Estabelecimento": "Instituto Politécnico de Beja",
+    "Estabelecimento": "Universidade Politécnica de Beja",
     "TotalCursos": 15,
     "Cursos": [
       "Agronomia",
@@ -464,10 +501,11 @@
       "Solicitadoria (regime de ensino a distância)",
       "Terapia Ocupacional",
       "Turismo"
-    ]
+    ],
+    "Icon": "https://media.licdn.com/dms/image/v2/D4E0BAQFYEhStel0w7Q/company-logo_200_200/company-logo_200_200/0/1711077797395?e=2147483647&v=beta&t=bynPVnuRmukHzfIccrfRooMQHthrrVbtAO2ZPx8PPdQ"
   },
   {
-    "Estabelecimento": "Instituto Politécnico de Bragança",
+    "Estabelecimento": "Universidade Politécnica de Bragança",
     "TotalCursos": 47,
     "Cursos": [
       "Animação e Produção Artística",
@@ -517,10 +555,11 @@
       "Solicitadoria",
       "Tecnologia Biomédica",
       "Turismo"
-    ]
+    ],
+    "Icon": "https://media.licdn.com/dms/image/v2/D4E0BAQHTWFW77aZHEQ/company-logo_200_200/B4EZ.92zPgIgAI-/0/1785596687744/instituto_politecnico_de_braganca_logo?e=1787184000&v=beta&t=nkvjSgfJzxNXnSJ2g-WLRYF-OMaR6dCD-GFVEvz8B54"
   },
   {
-    "Estabelecimento": "Instituto Politécnico de Castelo Branco",
+    "Estabelecimento": "Universidade Politécnica de Castelo Branco",
     "TotalCursos": 31,
     "Cursos": [
       "Administração Pública",
@@ -554,10 +593,11 @@
       "Serviço Social",
       "Solicitadoria",
       "Turismo"
-    ]
+    ],
+    "Icon": "https://media.licdn.com/dms/image/v2/D4D0BAQGwevKFJbrLjg/company-logo_200_200/company-logo_200_200/0/1727429729216/politecnico_castelo_branco_logo?e=2147483647&v=beta&t=qts8ONmvmXHrEthKePlgEEX7BHVzR0I7ZwNoJ1Vh5Sg"
   },
   {
-    "Estabelecimento": "Instituto Politécnico de Coimbra",
+    "Estabelecimento": "Universidade Politécnica de Coimbra",
     "TotalCursos": 59,
     "Cursos": [
       "Agronomia",
@@ -619,7 +659,8 @@
       "Turismo (regime pós-laboral)",
       "Turismo em Espaços Rurais e Naturais",
       "Zootecnia"
-    ]
+    ],
+    "Icon": "https://media.licdn.com/dms/image/v2/C4E0BAQGImEEIDjFTvA/company-logo_200_200/company-logo_200_200/0/1630570128564?e=2147483647&v=beta&t=3-7XVtNFAoGsMmtlMdVEXD5lnOka1glzBbo7g0gEizU"
   },
   {
     "Estabelecimento": "Instituto Politécnico de Leiria",
@@ -677,10 +718,11 @@
       "Terapia da Fala",
       "Tradução e Interpretação: Português/Chinês - Chinês/Português",
       "Turismo"
-    ]
+    ],
+    "Icon": "https://media.licdn.com/dms/image/v2/D4E0BAQE8X1QWp3BNcA/company-logo_200_200/B4EZ_IcAAUJUAI-/0/1785774211351/politecnicodeleiria_logo?e=2147483647&v=beta&t=1EL3hcYOga1KIJfghFGhL09LRW_EoEXHokgPvwYpq00"
   },
   {
-    "Estabelecimento": "Instituto Politécnico de Lisboa",
+    "Estabelecimento": "Universidade Politécnica de Lisboa",
     "TotalCursos": 49,
     "Cursos": [
       "Animação Sociocultural",
@@ -732,10 +774,11 @@
       "Teatro",
       "Tecnologias da Música (regime pós-laboral)",
       "Tecnologias e Gestão Municipal"
-    ]
+    ],
+    "Icon": "https://media.licdn.com/dms/image/v2/D4D0BAQF0ET1McO_D3A/company-logo_200_200/company-logo_200_200/0/1719581021644/politecnico_de_lisboa_logo?e=1787184000&v=beta&t=H1aIEgLEPmMB7_0bmM-0XjE3tmUbwKc21fb-BN0pDsM"
   },
   {
-    "Estabelecimento": "Instituto Politécnico de Portalegre",
+    "Estabelecimento": "Universidade Politécnica de Portalegre",
     "TotalCursos": 22,
     "Cursos": [
       "Administração de Publicidade e Marketing",
@@ -760,10 +803,11 @@
       "Serviço Social",
       "Serviço Social (regime pós-laboral)",
       "Turismo"
-    ]
+    ],
+    "Icon": "https://media.licdn.com/dms/image/v2/D4E0BAQHbar1aoq2hGw/company-logo_200_200/B4EZ_MPK_HIgAI-/0/1785837957305/politecnicodeportalegre_logo?e=2147483647&v=beta&t=drrFM3RVMrDmibgH00uJb1ajy7bWrrF-v8R0Q7Erv5s"
   },
   {
-    "Estabelecimento": "Instituto Politécnico de Santarém",
+    "Estabelecimento": "Universidade Politécnica de Santarém",
     "TotalCursos": 22,
     "Cursos": [
       "Agronomia",
@@ -788,7 +832,8 @@
       "Qualidade Alimentar e Nutrição Humana",
       "Treino Desportivo",
       "Zootecnia"
-    ]
+    ],
+    "Icon": "https://media.licdn.com/dms/image/v2/C560BAQE8whTAQemCrA/company-logo_200_200/company-logo_200_200/0/1630648514581/instituto_politcnico_de_santarm_logo?e=1787184000&v=beta&t=BHAkwgyixdOoilN1aya2qz3t-tQr6eA2S91yXACX0hc"
   },
   {
     "Estabelecimento": "Instituto Politécnico de Saúde do Norte - CESPU",
@@ -803,10 +848,11 @@
       "Osteopatia",
       "Podologia",
       "Prótese Dentária"
-    ]
+    ],
+    "Icon": "https://media.licdn.com/dms/image/v2/D4E0BAQGUneQpa4zbPQ/company-logo_200_200/B4EZuyNPYbJ8AI-/0/1768221374902/cespu_ensino_logo?e=1787184000&v=beta&t=xiR_2JipUl-QeUfidFPcwxL4ePqCFlSHSgYIhchBZCM"
   },
   {
-    "Estabelecimento": "Instituto Politécnico de Setúbal",
+    "Estabelecimento": "Universidade Politécnica de Setúbal",
     "TotalCursos": 29,
     "Cursos": [
       "Animação Sociocultural",
@@ -838,10 +884,11 @@
       "Tecnologias do Petróleo",
       "Terapia da Fala",
       "Tradução e Interpretação de Língua Gestual Portuguesa"
-    ]
+    ],
+    "Icon": "https://media.licdn.com/dms/image/v2/D4D0BAQEc4r0XjlQRuw/company-logo_200_200/company-logo_200_200/0/1696868893030?e=1787184000&v=beta&t=tSqDFVeE9GF4rF45vHnr09DBlOYZxBae2c8SZdhqOVE"
   },
   {
-    "Estabelecimento": "Instituto Politécnico de Tomar",
+    "Estabelecimento": "Universidade Politécnica de Tomar",
     "TotalCursos": 17,
     "Cursos": [
       "Cinema e Média Digitais",
@@ -861,10 +908,11 @@
       "Informática e Tecnologias Multimédia",
       "Tecnologia Química",
       "Turismo e Gestão do Património Cultural"
-    ]
+    ],
+    "Icon": "https://media.licdn.com/dms/image/v2/D4D0BAQGEMYC-4OFWGg/company-logo_200_200/B4DZd4QZ6FH4AM-/0/1750069256169/politecnicodetomar_logo?e=2147483647&v=beta&t=7_-oG0M3VsG1XS4U7-d5X92HfhUp2QSDCOorZCU8MO4"
   },
   {
-    "Estabelecimento": "Instituto Politécnico de Viana do Castelo",
+    "Estabelecimento": "Universidade Politécnica de Viana do Castelo",
     "TotalCursos": 28,
     "Cursos": [
       "Agronomia",
@@ -895,10 +943,11 @@
       "Organização e Gestão Empresariais",
       "Tecnologia Alimentar e Nutrição",
       "Turismo"
-    ]
+    ],
+    "Icon": "https://media.licdn.com/dms/image/v2/D4E0BAQHX6iYAUqj6TA/company-logo_200_200/B4EZ_ICWrIHMAE-/0/1785767488409/instituto_polit_cnico_de_viana_do_castelo_logo?e=1787184000&v=beta&t=u_ooO3wYRCmj6lY_G3_sg75oc-sSRGbh-4JxZookgw8"
   },
   {
-    "Estabelecimento": "Instituto Politécnico de Viseu",
+    "Estabelecimento": "Universidade Politécnica de Viseu",
     "TotalCursos": 32,
     "Cursos": [
       "Artes Performativas",
@@ -933,10 +982,11 @@
       "Tecnologia e Design de Mobiliário",
       "Tecnologias e Design de Multimédia",
       "Turismo"
-    ]
+    ],
+    "Icon": "https://media.licdn.com/dms/image/v2/D4E0BAQE4QXtiaMpIrg/img-crop_100/B4EZ.5_8GCI0AM-/0/1785531974274?e=1787184000&v=beta&t=29Lpzqg4k5Eiqyh0Lh735Hq0xf3IaQpusgXdp1iKZd4"
   },
   {
-    "Estabelecimento": "Instituto Politécnico do Cávado e do Ave",
+    "Estabelecimento": "Universidade Politécnica do Cávado e do Ave",
     "TotalCursos": 24,
     "Cursos": [
       "Contabilidade",
@@ -963,7 +1013,8 @@
       "Gestão de Empresas (regime pós-laboral)",
       "Solicitadoria",
       "Solicitadoria (regime pós-laboral)"
-    ]
+    ],
+    "Icon": "https://media.licdn.com/dms/image/v2/D4E0BAQEvE5aaJqcdeg/company-logo_200_200/B4EZ..OiI7I0AE-/0/1785602909208/universidade_politecnica_cavado_ave_logo?e=2147483647&v=beta&t=dMTj9cf8xg0Gb1JIpgKw_WrQRL52wUyhQP8qc-OI168"
   },
   {
     "Estabelecimento": "Instituto Politécnico do Porto",
@@ -1046,7 +1097,8 @@
       "Terapia Ocupacional",
       "Terapia da Fala",
       "Tradução e Interpretação em Língua Gestual Portuguesa"
-    ]
+    ],
+    "Icon": "https://media.licdn.com/dms/image/v2/D4D0BAQGTarlXEIvx3A/company-logo_200_200/company-logo_200_200/0/1732536785441/polit_cnico_do_porto_logo?e=2147483647&v=beta&t=T7A4oqzk77MAfPvv2wxuJTgEMlLW9ik2pLI32KV9dcQ"
   },
   {
     "Estabelecimento": "Instituto Português de Administração de Marketing de Lisboa",
@@ -1054,7 +1106,8 @@
     "Cursos": [
       "Gestão de Marketing",
       "Marketing"
-    ]
+    ],
+    "Icon": "https://media.licdn.com/dms/image/v2/C4D0BAQHo4JqIxRIKug/company-logo_200_200/company-logo_200_200/0/1630577984350/ipam_logo?e=2147483647&v=beta&t=o22NiIh-Y-XOO5R78k8nNBEBKU7hxv4Y6WkU1oSjitQ"
   },
   {
     "Estabelecimento": "Instituto Português de Administração de Marketing do Porto",
@@ -1065,7 +1118,8 @@
       "Gestão de Negócios",
       "Marketing",
       "Negócios Globais"
-    ]
+    ],
+    "Icon": "https://media.licdn.com/dms/image/v2/C4D0BAQHo4JqIxRIKug/company-logo_200_200/company-logo_200_200/0/1630577984350/ipam_logo?e=2147483647&v=beta&t=o22NiIh-Y-XOO5R78k8nNBEBKU7hxv4Y6WkU1oSjitQ"
   },
   {
     "Estabelecimento": "Instituto Superior D. Dinis",
@@ -1078,7 +1132,8 @@
       "Gestão Comercial",
       "Gestão Industrial e Inovação Tecnológica",
       "Gestão de Recursos Humanos"
-    ]
+    ],
+    "Icon": "https://www.ensinolusofona.pt/images/isdom.svg"
   },
   {
     "Estabelecimento": "Instituto Superior Manuel Teixeira Gomes",
@@ -1097,7 +1152,8 @@
       "Gestão do Turismo",
       "Psicologia",
       "Tecnologias Criativas"
-    ]
+    ],
+    "Icon": "https://media.licdn.com/dms/image/v2/C560BAQEhM7aLgzb0iw/company-logo_200_200/company-logo_200_200/0/1630579236603/ismat_instituto_superior_manuel_teixeira_gomes_logo?e=1787184000&v=beta&t=OmFJ1AzYTE8GUDo-oCekz2gh6ytTQECN6xnATaU8uOg"
   },
   {
     "Estabelecimento": "Instituto Superior Miguel Torga",
@@ -1113,7 +1169,8 @@
       "Multimédia",
       "Psicologia",
       "Serviço Social"
-    ]
+    ],
+    "Icon": "https://media.licdn.com/dms/image/v2/D4E0BAQEvJQPBDlWpQw/company-logo_200_200/B4EZwzumlxGwAM-/0/1770394381137/instituto_superior_miguel_torga_logo?e=2147483647&v=beta&t=BG8PDb4vFxwcpcDjZlaFOr6fcLXKwqAVCwHj69eAE3U"
   },
   {
     "Estabelecimento": "Instituto Superior Politécnico Gaya",
@@ -1124,7 +1181,8 @@
       "Engenharia Informática",
       "Engenharia Mecânica",
       "Gestão"
-    ]
+    ],
+    "Icon": "https://media.licdn.com/dms/image/v2/C560BAQGHvk17rp8KWA/company-logo_200_200/company-logo_200_200/0/1630584522334/ispgaya_logo?e=2147483647&v=beta&t=gllG1y5qKsM_sjMG4aOABmgrV2DDca43TmIm7RQJj3M"
   },
   {
     "Estabelecimento": "Instituto Superior de Administração e Gestão",
@@ -1135,7 +1193,8 @@
       "Gestão de Empresas",
       "Relações Empresariais",
       "Turismo"
-    ]
+    ],
+    "Icon": "https://media.licdn.com/dms/image/v2/D4E0BAQFXKSeKgNw54Q/company-logo_200_200/company-logo_200_200/0/1665062006821/isag_logo?e=2147483647&v=beta&t=N3eHWJoGJ6zCogUVtjI-1FLm9hh1ncrwj4dEPT44YPs"
   },
   {
     "Estabelecimento": "Instituto Superior de Administração e Línguas",
@@ -1143,7 +1202,8 @@
     "Cursos": [
       "Gestão de Empresas",
       "Turismo"
-    ]
+    ],
+    "Icon": "https://media.licdn.com/dms/image/v2/C4E0BAQFxhQ3pyG7hbg/company-logo_200_200/company-logo_200_200/0/1630615811838/isal_logo?e=2147483647&v=beta&t=ZW83z6LxSDsTayNXXxJU88WgeFVkUPjcn4H8ao_FoDQ"
   },
   {
     "Estabelecimento": "Instituto Superior de Ciências Educativas do Douro",
@@ -1154,7 +1214,8 @@
       "Educação Básica",
       "Educação Social",
       "Tecnologias Multimédia"
-    ]
+    ],
+    "Icon": "https://media.licdn.com/dms/image/v2/C4D0BAQGiYNmyWvCZ7Q/company-logo_200_200/company-logo_200_200/0/1630512029296/isce_douro_logo?e=2147483647&v=beta&t=mej-_bYm142KkVpt_Tn-w-sTuujoPxvY-JDFtkUY5jg"
   },
   {
     "Estabelecimento": "Instituto Superior de Ciências Empresariais e do Turismo",
@@ -1165,7 +1226,8 @@
       "Marketing e Publicidade",
       "Solicitadoria",
       "Turismo"
-    ]
+    ],
+    "Icon": "https://media.licdn.com/dms/image/v2/D560BAQHLuhB4-zlmlg/company-logo_200_200/company-logo_200_200/0/1709142019518?e=2147483647&v=beta&t=QlsHKT2p1oRqfSFCj7ylhfmxOPLNOvsLudgxATVwoXQ"
   },
   {
     "Estabelecimento": "Instituto Superior de Ciências da Informação e da Administração",
@@ -1174,7 +1236,8 @@
       "Educação Social",
       "Proteção Civil",
       "Segurança e Saúde no Trabalho"
-    ]
+    ],
+    "Icon": "https://media.licdn.com/dms/image/v2/D4D0BAQEUpv08AbQ6wA/company-logo_200_200/company-logo_200_200/0/1683544036466/iscia_logo?e=2147483647&v=beta&t=PS1lLH4d-95aA9q8RJaD6mQJTrAb6W2ZKOmnttBNW9k"
   },
   {
     "Estabelecimento": "Instituto Superior de Entre Douro e Vouga",
@@ -1185,7 +1248,8 @@
       "Gestão de Empresas",
       "Marketing, Publicidade e Relações Públicas",
       "Solicitadoria"
-    ]
+    ],
+    "Icon": "https://media.licdn.com/dms/image/v2/C4D0BAQFOuCT_su_uUw/company-logo_200_200/company-logo_200_200/0/1659540948370/isvouga_logo?e=2147483647&v=beta&t=jQptDSNBL1OKlpl5ZtPdxf3upcAE4sMywUTE5aLH1ac"
   },
   {
     "Estabelecimento": "Instituto Superior de Estudos Interculturais e Transdisciplinares de Almada",
@@ -1194,7 +1258,8 @@
       "Educação Física e Desporto",
       "Gestão",
       "Psicologia"
-    ]
+    ],
+    "Icon": "https://www.dges.gov.pt/simges/public/storage/files/instituicoes_uo/49_logotipo.jpg"
   },
   {
     "Estabelecimento": "Instituto Superior de Estudos Interculturais e Transdisciplinares de Viseu",
@@ -1202,7 +1267,8 @@
     "Cursos": [
       "Psicologia",
       "Relações Internacionais"
-    ]
+    ],
+    "Icon": "https://www.dges.gov.pt/simges/public/storage/files/instituicoes_uo/49_logotipo.jpg"
   },
   {
     "Estabelecimento": "Instituto Superior de Gestão",
@@ -1211,7 +1277,8 @@
       "Gestão",
       "Gestão de Recursos Humanos",
       "Gestão do Turismo"
-    ]
+    ],
+    "Icon": "https://media.licdn.com/dms/image/v2/C560BAQGsWBEtP-Vjsw/company-logo_200_200/company-logo_200_200/0/1631349445059?e=2147483647&v=beta&t=mozPjgWbe7bb50yVjY36mh60U2_jiUwFs2WwO-T8dxU"
   },
   {
     "Estabelecimento": "Instituto Superior de Serviço Social do Porto",
@@ -1219,7 +1286,8 @@
     "Cursos": [
       "Gerontologia",
       "Serviço Social"
-    ]
+    ],
+    "Icon": "https://media.licdn.com/dms/image/v2/C4E0BAQH9QO-g2RaWtg/company-logo_200_200/company-logo_200_200/0/1631378440586?e=2147483647&v=beta&t=4mQtKDxFIxl8XOcJA389tNlJAKanG-RVFGCZCy0pOEY"
   },
   {
     "Estabelecimento": "Instituto Superior de Tecnologias Avançadas de Lisboa",
@@ -1228,7 +1296,8 @@
       "Engenharia Informática",
       "Engenharia Multimédia",
       "Engenharia de Redes e Segurança Informática"
-    ]
+    ],
+    "Icon": "https://media.licdn.com/dms/image/v2/C4E0BAQEORmawyTodjw/company-logo_200_200/company-logo_200_200/0/1631379770594/istec_logo?e=2147483647&v=beta&t=XnIeIXdD0ANeIgQXrfS2maV2SpGj4--ib9jjncPJUws"
   },
   {
     "Estabelecimento": "Instituto Superior de Tecnologias Avançadas do Porto",
@@ -1236,7 +1305,8 @@
     "Cursos": [
       "Engenharia Informática",
       "Engenharia Multimédia"
-    ]
+    ],
+    "Icon": "https://media.licdn.com/dms/image/v2/C4E0BAQEORmawyTodjw/company-logo_200_200/company-logo_200_200/0/1631379770594/istec_logo?e=2147483647&v=beta&t=XnIeIXdD0ANeIgQXrfS2maV2SpGj4--ib9jjncPJUws"
   },
   {
     "Estabelecimento": "Instituto Universitário Egas Moniz",
@@ -1250,7 +1320,8 @@
       "Medicina Dentária",
       "Medicina Veterinária",
       "Psicologia"
-    ]
+    ],
+    "Icon": "https://media.licdn.com/dms/image/v2/C4D0BAQG3M2jbpqx13g/company-logo_200_200/company-logo_200_200/0/1632405025107?e=2147483647&v=beta&t=Ci8gP4SC85Ba0_MRVm5xfbTpYXNrbBY4BqstZpPboZ0"
   },
   {
     "Estabelecimento": "Instituto Universitário de Ciências da Saúde - CESPU",
@@ -1264,7 +1335,8 @@
       "Medicina Veterinária",
       "Psicologia",
       "Saúde Pública"
-    ]
+    ],
+    "Icon": "https://media.licdn.com/dms/image/v2/C560BAQHufMlGBkDFgA/company-logo_200_200/company-logo_200_200/0/1677607110137/iucsc_logo?e=2147483647&v=beta&t=i8M0-jryf-uKJu3ewYEd2Q04PhwjnBJReFOieVMBzf0"
   },
   {
     "Estabelecimento": "Universidade Aberta",
@@ -1282,7 +1354,8 @@
       "Línguas Aplicadas",
       "Matemática Aplicada à Gestão",
       "Matemática e Aplicações"
-    ]
+    ],
+    "Icon": "https://media.licdn.com/dms/image/v2/C4D0BAQG_VetjAjrS1g/company-logo_200_200/company-logo_200_200/0/1630548226549/universidade_aberta_logo?e=2147483647&v=beta&t=rZpxYGQxtSrlg-mOs3_hpGmZWV6ymN6je7zk1SBkNxY"
   },
   {
     "Estabelecimento": "Universidade Autónoma de Lisboa Luís de Camões",
@@ -1300,7 +1373,8 @@
       "Informática de Gestão",
       "Psicologia",
       "Relações Internacionais"
-    ]
+    ],
+    "Icon": "https://media.licdn.com/dms/image/v2/C510BAQGcE9tubXFqyA/company-logo_200_200/company-logo_200_200/0/1630577912178/ual_logo?e=2147483647&v=beta&t=TDGt9LLhyWvAi0zQA3ZclXAFBeGP9jw_Y_-V_xrnfMQ"
   },
   {
     "Estabelecimento": "Universidade Católica Portuguesa",
@@ -1337,7 +1411,8 @@
       "Som e Imagem",
       "Teologia",
       "Turismo"
-    ]
+    ],
+    "Icon": "https://media.licdn.com/dms/image/v2/D4E0BAQET8T4zEpsPAQ/company-logo_200_200/B4EZ0bOQgQJEAI-/0/1774278216385/universidade_catolica_portuguesa_logo?e=2147483647&v=beta&t=arynV2wWJ1eKJlkyN131BqM2wyXPSTUFYByPYjx_cT8"
   },
   {
     "Estabelecimento": "Universidade Europeia",
@@ -1372,7 +1447,8 @@
       "Psicologia (regime de ensino a distância)",
       "Tecnologias Criativas",
       "Turismo"
-    ]
+    ],
+    "Icon": "https://media.licdn.com/dms/image/v2/C4D0BAQETNAOoLb3L-Q/company-logo_200_200/company-logo_200_200/0/1657616783772/universidade_europeia_logo?e=2147483647&v=beta&t=UTrmdyjld2ABpwvA80ZGlnHXkKIk_fvTdjLOWkh8oxU"
   },
   {
     "Estabelecimento": "Universidade Fernando Pessoa",
@@ -1390,7 +1466,8 @@
       "Medicina",
       "Medicina Dentária",
       "Psicologia"
-    ]
+    ],
+    "Icon": "https://media.licdn.com/dms/image/v2/C4D0BAQGIv8acZxjZJA/company-logo_200_200/company-logo_200_200/0/1630466152534/universidade_fernando_pessoa_logo?e=2147483647&v=beta&t=wut4LzQ5NfS8korcZvF_DhbP4RsXY-ixEigJCjzvpeM"
   },
   {
     "Estabelecimento": "Universidade Lusíada",
@@ -1418,7 +1495,8 @@
       "Relações Internacionais",
       "Segurança e Justiça",
       "Serviço Social"
-    ]
+    ],
+    "Icon": "https://media.licdn.com/dms/image/v2/D4D0BAQHP3iVx4RZqlA/company-logo_200_200/B4DZX0CAfgHAAI-/0/1743555922546/universidade_lusiada_logo?e=2147483647&v=beta&t=g90GIeL3l8odtgX-UE2VnjJQM1udGJ0XZ_Ns8HVL7e0"
   },
   {
     "Estabelecimento": "Universidade Lusófona",
@@ -1485,7 +1563,8 @@
       "Turismo e Gestão de Empresas Turísticas",
       "Videojogos",
       "Videojogos e Aplicações Multimédia"
-    ]
+    ],
+    "Icon": "https://media.licdn.com/dms/image/v2/C4E0BAQGGMOeCz-CNUA/company-logo_200_200/company-logo_200_200/0/1631355384324?e=2147483647&v=beta&t=qjK32gi0Ei08GEWyI4AF9_-7ez2n2_k_oObzjtUlUvs"
   },
   {
     "Estabelecimento": "Universidade Nova de Lisboa",
@@ -1535,7 +1614,8 @@
       "Sociologia (regime pós-laboral)",
       "Tecnologia Agro-Industrial",
       "Tradução"
-    ]
+    ],
+    "Icon": "https://media.licdn.com/dms/image/v2/C4D0BAQHyHZBJmvwlsQ/company-logo_200_200/company-logo_200_200/0/1630575474316/universidade_nova_de_lisboa_logo?e=2147483647&v=beta&t=valO0bWU6sblpSeG5RpgfDINuE99hLzVKg7jpY-1bYg"
   },
   {
     "Estabelecimento": "Universidade Portucalense Infante D. Henrique",
@@ -1557,7 +1637,8 @@
       "Sistemas de Informação para Gestão",
       "Solicitadoria",
       "Turismo"
-    ]
+    ],
+    "Icon": "https://media.licdn.com/dms/image/v2/C510BAQFkEVzfddeJ8Q/company-logo_200_200/company-logo_200_200/0/1631357701534?e=2147483647&v=beta&t=aYsZYgZZ8nDTKqPhJu2LSnzaAJZFVM6qdauJJ4XtoBE"
   },
   {
     "Estabelecimento": "Universidade da Beira Interior",
@@ -1599,7 +1680,8 @@
       "Química Industrial",
       "Sociologia",
       "Tecnologia e Produto de Moda Sustentável"
-    ]
+    ],
+    "Icon": "https://media.licdn.com/dms/image/v2/C4D0BAQHH5F7vd-eGFA/company-logo_200_200/company-logo_200_200/0/1631303267225?e=2147483647&v=beta&t=IHDQ2j5jz7UXAkYCLwoU71zVeHhfhpy8RJBYO-nXLnk"
   },
   {
     "Estabelecimento": "Universidade da Madeira",
@@ -1627,7 +1709,8 @@
       "Línguas e Relações Empresariais",
       "Matemática",
       "Psicologia"
-    ]
+    ],
+    "Icon": "https://media.licdn.com/dms/image/v2/C4D0BAQGunI4bjWtnlg/company-logo_200_200/company-logo_200_200/0/1630521529166/umoficial_logo?e=2147483647&v=beta&t=ZT8DB8OaiTl0SgrcxjrqSkjXzrpDomigASgDKkqWiss"
   },
   {
     "Estabelecimento": "Universidade da Maia",
@@ -1647,7 +1730,8 @@
       "Relações Públicas e Gestão da Comunicação",
       "Tecnologias de Comunicação Multimédia",
       "Turismo"
-    ]
+    ],
+    "Icon": "https://media.licdn.com/dms/image/v2/C4D0BAQGunI4bjWtnlg/company-logo_200_200/company-logo_200_200/0/1630521529166/umoficial_logo?e=2147483647&v=beta&t=ZT8DB8OaiTl0SgrcxjrqSkjXzrpDomigASgDKkqWiss"
   },
   {
     "Estabelecimento": "Universidade de Aveiro",
@@ -1710,7 +1794,8 @@
       "Secretariado e Comunicação Empresarial",
       "Terapia da Fala",
       "Tradução"
-    ]
+    ],
+    "Icon": "https://media.licdn.com/dms/image/v2/D4D0BAQHr07yrvZPJgg/company-logo_200_200/company-logo_200_200/0/1705618491107?e=2147483647&v=beta&t=bWgFpWF__jh2HOa3HxninsVv0xU7hEVonrbl_GwJ0zA"
   },
   {
     "Estabelecimento": "Universidade de Coimbra",
@@ -1767,7 +1852,8 @@
       "Serviço Social",
       "Sociologia",
       "Turismo, Território e Patrimónios"
-    ]
+    ],
+    "Icon": "https://media.licdn.com/dms/image/v2/D4E0BAQGmFFAyduXsmQ/company-logo_200_200/B4EZ1mTXpcHsAI-/0/1775537847426/universidade_de_coimbra_logo?e=2147483647&v=beta&t=NN6cIn7qp-DHb2YThCW2e-arCdgvC0KECQOdrH9oFXY"
   },
   {
     "Estabelecimento": "Universidade de Lisboa",
@@ -1876,7 +1962,8 @@
       "Sociologia (regime pós-laboral)",
       "Tecnologias de Informação",
       "Tradução"
-    ]
+    ],
+    "Icon": "https://media.licdn.com/dms/image/v2/C4E0BAQGEzqG4wKW_JQ/company-logo_200_200/company-logo_200_200/0/1653583242711/universidade_de_lisboa_logo?e=2147483647&v=beta&t=nTn13qPLo6ePtaOoKmIY832ldd7DuUxcM6_yzBUygZ0"
   },
   {
     "Estabelecimento": "Universidade de Trás-os-Montes e Alto Douro",
@@ -1920,7 +2007,8 @@
       "Serviço Social",
       "Teatro e Artes Performativas",
       "Turismo"
-    ]
+    ],
+    "Icon": "https://media.licdn.com/dms/image/v2/D4D0BAQG_3YPpvraY-g/company-logo_200_200/company-logo_200_200/0/1729072039986/utad_oficial_logo?e=2147483647&v=beta&t=Uu1tDuyf5GDN2A4Ztrol8NORaVgMWxXp7WQSZHeOzKI"
   },
   {
     "Estabelecimento": "Universidade de Évora",
@@ -1966,7 +2054,8 @@
       "Sociologia",
       "Teatro",
       "Turismo"
-    ]
+    ],
+    "Icon": "https://media.licdn.com/dms/image/v2/C4D0BAQFqmI5cmzExIg/company-logo_200_200/company-logo_200_200/0/1630562430383/universidade_de_evora_logo?e=2147483647&v=beta&t=FyqzKqoKDPgowoJBLfx-atyfgjyw0iqVZT-LETo4YLU"
   },
   {
     "Estabelecimento": "Universidade do Algarve",
@@ -2015,7 +2104,8 @@
       "Sociologia",
       "Terapia da Fala",
       "Turismo"
-    ]
+    ],
+    "Icon": "https://media.licdn.com/dms/image/v2/D4D0BAQEiPtNkds7bkA/company-logo_200_200/company-logo_200_200/0/1714659285434/universidade_do_algarve_logo?e=2147483647&v=beta&t=jh4xtd9FSzAINU9Yq1GCX74jlPnSI1EUIMi3J7J2AOk"
   },
   {
     "Estabelecimento": "Universidade do Minho",
@@ -2082,7 +2172,8 @@
       "Relações Internacionais",
       "Sociologia",
       "Teatro"
-    ]
+    ],
+    "Icon": "https://media.licdn.com/dms/image/v2/D4D0BAQGalY8kOmcLwg/img-crop_100/B4DZYbF2iaG4AM-/0/1744211241889?e=2147483647&v=beta&t=Y5zpxwcx77OXRdZIQzpEhC1cHVnTrQDHPCRKgvgjwr0"
   },
   {
     "Estabelecimento": "Universidade do Porto",
@@ -2146,7 +2237,8 @@
       "Química",
       "Saúde Digital e Inovação Biomédica",
       "Sociologia"
-    ]
+    ],
+    "Icon": "https://media.licdn.com/dms/image/v2/C560BAQFngfafSNA0tQ/company-logo_200_200/company-logo_200_200/0/1641820793542/up_logo?e=2147483647&v=beta&t=7BVJXdAtpZ0W_Sm0oZ5jXCd0f1oCXYP0dHYUs9_XXQo"
   },
   {
     "Estabelecimento": "Universidade dos Açores",
@@ -2173,6 +2265,7 @@
       "Serviço Social",
       "Sociologia",
       "Turismo"
-    ]
+    ],
+    "Icon": "https://media.licdn.com/dms/image/v2/C4E0BAQF6rr5YDv4DGA/company-logo_200_200/company-logo_200_200/0/1630640095353/universidade_dos_a_ores_logo?e=2147483647&v=beta&t=KZG0F_lohJGBPX2EOvgcXKUT3AkNwrKYAsJ1H6Sfmo0"
   }
 ]

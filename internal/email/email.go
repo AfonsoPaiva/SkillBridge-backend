@@ -79,7 +79,7 @@ func SendWelcome(name, email string, frontendURL string) error {
 
 func SendProjectApplication(projectOwnerEmail, projectOwnerName, projectTitle, applicantName string, messagesURL string) error {
 	subject := fmt.Sprintf("Nova candidatura: %s", projectTitle)
-	html := fmt.Sprintf(projectApplicationTemplate, projectOwnerName, applicantName, projectTitle, messagesURL)
+	html := fmt.Sprintf(projectApplicationTemplate, projectOwnerName, applicantName, projectTitle, messagesURL, messagesURL)
 	return send(getEmailFrom(), projectOwnerEmail, subject, html)
 }
 
@@ -121,7 +121,7 @@ func SendProjectMatches(userEmail, userName string, projects []ProjectMatch, pro
 		</tr>`, proj.Title, proj.Description, proj.Skills)
 	}
 
-	html := fmt.Sprintf(projectMatchesTemplate, userName, len(projects), projectsHTML, projectsURL)
+	html := fmt.Sprintf(projectMatchesTemplate, userName, len(projects), projectsHTML, projectsURL, projectsURL)
 	return send(getEmailFrom(), userEmail, subject, html)
 }
 

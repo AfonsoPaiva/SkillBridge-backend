@@ -188,6 +188,7 @@ func Setup(r *gin.Engine) {
 
 		// Avaliações
 		protected.POST("/reviews", handlers.CreateReview)
+		protected.POST("/universities/reviews", handlers.CreateUniversityReview)
 
 		// Upload de imagens — higher body limit for image files (10 MB)
 		protected.POST("/upload/image", middleware.LimitBodySize(middleware.UploadBodyLimit), handlers.UploadImage)
@@ -230,10 +231,12 @@ func Setup(r *gin.Engine) {
 		// Skills (leitura pública)
 		public.GET("/skills", handlers.ListSkills)
 
-		// Universidades/cursos estáticos
+		// Universidades/cursos estáticos e avaliações
 		public.GET("/universities", handlers.ListUniversities)
 		public.GET("/universities/search", handlers.SearchUniversities)
 		public.GET("/universities/courses", handlers.ListCoursesByUniversity)
+		public.GET("/universities/rankings", handlers.GetUniversityRankings)
+		public.GET("/universities/reviews", handlers.GetUniversityReviews)
 
 		// Guest onboarding sessions (anónimo) — write limited + reCAPTCHA (20 req/min)
 		public.POST("/guest/session", middleware.SensitiveWriteRateLimit(), middleware.VerifyRecaptcha(0.3), handlers.CreateGuestSession)
