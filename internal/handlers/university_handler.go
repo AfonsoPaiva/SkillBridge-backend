@@ -189,16 +189,64 @@ func GetUniversityRankings(c *gin.Context) {
 		sort.Slice(result, func(i, j int) bool {
 			return result[i].Estabelecimento < result[j].Estabelecimento
 		})
-	default: // ranking_desc
+	default: // Default: sorted by average rating, total reviews, and university popularity rank in Portugal
 		sort.Slice(result, func(i, j int) bool {
-			if result[i].AverageRating == result[j].AverageRating {
+			if result[i].AverageRating != result[j].AverageRating {
+				return result[i].AverageRating > result[j].AverageRating
+			}
+			if result[i].TotalReviews != result[j].TotalReviews {
 				return result[i].TotalReviews > result[j].TotalReviews
 			}
-			return result[i].AverageRating > result[j].AverageRating
+			rI := getUnivPopularityRank(result[i].Estabelecimento)
+			rJ := getUnivPopularityRank(result[j].Estabelecimento)
+			if rI != rJ {
+				return rI < rJ
+			}
+			return result[i].Estabelecimento < result[j].Estabelecimento
 		})
 	}
 
 	c.JSON(http.StatusOK, result)
+}
+
+var popularUnivOrder = map[string]int{
+	"Universidade de Lisboa":                        1,
+	"Universidade do Porto":                         2,
+	"Universidade de Coimbra":                       3,
+	"Universidade Nova de Lisboa":                   4,
+	"Universidade do Minho":                         5,
+	"Universidade de Aveiro":                        6,
+	"ISCTE - Instituto Universitário de Lisboa":     7,
+	"Universidade Católica Portuguesa":              8,
+	"Universidade Politécnica de Lisboa":            9,
+	"Universidade Politécnica de Coimbra":           10,
+	"Instituto Politécnico de Leiria":               11,
+	"Universidade da Beira Interior":                12,
+	"Universidade do Algarve":                       13,
+	"Universidade de Trás-os-Montes e Alto Douro":   14,
+	"Universidade de Évora":                         15,
+	"Universidade Lusófona":                         16,
+	"Universidade Europeia":                         17,
+	"Universidade Politécnica de Setúbal":           18,
+	"Universidade Politécnica de Viana do Castelo":   19,
+	"Universidade Politécnica de Viseu":             20,
+	"Universidade Politécnica de Bragança":          21,
+	"Universidade Politécnica do Cávado e do Ave":   22,
+	"Universidade da Madeira":                       23,
+	"Universidade dos Açores":                       24,
+	"Universidade Autónoma de Lisboa Luís de Camões": 25,
+	"Universidade Lusíada":                          26,
+	"Universidade Fernando Pessoa":                  27,
+	"Universidade Portucalense Infante D. Henrique": 28,
+	"Universidade da Maia":                          29,
+	"Universidade Aberta":                           30,
+}
+
+func getUnivPopularityRank(name string) int {
+	if rank, ok := popularUnivOrder[name]; ok {
+		return rank
+	}
+	return 999
 }
 
 // GetUniversityReviews retrieves student evaluations for a university.
@@ -350,6 +398,37 @@ func CreateUniversityReview(c *gin.Context) {
 
 	totalSum := u1 + u2 + u3 + u4 + u5 + u6 + u7 + c1 + c2 + c3 + c4 + c5 + c6 + c7
 	overall := math.Round((totalSum/14.0)*10) / 10
+
+	var existing models.UniversityReview
+	if err := database.DB.Where("user_id = ? AND university_name = ?", currentUser.ID, input.UniversityName).First(&existing).Error; err == nil {
+		// Update existing review (enforce maximum 1 review per university per user)
+		existing.CourseName = input.CourseName
+		existing.IsAnonymous = input.IsAnonymous
+		existing.Comment = strings.TrimSpace(input.Comment)
+		existing.CampusQuality = u1
+		existing.LocationAccessibility = u2
+		existing.CostOfLiving = u3
+		existing.SocialEnvironment = u4
+		existing.Reputation = u5
+		existing.LibrariesQuality = u6
+		existing.FoodServices = u7
+		existing.TeachersQuality = c1
+		existing.SubjectInterest = c2
+		existing.CourseFacilities = c3
+		existing.ClassmatesEnvironment = c4
+		existing.WorkloadBalance = c5
+		existing.PracticalOpportunities = c6
+		existing.FutureProspects = c7
+		existing.OverallScore = overall
+
+		if err := database.DB.Save(&existing).Error; err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "Erro ao atualizar a avaliação na base de dados."})
+			return
+		}
+
+		c.JSON(http.StatusOK, existing)
+		return
+	}
 
 	review := models.UniversityReview{
 		UserID:                 currentUser.ID,

@@ -111,6 +111,7 @@ type User struct {
 	Course                 string       `json:"course"`
 	LicenciaturaUniversity string       `json:"licenciatura_university"`
 	LicenciaturaCourse     string       `json:"licenciatura_course"`
+	UniversityLastChangedAt *time.Time  `json:"university_last_changed_at,omitempty"`
 	Year                   string       `gorm:"type:varchar(50)" json:"year"`
 	Bio           string       `json:"bio"`
 	AvatarURL     string       `json:"avatar_url"`

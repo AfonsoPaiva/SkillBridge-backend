@@ -3,6 +3,7 @@ package handlers
 import (
 	"fmt"
 	"log"
+	"math"
 	"net/http"
 	"strings"
 	"time"
@@ -286,6 +287,31 @@ func UpdateProfile(c *gin.Context) {
 	if input.Name != "" {
 		user.Name = input.Name
 	}
+
+	// Check if university or licenciatura_university is changing from a previously set value
+	univChanged := (input.University != user.University)
+	licUnivChanged := (input.LicenciaturaUniversity != user.LicenciaturaUniversity)
+
+	if (univChanged && user.University != "") || (licUnivChanged && user.LicenciaturaUniversity != "") {
+		if user.UniversityLastChangedAt != nil {
+			nextAllowed := user.UniversityLastChangedAt.Add(7 * 24 * time.Hour)
+			if time.Now().Before(nextAllowed) {
+				remaining := time.Until(nextAllowed)
+				days := int(math.Ceil(remaining.Hours() / 24))
+				daysStr := "dias"
+				if days == 1 {
+					daysStr = "dia"
+				}
+				c.JSON(http.StatusBadRequest, gin.H{
+					"error": fmt.Sprintf("Apenas podes alterar a tua universidade uma vez por semana. Próxima alteração disponível em %d %s.", days, daysStr),
+				})
+				return
+			}
+		}
+		now := time.Now()
+		user.UniversityLastChangedAt = &now
+	}
+
 	user.University = input.University
 	user.Course = input.Course
 	user.LicenciaturaUniversity = input.LicenciaturaUniversity
