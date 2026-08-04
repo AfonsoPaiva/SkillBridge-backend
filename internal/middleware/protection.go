@@ -111,6 +111,13 @@ var suspiciousPatterns = []string{
 // pattern is matched.  POST body inspection is left to the ORM layer.
 func SQLInjectionProtection() gin.HandlerFunc {
 	return func(c *gin.Context) {
+		// Skip SQL injection checks on the image proxy route since image URLs can contain
+		// arbitrary base64 strings, hashes, and CDN tokens (e.g. double-dashes '--' or '0x').
+		if strings.HasPrefix(c.Request.URL.Path, "/api/proxy/image") {
+			c.Next()
+			return
+		}
+
 		// Check URL path
 		pathLower := strings.ToLower(c.Request.URL.RawPath)
 		if pathLower == "" {
