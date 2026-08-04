@@ -60,7 +60,19 @@ func ProxyImage(c *gin.Context) {
 
 	// ── Fetch upstream ───────────────────────────────────────────────────────
 	client := &http.Client{Timeout: 8 * time.Second}
-	resp, err := client.Get(imageURL) //nolint:gosec // URL is allowlisted by design (logo proxying)
+	req, err := http.NewRequest(http.MethodGet, imageURL, nil) //nolint:gosec
+	if err != nil {
+		c.JSON(http.StatusBadGateway, gin.H{"error": "Failed to build request"})
+		return
+	}
+	// Mimic a real browser so CDNs (e.g. LinkedIn) don't block the request.
+	req.Header.Set("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36")
+	req.Header.Set("Accept", "image/avif,image/webp,image/apng,image/*,*/*;q=0.8")
+	req.Header.Set("Accept-Language", "pt-PT,pt;q=0.9,en;q=0.8")
+	if strings.Contains(imageURL, "linkedin.com") {
+		req.Header.Set("Referer", "https://www.linkedin.com/")
+	}
+	resp, err := client.Do(req)
 	if err != nil {
 		c.JSON(http.StatusBadGateway, gin.H{"error": "Failed to fetch image"})
 		return
