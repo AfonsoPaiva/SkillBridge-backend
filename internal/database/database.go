@@ -81,6 +81,10 @@ func Connect() {
 	alterIfMissing("users", "totp_verified_at", "TIMESTAMP")
 	// Email verification status (OAuth accounts are auto-verified)
 	alterIfMissing("users", "email_verified", "BOOL NOT NULL DEFAULT FALSE")
+	// Licenciatura fields & university last changed timestamp
+	alterIfMissing("users", "licenciatura_university", "TEXT DEFAULT ''")
+	alterIfMissing("users", "licenciatura_course", "TEXT DEFAULT ''")
+	alterIfMissing("users", "university_last_changed_at", "TIMESTAMP WITH TIME ZONE")
 	
 	// Recruiter fields that were added recently
 	alterIfMissing("recruiters", "logo_url", "TEXT DEFAULT ''")
