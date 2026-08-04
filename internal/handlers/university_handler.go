@@ -25,8 +25,26 @@ const (
 // urlPattern detects URLs inside comment text (spam vector).
 var urlPattern = regexp.MustCompile(`(?i)(https?://|www\.)\S+`)
 
-// repeatedCharPattern detects sequences of the same character repeated 6+ times (e.g. "aaaaaaa").
-var repeatedCharPattern = regexp.MustCompile(`(.)\1{5,}`)
+// hasRepeatedChars reports whether s contains any single rune repeated 6 or more
+// times consecutively (e.g. "aaaaaaa", "!!!!!!!"). RE2 (Go's regexp engine) does
+// not support backreferences, so we implement this with a simple rune scan.
+func hasRepeatedChars(s string) bool {
+	const threshold = 6
+	var prev rune
+	count := 0
+	for _, r := range s {
+		if r == prev {
+			count++
+			if count >= threshold {
+				return true
+			}
+		} else {
+			prev = r
+			count = 1
+		}
+	}
+	return false
+}
 
 // validateComment checks the comment for length, spam signals, and sanitises whitespace.
 // Returns a non-empty error string when the comment fails validation.
@@ -54,7 +72,7 @@ func validateComment(raw string) (sanitised string, errMsg string) {
 	}
 
 	// Spam: repeated character sequences (e.g. "aaaaaaa", "!!!!!!!").
-	if repeatedCharPattern.MatchString(sanitised) {
+	if hasRepeatedChars(sanitised) {
 		return "", "O comentário contém sequências de caracteres repetidos e foi recusado."
 	}
 
