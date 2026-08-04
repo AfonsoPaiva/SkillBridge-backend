@@ -463,12 +463,17 @@ func CreateUniversityReview(c *gin.Context) {
 
 // DeleteUniversityReview allows a user to delete their own university review.
 func DeleteUniversityReview(c *gin.Context) {
-	val, exists := c.Get("user")
-	if !exists {
+	firebaseUID := c.GetString("firebase_uid")
+	if firebaseUID == "" {
 		c.JSON(http.StatusUnauthorized, gin.H{"error": "Utilizador não autenticado."})
 		return
 	}
-	currentUser := val.(*models.User)
+
+	var currentUser models.User
+	if err := database.DB.Where("firebase_uid = ?", firebaseUID).First(&currentUser).Error; err != nil {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "Utilizador não encontrado no sistema."})
+		return
+	}
 
 	reviewID := c.Param("id")
 	var review models.UniversityReview
